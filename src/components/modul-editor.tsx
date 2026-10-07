@@ -47,8 +47,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { exportModulAjarPdf, unduhPdf, unduhPpt, unduhWord } from "@/lib/exporters";
-import { buatSlides } from "@/lib/modul-ai";
+import { exportModulAjarPdf, unduhPdf, unduhWord } from "@/lib/exporters";
 import { formatTanggal, type Modul } from "@/lib/modul-types";
 import { useServerFn } from "@tanstack/react-start";
 import { editModulAi, generateModulAi, saveModulDraftServerFn, publishModulServerFn } from "@/lib/ai.functions";
@@ -86,7 +85,6 @@ export function ModulEditor({
   const [regenerateOpen, setRegenerateOpen] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [ilustrasiLoading, setIlustrasiLoading] = useState(false);
-  const [pptLoading, setPptLoading] = useState(false);
 
   // Dirty State & Unsaved Changes Management
   const [initialSnapshot, setInitialSnapshot] = useState(() => JSON.stringify(modul));
@@ -608,15 +606,6 @@ export function ModulEditor({
     } finally {
       setReplacingSectionId(null);
     }
-  };
-
-  const generatePpt = () => {
-    setPptLoading(true);
-    setTimeout(() => {
-      onChange({ ...modul, slides: buatSlides(modul) });
-      setPptLoading(false);
-      toast.success("Slide PPT siap ditinjau.");
-    }, 1600);
   };
 
   return (
@@ -1420,83 +1409,11 @@ export function ModulEditor({
 
         {/* TAB 5: PPT OTOMATIS */}
         <TabsContent value="ppt" className="mt-4 grid gap-6">
-          {/* GEN-0: Shared Planning & Approval Layer */}
+          {/* Real OOXML PPTX Planning, Generation & Export Pipeline */}
           <PresentationPlanningPanel
             moduleId={modul.id}
             moduleTitle={modul.judul}
           />
-
-          {/* Quick Slides & Export Tools (Existing Feature Preserved) */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="font-display text-base text-navy">
-                Generator Cepat & Pratinjau Slide Sederhana
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 pt-0">
-              <p className="text-sm text-muted-foreground">
-                Modul → AI membaca struktur → AI menyusun slide → AI menambahkan ilustrasi →
-                pratinjau → unduh PPT.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={generatePpt} disabled={pptLoading}>
-                  {pptLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Presentation className="h-4 w-4" />
-                  )}
-                  {pptLoading ? "AI sedang menyusun slide…" : "Generate PPT dengan Ilustrasi"}
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={modul.slides.length === 0}
-                  onClick={() => unduhPpt(modul)}
-                >
-                  <Download className="h-4 w-4" />
-                  Unduh PPT
-                </Button>
-              </div>
-
-              {modul.slides.length > 0 ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {modul.slides.map((slide, i) => (
-                    <div
-                      key={slide.id}
-                      className="grid gap-2 rounded-xl border bg-card p-4 shadow-sm"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-display text-sm font-semibold text-navy">
-                          {slide.judul}
-                        </p>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          Slide {i + 1}
-                        </span>
-                      </div>
-                      {slide.ilustrasi ? (
-                        <img
-                          src={slide.ilustrasi}
-                          alt=""
-                          className="h-28 w-full rounded-lg border object-cover"
-                        />
-                      ) : null}
-                      <ul className="grid gap-1 text-xs text-muted-foreground">
-                        {slide.bullets.map((b) => (
-                          <li key={b} className="flex gap-2">
-                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-accent" />
-                            <span>{b}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                  Belum ada slide. Jalankan generator untuk membuat pratinjau slide.
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 
