@@ -46,7 +46,9 @@
     "test:ai-recovery-03": "npx tsx tests/ai-recovery/ai-modul-generation-persistence.test.mjs",
     "test:ai-recovery-04": "npx tsx tests/ai-recovery/ai-illustration-pipeline.test.mjs",
     "test:ai-recovery-05": "npx tsx tests/ai-recovery/ai-presentation-pptx-pipeline.test.mjs",
-    "test:ai-recovery-06": "npx tsx tests/ai-recovery/ai-e2e-golden-path.test.mjs"
+    "test:ai-recovery-06": "npx tsx tests/ai-recovery/ai-e2e-golden-path.test.mjs",
+    "test:ai-recovery-07": "npx tsx tests/ai-recovery/ai-production-hardening-gate.test.mjs",
+    "test:ai-recovery-all": "npm run test:ai-recovery && npm run test:ai-recovery-02 && npm run test:ai-recovery-03 && npm run test:ai-recovery-04 && npm run test:ai-recovery-05 && npm run test:ai-recovery-06 && npm run test:ai-recovery-07"
   },
   "overrides": {
     "rolldown": "1.2.1"
