@@ -104,6 +104,7 @@ export type IllustrationAsset = z.infer<typeof IllustrationAssetSchema>;
 export const PersistIllustrationAssetInputSchema = z.object({
   generationId: z.string().min(1, "ID generasi wajib diisi."),
   targetSectionId: z.string().trim().optional(),
+  generationSnapshot: z.any().optional(),
 });
 export type PersistIllustrationAssetInput = z.infer<typeof PersistIllustrationAssetInputSchema>;
 

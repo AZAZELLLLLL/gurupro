@@ -106,28 +106,34 @@ export class SupabaseStorageDriver implements IllustrationStorageDriver {
           upsert: true,
         });
 
-      if (error) {
-        throw new Error(error.message);
+      if (!error) {
+        const { data: publicData } = this.supabaseClient.storage
+          .from(this.bucketName)
+          .getPublicUrl(storagePath);
+
+        const publicUrl = publicData?.publicUrl || storagePath;
+
+        return {
+          publicUrl,
+          storagePath,
+          provider: this.providerType,
+          byteSize: bytes.length,
+        };
       }
-
-      const { data: publicData } = this.supabaseClient.storage
-        .from(this.bucketName)
-        .getPublicUrl(storagePath);
-
-      const publicUrl = publicData?.publicUrl || storagePath;
-
-      return {
-        publicUrl,
-        storagePath,
-        provider: this.providerType,
-        byteSize: bytes.length,
-      };
+      console.warn("[SupabaseStorageDriver] Storage upload notice (falling back to data URI):", error.message);
     } catch (err: any) {
-      throw new AiServiceError(
-        AI_ERROR_CODES.STORAGE_ERROR,
-        `Gagal mengunggah asset ke Supabase Storage: ${err.message}`
-      );
+      console.warn("[SupabaseStorageDriver] Storage exception (falling back to data URI):", err.message);
     }
+
+    // Resilient fallback: data URL ensures zero generation loss even without bucket configuration
+    const base64 = Buffer.from(bytes).toString("base64");
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+    return {
+      publicUrl: dataUrl,
+      storagePath,
+      provider: "data_url",
+      byteSize: bytes.length,
+    };
   }
 
   async download(storagePath: string): Promise<Uint8Array> {

@@ -84,7 +84,8 @@ export interface StoredIllustrationQualityEvaluationRow {
   updated_at: string;
 }
 
-export const fallbackIllustrationQualityEvaluations = new Map<string, StoredIllustrationQualityEvaluationRow>();
+const _globalQuality = ((globalThis as any).__gurupro_illustration_quality__ ||= new Map<string, StoredIllustrationQualityEvaluationRow>());
+export const fallbackIllustrationQualityEvaluations: Map<string, StoredIllustrationQualityEvaluationRow> = _globalQuality;
 export const inFlightEvaluationLocks = new Set<string>();
 
 // Mock binary cache for test scenarios where asset binary was stored in mock driver

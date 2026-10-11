@@ -1057,7 +1057,12 @@ export function IllustrationPlanningPanel({
                                     if (generationResult?.generationId) {
                                       const ast = await persistAsset(
                                         generationResult.generationId,
-                                        selectedTargetSection || undefined
+                                        selectedTargetSection || undefined,
+                                        {
+                                          ...generationResult,
+                                          moduleId,
+                                          generationPlanId: plan?.id,
+                                        }
                                       );
                                       if (ast && onSectionUpdated && ast.attachedSectionId) {
                                         onSectionUpdated(ast.attachedSectionId, ast.publicUrl);

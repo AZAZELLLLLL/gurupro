@@ -57,7 +57,8 @@ export interface StoredIllustrationReviewRow {
   updated_at: string;
 }
 
-export const fallbackIllustrationReviews = new Map<string, StoredIllustrationReviewRow>();
+const _globalReviews = ((globalThis as any).__gurupro_illustration_reviews__ ||= new Map<string, StoredIllustrationReviewRow>());
+export const fallbackIllustrationReviews: Map<string, StoredIllustrationReviewRow> = _globalReviews;
 
 function toReview(row: StoredIllustrationReviewRow): IllustrationReview {
   return {

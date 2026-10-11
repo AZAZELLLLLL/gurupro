@@ -71,7 +71,7 @@ export interface UseIllustrationAssetStoreResult {
 
   // Asset Actions (VIS-1C)
   loadAssets: (moduleId: string) => Promise<void>;
-  persistAsset: (generationId: string, targetSectionId?: string) => Promise<IllustrationAsset | null>;
+  persistAsset: (generationId: string, targetSectionId?: string, generationSnapshot?: any) => Promise<IllustrationAsset | null>;
   attachAsset: (assetId: string, moduleId: string, sectionId: string) => Promise<IllustrationAsset | null>;
   detachAsset: (assetId: string, moduleId: string) => Promise<boolean>;
   transitionLifecycle: (
@@ -186,12 +186,12 @@ export function useIllustrationAssetStore(targetModuleId?: string): UseIllustrat
   }, []);
 
   const persistAsset = useCallback(
-    async (generationId: string, targetSectionId?: string) => {
+    async (generationId: string, targetSectionId?: string, generationSnapshot?: any) => {
       setPersisting(true);
       setError(null);
       try {
         const res = await persistIllustrationAssetServerFn({
-          data: { generationId, targetSectionId },
+          data: { generationId, targetSectionId, generationSnapshot },
         });
         const asset = res.asset;
         toast.success("Aset ilustrasi permanen berhasil disimpan.");

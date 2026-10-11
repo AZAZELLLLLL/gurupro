@@ -77,7 +77,8 @@ export interface StoredIllustrationRequestRow {
 }
 
 // In-memory fallback repository for unit tests or environments before migration execution
-export const fallbackIllustrationRequests = new Map<string, StoredIllustrationRequestRow>();
+const _globalRequests = ((globalThis as any).__gurupro_illustration_requests__ ||= new Map<string, StoredIllustrationRequestRow>());
+export const fallbackIllustrationRequests: Map<string, StoredIllustrationRequestRow> = _globalRequests;
 
 export interface StoredIllustrationGenerationRow {
   id: string;
@@ -102,7 +103,8 @@ export interface StoredIllustrationGenerationRow {
   updated_at: string;
 }
 
-export const fallbackIllustrationGenerations = new Map<string, StoredIllustrationGenerationRow>();
+const _globalGenerations = ((globalThis as any).__gurupro_illustration_generations__ ||= new Map<string, StoredIllustrationGenerationRow>());
+export const fallbackIllustrationGenerations: Map<string, StoredIllustrationGenerationRow> = _globalGenerations;
 export const inFlightGenerationLocks = new Map<string, number>();
 
 // Shared fallback plan repository across all server functions and test suites

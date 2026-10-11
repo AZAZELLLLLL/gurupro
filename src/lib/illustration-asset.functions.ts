@@ -66,7 +66,8 @@ export interface StoredIllustrationAssetRow {
   updated_at: string;
 }
 
-export const fallbackIllustrationAssets = new Map<string, StoredIllustrationAssetRow>();
+const _globalAssets = ((globalThis as any).__gurupro_illustration_assets__ ||= new Map<string, StoredIllustrationAssetRow>());
+export const fallbackIllustrationAssets: Map<string, StoredIllustrationAssetRow> = _globalAssets;
 export const fallbackModulesStore = new Map<string, any>();
 
 function toAsset(row: StoredIllustrationAssetRow): IllustrationAsset {
@@ -133,6 +134,33 @@ export async function executePersistIllustrationAsset(
 
   if (!genRow) {
     genRow = fallbackIllustrationGenerations.get(data.generationId) || null;
+  }
+
+  // Resilient rehydration from client generationSnapshot
+  if (!genRow && (data as any).generationSnapshot) {
+    const snap = (data as any).generationSnapshot;
+    if (snap.generationId === data.generationId || snap.id === data.generationId) {
+      genRow = {
+        id: snap.generationId || snap.id,
+        request_id: snap.requestId || `req_ill_${snap.generationId}`,
+        generation_plan_id: snap.generationPlanId || "",
+        module_id: snap.moduleId || "",
+        owner_id: userId,
+        provider: snap.provider || "openai",
+        model: snap.model || "gpt-image-2",
+        status: snap.status || "succeeded",
+        image_data: snap.assetReference || snap.imageData,
+        asset_url: snap.assetReference || snap.assetUrl,
+        mime_type: snap.mimeType || "image/png",
+        width: snap.width || 1024,
+        height: snap.height || 1024,
+        byte_size: snap.byteSize || 1024,
+        retry_count: 0,
+        created_at: snap.createdAt || new Date().toISOString(),
+        updated_at: snap.updatedAt || new Date().toISOString(),
+      };
+      fallbackIllustrationGenerations.set(genRow.id, genRow);
+    }
   }
 
   if (!genRow) {
