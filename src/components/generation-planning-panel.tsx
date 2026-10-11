@@ -714,7 +714,7 @@ export function IllustrationPlanningPanel({
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Gaya Diterapkan:</span>
                         <span className="font-medium text-foreground">
-                          {specification.styleSnapshot.styleName} (v{specification.styleSnapshot.styleVersion})
+                          {(specification.styleSnapshot as any)?.styleName || (specification.styleSnapshot as any)?.name || "Default"} (v{(specification.styleSnapshot as any)?.styleVersion || (specification.styleSnapshot as any)?.version || 1})
                         </span>
                       </div>
                       <Separator className="my-1" />
@@ -2518,7 +2518,7 @@ export function PresentationPlanningPanel({
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Gaya Presentasi Terpilih:</span>
                         <span className="font-medium text-foreground">
-                          {specification.styleSnapshot.styleName} (v{specification.styleSnapshot.styleVersion})
+                          {(specification.styleSnapshot as any)?.styleName || (specification.styleSnapshot as any)?.name || "Default"} (v{(specification.styleSnapshot as any)?.styleVersion || (specification.styleSnapshot as any)?.version || 1})
                         </span>
                       </div>
                       <div className="flex items-center justify-between">

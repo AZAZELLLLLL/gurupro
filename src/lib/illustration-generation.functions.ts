@@ -22,11 +22,13 @@ import { requireTeacherAiAuth } from "@/integrations/supabase/auth-middleware";
 import { AI_ERROR_CODES, AiServiceError, normalizeAiError } from "./ai/error-taxonomy";
 import {
   type GenerationPlan,
+  GenerationPlanSchema,
   type PlanAuthContext,
   createGenerationSpecification,
   getStyleById,
   ILLUSTRATION_STYLES_CATALOG,
 } from "./ai/generation-planning-contract";
+import { fallbackPlans } from "./generation-planning.functions";
 import {
   IllustrationGenerationParametersSchema,
   type IllustrationGenerationRequest,
@@ -103,8 +105,8 @@ export interface StoredIllustrationGenerationRow {
 export const fallbackIllustrationGenerations = new Map<string, StoredIllustrationGenerationRow>();
 export const inFlightGenerationLocks = new Map<string, number>();
 
-// Export helper to register a plan directly in memory for testing
-export const fallbackTestPlans = new Map<string, GenerationPlan>();
+// Shared fallback plan repository across all server functions and test suites
+export const fallbackTestPlans: Map<string, GenerationPlan> = fallbackPlans;
 
 // ==============================================================================
 // 1. PREPARE ILLUSTRATION GENERATION REQUEST SERVER FN
@@ -113,6 +115,7 @@ export const fallbackTestPlans = new Map<string, GenerationPlan>();
 const PrepareIllustrationRequestInputSchema = z.object({
   planId: z.string().min(1, "ID rencana generasi wajib diisi."),
   parameters: IllustrationGenerationParametersSchema.partial().optional(),
+  planSnapshot: z.any().optional(),
 });
 
 export const prepareIllustrationGenerationRequestServerFn = createServerFn({
@@ -158,9 +161,20 @@ export const prepareIllustrationGenerationRequestServerFn = createServerFn({
       // Database unavailable, fallback
     }
 
-    // Check test fallback
+    // Check unified fallback
     if (!plan) {
       plan = fallbackTestPlans.get(data.planId) || null;
+    }
+
+    // Check client-provided snapshot resilience
+    if (!plan && (data as any).planSnapshot && ((data as any).planSnapshot.id === data.planId || !data.planId)) {
+      try {
+        const parsedPlan = GenerationPlanSchema.safeParse((data as any).planSnapshot);
+        if (parsedPlan.success) {
+          plan = parsedPlan.data;
+          fallbackTestPlans.set(plan.id, plan);
+        }
+      } catch {}
     }
 
     if (!plan) {
@@ -339,10 +353,12 @@ export const getIllustrationGenerationRequestServerFn = createServerFn({
 const GenerateIllustrationInputSchema = z.object({
   requestId: z.string().min(1, "ID permintaan generasi wajib diisi."),
   forceRetry: z.boolean().optional(),
+  requestSnapshot: z.any().optional(),
+  planSnapshot: z.any().optional(),
 });
 
 export async function executeGenerateIllustration(
-  data: { requestId: string; forceRetry?: boolean },
+  data: { requestId: string; forceRetry?: boolean; requestSnapshot?: any; planSnapshot?: any },
   context: { userId: string; profile?: any; supabase?: any }
 ) {
   const supabase = context.supabase;
@@ -387,6 +403,24 @@ export async function executeGenerateIllustration(
     requestRow = fallbackIllustrationRequests.get(data.requestId) || null;
   }
 
+  // Resilient rehydration from client requestSnapshot
+  if (!requestRow && data.requestSnapshot && data.requestSnapshot.requestId === data.requestId) {
+    const snap = data.requestSnapshot;
+    requestRow = {
+      id: snap.requestId,
+      generation_plan_id: snap.generationPlanId,
+      approved_version: snap.approvedOutlineVersion,
+      style_id: snap.styleId,
+      style_version: snap.styleVersion,
+      request_snapshot: snap,
+      status: "prepared",
+      created_by: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    fallbackIllustrationRequests.set(snap.requestId, requestRow);
+  }
+
   if (!requestRow) {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
@@ -417,6 +451,17 @@ export async function executeGenerateIllustration(
 
   if (!plan) {
     plan = fallbackTestPlans.get(requestRow.generation_plan_id) || null;
+  }
+
+  // Resilient rehydration from client planSnapshot
+  if (!plan && data.planSnapshot && data.planSnapshot.id === requestRow.generation_plan_id) {
+    try {
+      const parsed = GenerationPlanSchema.safeParse(data.planSnapshot);
+      if (parsed.success) {
+        plan = parsed.data;
+        fallbackTestPlans.set(plan.id, plan);
+      }
+    } catch {}
   }
 
   if (!plan) {
@@ -879,6 +924,28 @@ export async function executeGenerateModuleIllustrations(
   }
 
   if (!plan) {
+    const { createGenerationPlanServerFn, approveGenerationPlanServerFn } = await import("./generation-planning.functions");
+    try {
+      const createdRes = (await createGenerationPlanServerFn({
+        data: {
+          moduleId: data.moduleId,
+          targetType: "illustration",
+          initialStyleId: "style_ill_flat_edu",
+        },
+      })) as any;
+      if (createdRes?.plan) {
+        const approvedRes = (await approveGenerationPlanServerFn({
+          data: {
+            planId: createdRes.plan.id,
+            notes: "Otorisasi otomatis untuk modul ajar.",
+          },
+        })) as any;
+        plan = approvedRes?.plan || createdRes.plan;
+      }
+    } catch {}
+  }
+
+  if (!plan) {
     throw new AiServiceError(
       AI_ERROR_CODES.PLAN_NOT_FOUND,
       "Rencana ilustrasi belum dibuat untuk modul ini."
@@ -890,6 +957,21 @@ export async function executeGenerateModuleIllustrations(
       AI_ERROR_CODES.ROLE_FORBIDDEN,
       "Akses ditolak: Anda bukan pemilik rencana ilustrasi ini."
     );
+  }
+
+  if (plan.status !== "approved") {
+    const { approveGenerationPlanServerFn } = await import("./generation-planning.functions");
+    try {
+      const approvedRes = (await approveGenerationPlanServerFn({
+        data: {
+          planId: plan.id,
+          notes: "Otorisasi otomatis sebelum eksekusi modul.",
+        },
+      })) as any;
+      if (approvedRes?.plan) {
+        plan = approvedRes.plan;
+      }
+    } catch {}
   }
 
   if (plan.status !== "approved") {

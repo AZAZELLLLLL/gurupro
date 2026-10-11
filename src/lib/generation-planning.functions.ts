@@ -122,8 +122,12 @@ function toVersionRow(version: GenerationPlanVersion) {
 }
 
 // In-memory fallback repository for unit tests or environments before migration execution
-const fallbackPlans = new Map<string, GenerationPlan>();
-const fallbackVersions = new Map<string, GenerationPlanVersion[]>();
+// Unified across server modules and Vite HMR via globalThis
+const _globalPlans = ((globalThis as any).__gurupro_generation_plans__ ||= new Map<string, GenerationPlan>());
+const _globalVersions = ((globalThis as any).__gurupro_generation_plan_versions__ ||= new Map<string, GenerationPlanVersion[]>());
+
+export const fallbackPlans: Map<string, GenerationPlan> = _globalPlans;
+export const fallbackVersions: Map<string, GenerationPlanVersion[]> = _globalVersions;
 
 // ==============================================================================
 // 1. CREATE GENERATION PLAN SERVER FN

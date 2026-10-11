@@ -400,6 +400,7 @@ export function useGenerationPlan({
           data: {
             planId: plan.id,
             parameters: overrideParams,
+            planSnapshot: plan,
           },
         })) as any;
         if (res.status === "success" && res.request) {
@@ -437,6 +438,8 @@ export function useGenerationPlan({
           data: {
             requestId: req.requestId,
             forceRetry,
+            requestSnapshot: req,
+            planSnapshot: plan,
           },
         })) as any;
 
@@ -475,6 +478,7 @@ export function useGenerationPlan({
           data: {
             planId: plan.id,
             parameters: overrideParams,
+            planSnapshot: plan,
           },
         })) as any;
         if (res.status === "success" && res.request) {
@@ -513,13 +517,15 @@ export function useGenerationPlan({
 
   const generatePresentationContent = useCallback(
     async (requestId?: string, forceRetry = false) => {
-      let targetRequestId = requestId || preparedPresentationRequest?.requestId;
+      let targetReq = preparedPresentationRequest;
+      let targetRequestId = requestId || targetReq?.requestId;
       if (!targetRequestId) {
         const req = await preparePresentationRequest();
         if (!req) {
           toast.error("Tidak dapat menjalankan generasi konten: Spesifikasi presentasi belum disiapkan.");
           return null;
         }
+        targetReq = req;
         targetRequestId = req.requestId;
       }
 
@@ -530,6 +536,8 @@ export function useGenerationPlan({
           data: {
             requestId: targetRequestId,
             options: { forceFresh: forceRetry },
+            requestSnapshot: targetReq || undefined,
+            planSnapshot: plan,
           },
         })) as any;
 

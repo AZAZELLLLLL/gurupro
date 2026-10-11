@@ -23,6 +23,7 @@ import { requireTeacherAiAuth } from "@/integrations/supabase/auth-middleware";
 import { AI_ERROR_CODES, AiServiceError, normalizeAiError } from "./ai/error-taxonomy";
 import {
   type GenerationPlan,
+  GenerationPlanSchema,
   type PlanAuthContext,
 } from "./ai/generation-planning-contract";
 import {
@@ -114,6 +115,7 @@ export async function executePreparePresentationGenerationRequest(
   data: {
     planId: string;
     parameters?: Partial<PresentationGenerationParameters> | undefined;
+    planSnapshot?: any;
   },
   context: {
     userId: string;
@@ -167,6 +169,17 @@ export async function executePreparePresentationGenerationRequest(
       if (fb) {
         plan = (fb as any).currentPlan || fb;
       }
+    }
+
+    // Check client snapshot rehydration
+    if (!plan && (data as any).planSnapshot && ((data as any).planSnapshot.id === data.planId || !data.planId)) {
+      try {
+        const parsed = GenerationPlanSchema.safeParse((data as any).planSnapshot);
+        if (parsed.success) {
+          plan = parsed.data;
+          fallbackTestPlans.set(plan.id, plan);
+        }
+      } catch {}
     }
 
     if (!plan) {
@@ -415,6 +428,24 @@ export async function executeGeneratePresentationContent(
       requestRow = fallbackPresentationRequests.get(data.requestId) || null;
     }
 
+    // Resilient rehydration from client requestSnapshot
+    if (!requestRow && (data as any).requestSnapshot && (data as any).requestSnapshot.requestId === data.requestId) {
+      const snap = (data as any).requestSnapshot;
+      requestRow = {
+        id: snap.requestId,
+        generation_plan_id: snap.generationPlanId,
+        outline_version: snap.approvedOutlineVersion,
+        style_id: snap.styleId,
+        style_version: snap.styleVersion,
+        request_snapshot: snap,
+        status: "prepared",
+        created_by: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      fallbackPresentationRequests.set(snap.requestId, requestRow);
+    }
+
     if (!requestRow) {
       throw new AiServiceError(
         AI_ERROR_CODES.INVALID_REQUEST,
@@ -449,6 +480,17 @@ export async function executeGeneratePresentationContent(
       if (fb) {
         plan = (fb as any).currentPlan || fb;
       }
+    }
+
+    // Resilient rehydration from client planSnapshot
+    if (!plan && (data as any).planSnapshot && (data as any).planSnapshot.id === request.generationPlanId) {
+      try {
+        const parsed = GenerationPlanSchema.safeParse((data as any).planSnapshot);
+        if (parsed.success) {
+          plan = parsed.data;
+          fallbackTestPlans.set(plan.id, plan);
+        }
+      } catch {}
     }
 
     if (!plan) {
@@ -697,6 +739,7 @@ export const preparePresentationGenerationRequestServerFn = createServerFn({
       .object({
         planId: z.string().min(1, "Plan ID wajib diisi."),
         parameters: PresentationGenerationParametersSchema.partial().optional(),
+        planSnapshot: z.any().optional(),
       })
       .parse(input);
   })
@@ -753,6 +796,8 @@ export const generatePresentationContentServerFn = createServerFn({
       .object({
         requestId: z.string().min(1, "Request ID wajib diisi."),
         options: z.any().optional(),
+        requestSnapshot: z.any().optional(),
+        planSnapshot: z.any().optional(),
       })
       .parse(input);
   })
