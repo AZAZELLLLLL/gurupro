@@ -43,7 +43,8 @@
     "test:product1d": "npx tsx tests/ux/product-student-experience.test.mjs",
     "test:ai-recovery": "npx tsx tests/ai-recovery/ai-baseline-recovery.test.mjs",
     "test:ai-recovery-02": "npx tsx tests/ai-recovery/ai-source-ingestion-grounding.test.mjs",
-    "test:ai-recovery-03": "npx tsx tests/ai-recovery/ai-modul-generation-persistence.test.mjs"
+    "test:ai-recovery-03": "npx tsx tests/ai-recovery/ai-modul-generation-persistence.test.mjs",
+    "test:ai-recovery-04": "npx tsx tests/ai-recovery/ai-illustration-pipeline.test.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"
