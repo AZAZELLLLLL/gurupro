@@ -252,7 +252,7 @@ export function IllustrationPlanningPanel({
   };
 
   const isApproved = plan?.status === "approved";
-  const selectedStyleId = plan?.selectedStyleId || "style_ill_flat_edu";
+  const selectedStyleId = plan?.style?.styleId || (plan as any)?.selectedStyleId || "style_ill_flat_edu";
 
   return (
     <div className="grid gap-6">
@@ -1749,16 +1749,19 @@ export function IllustrationPlanningPanel({
                   <Lock className="mx-auto h-6 w-6 text-muted-foreground/60 mb-2" />
                   <p className="font-medium text-foreground">Otorisasi Generasi Terkunci</p>
                   <p className="mt-1">
-                    Harap setujui rencana pada Langkah 4 terlebih dahulu agar spesifikasi otorisasi generasi dapat diterbitkan.
+                    Rencana ilustrasi perlu disetujui guru agar spesifikasi otorisasi generasi aktif.
                   </p>
-                  <Button
-                    disabled
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 cursor-not-allowed opacity-60 text-xs"
-                  >
-                    Generate Gambar Nyata (Terkunci)
-                  </Button>
+                  <div className="mt-3 flex items-center justify-center gap-2">
+                    <Button
+                      onClick={() => approvePlan()}
+                      disabled={approving || saving}
+                      size="sm"
+                      className="gap-1.5 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {approving ? "Menyetujui..." : "Setujui Rencana & Buka Otorisasi Generasi"}
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -1919,7 +1922,7 @@ export function PresentationPlanningPanel({
   };
 
   const isApproved = plan?.status === "approved";
-  const selectedStyleId = plan?.selectedStyleId || "style_ppt_edu_classroom";
+  const selectedStyleId = plan?.style?.styleId || (plan as any)?.selectedStyleId || "style_ppt_edu_classroom";
 
   const handleAddSlide = () => {
     if (!formOutline) return;
@@ -2501,29 +2504,39 @@ export function PresentationPlanningPanel({
               </div>
             </CardHeader>
             <CardContent className="pt-4 grid gap-4">
-              {isApproved && specification ? (
+              {isApproved ? (
                 <div className="grid gap-4">
                   {/* SPECIFICATION BASE SUMMARY */}
-                  <div className="rounded-xl border p-4 bg-muted/10 grid gap-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-muted-foreground">ID Otorisasi:</span>
-                      <span className="font-mono font-semibold text-foreground">
-                        {specification.authorizationId}
-                      </span>
+                  {specification ? (
+                    <div className="rounded-xl border p-4 bg-muted/10 grid gap-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-muted-foreground">ID Otorisasi:</span>
+                        <span className="font-mono font-semibold text-foreground">
+                          {specification.authorizationId}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Gaya Presentasi Terpilih:</span>
+                        <span className="font-medium text-foreground">
+                          {specification.styleSnapshot.styleName} (v{specification.styleSnapshot.styleVersion})
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Total Slide Disetujui:</span>
+                        <span className="font-medium text-foreground">
+                          {specification.outlineSnapshot.slides?.length || (formOutline?.slides.length ?? 0)} Slide
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Gaya Presentasi Terpilih:</span>
-                      <span className="font-medium text-foreground">
-                        {specification.styleSnapshot.styleName} (v{specification.styleSnapshot.styleVersion})
-                      </span>
+                  ) : (
+                    <div className="rounded-xl border p-3.5 bg-emerald-50/20 border-emerald-500/30 text-xs text-foreground flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <span>Rencana presentasi telah disetujui. Otorisasi generasi aktif dan siap diproses.</span>
+                      </div>
+                      <Badge className="bg-emerald-600 text-white text-[10px]">Otorisasi Valid</Badge>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Total Slide Disetujui:</span>
-                      <span className="font-medium text-foreground">
-                        {specification.outlineSnapshot.slides?.length || formOutline.slides.length} Slide
-                      </span>
-                    </div>
-                  </div>
+                  )}
 
                   {/* PPT-1A PRESENTATION PARAMETERS CONFIGURATION */}
                   <div className="rounded-xl border p-4 bg-background grid gap-3 text-xs">
@@ -3577,16 +3590,19 @@ export function PresentationPlanningPanel({
                   <Lock className="mx-auto h-6 w-6 text-muted-foreground/60 mb-2" />
                   <p className="font-medium text-foreground">Otorisasi Generasi PPT Terkunci</p>
                   <p className="mt-1">
-                    Harap setujui rencana slide pada Langkah 4 terlebih dahulu agar spesifikasi otorisasi dapat diterbitkan.
+                    Rencana slide presentasi perlu disetujui guru agar spesifikasi otorisasi dapat diterbitkan.
                   </p>
-                  <Button
-                    disabled
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 cursor-not-allowed opacity-60 text-xs"
-                  >
-                    Siapkan Spesifikasi PPT (Terkunci)
-                  </Button>
+                  <div className="mt-3 flex items-center justify-center gap-2">
+                    <Button
+                      onClick={() => approvePlan()}
+                      disabled={approving || saving}
+                      size="sm"
+                      className="gap-1.5 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {approving ? "Menyetujui..." : "Setujui Rencana Slide & Buka Otorisasi Generasi"}
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>

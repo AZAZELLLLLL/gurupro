@@ -539,8 +539,42 @@ export function ModulEditor({
   const generateIlustrasi = async () => {
     setIlustrasiLoading(true);
     try {
+      // 1. Ensure plan exists and is approved so teacher is never deadlocked
+      try {
+        const {
+          getGenerationPlanServerFn,
+          createGenerationPlanServerFn,
+          approveGenerationPlanServerFn,
+        } = await import("@/lib/generation-planning.functions");
+
+        const planRes = (await getGenerationPlanServerFn({
+          data: { moduleId: modul.id, targetType: "illustration" },
+        })) as any;
+
+        let currentPlan = planRes?.plan;
+        if (!currentPlan) {
+          const initRes = (await createGenerationPlanServerFn({
+            data: {
+              moduleId: modul.id,
+              targetType: "illustration",
+              initialStyleId: "style_ill_flat_edu",
+            },
+          })) as any;
+          currentPlan = initRes?.plan;
+        }
+
+        if (currentPlan && currentPlan.status !== "approved") {
+          await approveGenerationPlanServerFn({
+            data: { planId: currentPlan.id },
+          });
+        }
+      } catch (prepErr) {
+        console.warn("[generateIlustrasi] Auto-prep plan notice:", prepErr);
+      }
+
+      // 2. Generate genuine AI illustrations (with forceRetry to eliminate old mockups)
       const res = (await generateModuleIllustrationsServerFn({
-        data: { moduleId: modul.id },
+        data: { moduleId: modul.id, forceRetry: true },
       })) as any;
 
       if (res.status === "success") {
@@ -559,9 +593,9 @@ export function ModulEditor({
         });
 
         if (res.failed === 0) {
-          toast.success(`${res.total} / ${res.total} ilustrasi berhasil dibuat.`);
+          toast.success(`${res.total} / ${res.total} ilustrasi nyata AI berhasil dibuat.`);
         } else if (res.succeeded > 0) {
-          toast.warning(`${res.succeeded} / ${res.total} ilustrasi berhasil dibuat (${res.failed} gagal).`);
+          toast.warning(`${res.succeeded} / ${res.total} ilustrasi nyata AI berhasil dibuat (${res.failed} gagal).`);
         } else {
           toast.error("Gagal membuat ilustrasi dari penyedia AI.");
         }
@@ -1364,9 +1398,20 @@ export function ModulEditor({
                         <img
                           src={s.ilustrasi}
                           alt={`Ilustrasi ${s.judul}`}
-                          className="w-full rounded-lg border"
+                          className="w-full rounded-lg border max-h-48 object-cover"
                         />
-                        <p className="truncate text-sm font-medium">{s.judul}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="truncate text-sm font-medium">{s.judul}</p>
+                          {s.ilustrasi.startsWith("data:image/svg+xml") ? (
+                            <Badge variant="outline" className="text-amber-600 border-amber-300 text-[10px] shrink-0">
+                              Mockup Geometris
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-emerald-600 text-white text-[10px] shrink-0">
+                              AI Nyata
+                            </Badge>
+                          )}
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           <Button
                             size="sm"
