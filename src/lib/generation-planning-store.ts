@@ -590,13 +590,19 @@ export function useGenerationPlan({
       try {
         setRenderStage("validating");
         const res = (await renderPresentationPptxServerFn({
-          data: { contentResultId, forceReRender },
+          data: {
+            contentResultId,
+            forceReRender,
+            contentSnapshot: generatedPresentationContent || undefined,
+          },
         })) as any;
 
         if (res.status === "success" && res.artifact) {
           setRenderStage("ready");
           setPresentationArtifact(res.artifact);
           toast.success("File PowerPoint (.pptx) berhasil dibuat!");
+          // Auto evaluate Quality Gate (PPT-1F) so the teacher can download immediately
+          void evaluatePresentationQuality(res.artifact.id);
           return res.artifact;
         } else {
           throw new Error("Gagal membuat file PPTX.");
@@ -683,6 +689,9 @@ export function useGenerationPlan({
         if (res.status === "success" && res.review) {
           setPresentationReview(res.review);
           toast.success("Presentasi berhasil disetujui oleh guru!");
+          if (presentationArtifact?.id) {
+            void evaluatePresentationQuality(presentationArtifact.id, true);
+          }
           return res.review;
         }
       } catch (err: any) {

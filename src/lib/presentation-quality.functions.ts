@@ -88,16 +88,18 @@ export interface StoredPresentationQualityEvaluationRow {
 }
 
 // In-memory fallback repository for unit tests & offline resilience
-export const fallbackPresentationQualityEvaluations = new Map<
+const _globalQuality = ((globalThis as any).__gurupro_presentation_quality__ ||= new Map<string, StoredPresentationQualityEvaluationRow>());
+export const fallbackPresentationQualityEvaluations: Map<
   string,
   StoredPresentationQualityEvaluationRow
->();
+> = _globalQuality;
 
 // In-flight concurrency lock
 export const inFlightQualityEvaluationLocks = new Set<string>();
 
 // Mock binary cache for test scenarios where artifact binary was stored in memory
-export const mockArtifactBinaries = new Map<string, Uint8Array>();
+const _globalMockBinaries = ((globalThis as any).__gurupro_mock_artifact_binaries__ ||= new Map<string, Uint8Array>());
+export const mockArtifactBinaries: Map<string, Uint8Array> = _globalMockBinaries;
 
 function toQualityEvaluation(
   row: StoredPresentationQualityEvaluationRow

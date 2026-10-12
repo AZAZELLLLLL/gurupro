@@ -1902,7 +1902,7 @@ export function PresentationPlanningPanel({
   };
 
   useEffect(() => {
-    if (plan && plan.outline) {
+    if (plan && plan.outline && Array.isArray((plan.outline as any).slides)) {
       setFormOutline(plan.outline as PresentationOutline);
     }
   }, [plan]);
@@ -2058,7 +2058,7 @@ export function PresentationPlanningPanel({
                   </h4>
                 </div>
                 <Badge variant="outline" className="text-xs">
-                  {formOutline.slides.length} Slide Terdaftar
+                  {formOutline?.slides?.length ?? 0} Slide Terdaftar
                 </Badge>
               </div>
             </CardHeader>
@@ -2138,7 +2138,7 @@ export function PresentationPlanningPanel({
               {/* SLIDE LIST THUMBNAILS (NAV) */}
               <div className="md:col-span-4 space-y-2 border-r pr-2 max-h-[500px] overflow-y-auto">
                 <p className="text-xs font-semibold text-muted-foreground mb-2">Daftar Slide</p>
-                {formOutline.slides.map((s, idx) => (
+                {(formOutline?.slides || []).map((s, idx) => (
                   <div
                     key={s.id}
                     onClick={() => setActiveSlideIndex(idx)}
@@ -2165,7 +2165,7 @@ export function PresentationPlanningPanel({
                         <ArrowUp className="h-3 w-3" />
                       </button>
                       <button
-                        disabled={idx === formOutline.slides.length - 1}
+                        disabled={idx === (formOutline?.slides?.length ?? 1) - 1}
                         onClick={() => handleMoveSlide(idx, "down")}
                         className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
                         title="Pindah ke bawah"
@@ -2180,7 +2180,7 @@ export function PresentationPlanningPanel({
                         <Copy className="h-3 w-3" />
                       </button>
                       <button
-                        disabled={formOutline.slides.length <= 1}
+                        disabled={(formOutline?.slides?.length ?? 0) <= 1}
                         onClick={() => handleRemoveSlide(s.id)}
                         className="p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive disabled:opacity-30"
                         title="Hapus slide"
@@ -2199,7 +2199,7 @@ export function PresentationPlanningPanel({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="font-mono text-xs">
-                          Slide {activeSlideIndex + 1} dari {formOutline.slides.length}
+                          Slide {activeSlideIndex + 1} dari {formOutline?.slides?.length || 1}
                         </Badge>
                         <Button
                           variant="ghost"
@@ -2436,7 +2436,7 @@ export function PresentationPlanningPanel({
                   </AlertTitle>
                   <AlertDescription className="text-xs text-emerald-700 mt-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <span>
-                      Rencana slide PPT ({formOutline.slides.length} slide) telah divalidasi. Mengubah urutan slide atau gaya presentasi akan otomatis mencabut persetujuan ini.
+                      Rencana slide PPT ({formOutline?.slides?.length ?? 0} slide) telah divalidasi. Mengubah urutan slide atau gaya presentasi akan otomatis mencabut persetujuan ini.
                     </span>
                     <Button
                       variant="outline"
@@ -2529,7 +2529,7 @@ export function PresentationPlanningPanel({
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Total Slide Disetujui:</span>
                         <span className="font-medium text-foreground">
-                          {specification.outlineSnapshot.slides?.length || (formOutline?.slides.length ?? 0)} Slide
+                          {((specification.approvedOutline as any)?.slides?.length || (specification as any)?.outlineSnapshot?.slides?.length || formOutline?.slides?.length || 0)} Slide
                         </span>
                       </div>
                     </div>
@@ -2657,8 +2657,24 @@ export function PresentationPlanningPanel({
 
                     <div className="flex items-center gap-2">
                       <Button
-                        onClick={() => generatePresentationContent()}
-                        disabled={generatingPresentationContent || !preparedPresentationRequest}
+                        onClick={() => {
+                          if (!preparedPresentationRequest) {
+                            void preparePresentationRequest({
+                              aspectRatio,
+                              contentDensity,
+                              language,
+                              includeSpeakerNotes,
+                              footerPolicy,
+                            }).then((req) => {
+                              if (req) {
+                                void generatePresentationContent(req.requestId);
+                              }
+                            });
+                          } else {
+                            void generatePresentationContent();
+                          }
+                        }}
+                        disabled={generatingPresentationContent || preparingPresentationRequest || !isApproved}
                         variant="default"
                         size="sm"
                         className="text-xs gap-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-sm"
@@ -2828,7 +2844,7 @@ export function PresentationPlanningPanel({
                           Struktur Pedagogis Slide (Inferred):
                         </span>
                         <div className="flex flex-wrap gap-1.5">
-                          {preparedPresentationRequest.blueprint.slides.map((s) => (
+                          {(preparedPresentationRequest?.blueprint?.slides || []).map((s) => (
                             <Badge
                               key={s.slideId}
                               variant="outline"
@@ -2915,7 +2931,7 @@ export function PresentationPlanningPanel({
                         <div>
                           <span className="text-muted-foreground block">Estimasi Durasi:</span>
                           <span className="font-medium text-foreground">
-                            {generatedPresentationContent.estimatedDurationMinutes || (generatedPresentationContent.slides.length * 3)} menit
+                            {generatedPresentationContent.estimatedDurationMinutes || (((generatedPresentationContent?.slides?.length ?? 0)) * 3)} menit
                           </span>
                         </div>
                         <div>
@@ -3120,7 +3136,7 @@ export function PresentationPlanningPanel({
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-xs text-foreground">
-                            Pratinjau Slide ({generatedPresentationContent.slides.length} Slide):
+                            Pratinjau Slide ({generatedPresentationContent?.slides?.length ?? 0} Slide):
                           </span>
                           <span className="text-[11px] text-muted-foreground">
                             Klik slide untuk meninjau detail konten
@@ -3129,7 +3145,7 @@ export function PresentationPlanningPanel({
 
                         {/* HORIZONTAL SLIDE SELECTOR */}
                         <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5">
-                          {generatedPresentationContent.slides.map((sl) => {
+                          {(generatedPresentationContent?.slides || []).map((sl) => {
                             const isSelected = sl.slideOrder === selectedContentSlideOrder;
                             return (
                               <button
@@ -3162,9 +3178,9 @@ export function PresentationPlanningPanel({
 
                         {/* SELECTED SLIDE CONTENT CARD */}
                         {(() => {
-                          const currentSlide = generatedPresentationContent.slides.find(
+                          const currentSlide = generatedPresentationContent?.slides?.find(
                             (s) => s.slideOrder === selectedContentSlideOrder
-                          ) || generatedPresentationContent.slides[0];
+                          ) || generatedPresentationContent?.slides?.[0];
 
                           if (!currentSlide) return null;
 

@@ -112,6 +112,7 @@ export const RenderPresentationPptxInputSchema = z.object({
       customFilename: z.string().optional(),
     })
     .optional(),
+  contentSnapshot: z.any().optional(),
 });
 export type RenderPresentationPptxInput = z.infer<
   typeof RenderPresentationPptxInputSchema

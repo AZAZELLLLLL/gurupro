@@ -104,8 +104,11 @@ export interface StoredPresentationResultRow {
 }
 
 // In-memory fallback repository for unit tests and offline execution
-export const fallbackPresentationRequests = new Map<string, StoredPresentationRequestRow>();
-export const fallbackPresentationResults = new Map<string, StoredPresentationResultRow>();
+const _globalPresentationRequests = ((globalThis as any).__gurupro_presentation_requests__ ||= new Map<string, StoredPresentationRequestRow>());
+export const fallbackPresentationRequests: Map<string, StoredPresentationRequestRow> = _globalPresentationRequests;
+
+const _globalPresentationResults = ((globalThis as any).__gurupro_presentation_results__ ||= new Map<string, StoredPresentationResultRow>());
+export const fallbackPresentationResults: Map<string, StoredPresentationResultRow> = _globalPresentationResults;
 
 // ==============================================================================
 // 1. EXECUTE: PREPARE PRESENTATION GENERATION REQUEST

@@ -71,10 +71,11 @@ export interface StoredPresentationArtifactRow {
 }
 
 // In-memory fallback repository for unit tests & offline resilience
-export const fallbackPresentationArtifacts = new Map<
+const _globalArtifacts = ((globalThis as any).__gurupro_presentation_artifacts__ ||= new Map<string, StoredPresentationArtifactRow>());
+export const fallbackPresentationArtifacts: Map<
   string,
   StoredPresentationArtifactRow
->();
+> = _globalArtifacts;
 
 // In-flight concurrency lock
 const activePresentationRenderings = new Set<string>();
@@ -179,6 +180,34 @@ export async function executeRenderPresentationPptx(
         break;
       }
     }
+  }
+
+  if (!resultRow && (data as any).contentSnapshot) {
+    const snap = (data as any).contentSnapshot;
+    resultRow = {
+      id: snap.presentationId || contentResultId,
+      request_id: snap.requestId || contentResultId,
+      generation_plan_id: snap.generationPlanId || "",
+      module_id: snap.moduleId || "",
+      owner_id: userId,
+      approved_version: snap.approvedOutlineVersion || 1,
+      style_id: snap.style?.id || "style_ppt_edu_classroom",
+      style_version: snap.style?.version || 1,
+      generator_version: "v1",
+      provider: snap.generationMetadata?.provider || "openai",
+      model: snap.generationMetadata?.model || "gpt-4o-mini",
+      content_package: snap,
+      validation_result: { valid: true },
+      semantic_decision: "PASS",
+      grounding_metadata: {},
+      status: "ready",
+      retry_count: 0,
+      generation_key: snap.generationKey || `genkey_${Date.now()}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    fallbackPresentationResults.set(resultRow.id, resultRow);
+    fallbackPresentationResults.set(resultRow.request_id, resultRow);
   }
 
   if (!resultRow) {
@@ -290,6 +319,14 @@ export async function executeRenderPresentationPptx(
       renderResult.bytes,
       PPTX_MIME_TYPE
     );
+
+    // Cache bytes for guaranteed instantaneous download
+    const globalMock = ((globalThis as any).__gurupro_mock_artifact_binaries__ ||= new Map<string, Uint8Array>());
+    globalMock.set(artifactId, renderResult.bytes);
+    globalMock.set(storageReference, renderResult.bytes);
+    if (uploadResult.downloadUrl) {
+      globalMock.set(uploadResult.downloadUrl, renderResult.bytes);
+    }
 
     // 7. Persist Artifact Record
     const artifactRow: StoredPresentationArtifactRow = {

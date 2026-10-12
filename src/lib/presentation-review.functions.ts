@@ -67,7 +67,8 @@ export interface StoredPresentationReviewRow {
 }
 
 // In-memory fallback repository for unit tests and offline resilience
-export const fallbackPresentationReviews = new Map<string, StoredPresentationReviewRow>();
+const _globalReviews = ((globalThis as any).__gurupro_presentation_reviews__ ||= new Map<string, StoredPresentationReviewRow>());
+export const fallbackPresentationReviews: Map<string, StoredPresentationReviewRow> = _globalReviews;
 
 function toReview(row: StoredPresentationReviewRow): PresentationReview {
   return {
