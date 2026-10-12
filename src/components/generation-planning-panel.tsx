@@ -2896,7 +2896,7 @@ export function PresentationPlanningPanel({
                                 PPT-1B Terverifikasi
                               </Badge>
                               <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[10px]">
-                                {generatedPresentationContent.validationMetadata.semanticEvaluation.decision}
+                                {(generatedPresentationContent.validationMetadata as any)?.semanticDecision || (generatedPresentationContent.validationMetadata as any)?.semanticEvaluation?.decision || "PASS"}
                               </Badge>
                             </div>
                             {generatedPresentationContent.subtitle ? (
@@ -2937,25 +2937,25 @@ export function PresentationPlanningPanel({
                         <div>
                           <span className="text-muted-foreground block">Gaya & Kerapatan:</span>
                           <span className="font-medium text-foreground capitalize">
-                            {generatedPresentationContent.style.name} • {generatedPresentationContent.contentDensity}
+                            {(generatedPresentationContent as any).style?.name || (generatedPresentationContent as any).styleName || (generatedPresentationContent as any).styleId || "Standar"} • {generatedPresentationContent.contentDensity || "balanced"}
                           </span>
                         </div>
                         <div>
                           <span className="text-muted-foreground block">AI Generator:</span>
                           <span className="font-medium font-mono text-[10px] text-muted-foreground">
-                            {generatedPresentationContent.generationMetadata.provider} / {generatedPresentationContent.generationMetadata.model}
+                            {generatedPresentationContent.generationMetadata?.provider || "AI"} / {generatedPresentationContent.generationMetadata?.model || "Standard"}
                           </span>
                         </div>
                       </div>
 
                       {/* LEARNING OBJECTIVES BANNER */}
-                      {generatedPresentationContent.primaryLearningObjectives.length > 0 ? (
+                      {((generatedPresentationContent as any).learningObjectives || (generatedPresentationContent as any).primaryLearningObjectives || []).length > 0 ? (
                         <div className="p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200/50 text-[11px]">
                           <span className="font-semibold text-emerald-800 block mb-1">
                             Tujuan Pembelajaran Utama:
                           </span>
                           <ul className="list-disc list-inside space-y-0.5 text-emerald-900">
-                            {generatedPresentationContent.primaryLearningObjectives.map((obj, i) => (
+                            {((generatedPresentationContent as any).learningObjectives || (generatedPresentationContent as any).primaryLearningObjectives || []).map((obj: string, i: number) => (
                               <li key={i}>{obj}</li>
                             ))}
                           </ul>
@@ -3236,13 +3236,13 @@ export function PresentationPlanningPanel({
                               </div>
 
                               {/* KEY POINTS (POIN UTAMA) */}
-                              {currentSlide.keyPoints.length > 0 ? (
+                              {((currentSlide.keyPoints || []).length > 0) ? (
                                 <div className="p-2.5 rounded-lg bg-muted/40 border border-border/40 text-xs">
                                   <span className="font-semibold text-foreground text-[11px] block mb-1">
                                     Poin Inti Slide:
                                   </span>
                                   <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                                    {currentSlide.keyPoints.map((kp, kIdx) => (
+                                    {(currentSlide.keyPoints || []).map((kp, kIdx) => (
                                       <li key={kIdx} className="text-foreground/90">{kp}</li>
                                     ))}
                                   </ul>
@@ -3250,92 +3250,100 @@ export function PresentationPlanningPanel({
                               ) : null}
 
                               {/* STRUCTURED CONTENT BLOCKS */}
-                              <div className="space-y-2">
-                                <span className="font-semibold text-xs text-foreground block">
-                                  Blok Konten Terstruktur ({currentSlide.blocks.length} Blok):
-                                </span>
-                                <div className="grid gap-2.5">
-                                  {currentSlide.blocks.map((block) => (
-                                    <div
-                                      key={block.id}
-                                      className="p-3 rounded-lg border border-border/70 bg-card hover:bg-accent/5 transition-colors space-y-1.5"
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <Badge variant="secondary" className="text-[9px] font-mono uppercase">
-                                          {block.blockType.replace("_", " ")}
-                                        </Badge>
-                                        {block.title ? (
-                                          <span className="font-semibold text-xs text-foreground">
-                                            {block.title}
-                                          </span>
-                                        ) : null}
-                                      </div>
-
-                                      {block.content ? (
-                                        <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
-                                          {block.content}
-                                        </p>
-                                      ) : null}
-
-                                      {block.items && block.items.length > 0 ? (
-                                        <ul className="list-disc list-inside space-y-0.5 text-xs text-foreground/90 pl-1">
-                                          {block.items.map((item, itemIdx) => (
-                                            <li key={itemIdx}>{item}</li>
-                                          ))}
-                                        </ul>
-                                      ) : null}
-
-                                      {/* STAT METRIC RENDERING */}
-                                      {block.blockType === "stat_metric" && block.metadata ? (
-                                        <div className="flex items-center gap-3 pt-1">
-                                          <span className="text-2xl font-black text-indigo-600">
-                                            {block.metadata.value || block.metadata.stat}
-                                          </span>
-                                          <span className="text-xs text-muted-foreground">
-                                            {block.metadata.label || block.metadata.unit}
-                                          </span>
-                                        </div>
-                                      ) : null}
-
-                                      {/* KEY VALUE RENDERING */}
-                                      {block.blockType === "key_value" && block.metadata && block.metadata.pairs ? (
-                                        <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
-                                          {Object.entries(block.metadata.pairs).map(([k, v]) => (
-                                            <div key={k} className="p-1.5 rounded bg-muted/40">
-                                              <span className="font-semibold block text-muted-foreground">{k}:</span>
-                                              <span className="text-foreground">{String(v)}</span>
+                              {(() => {
+                                const slideBlocks: any[] = (currentSlide as any).contentBlocks || (currentSlide as any).blocks || [];
+                                return (
+                                  <div className="space-y-2">
+                                    <span className="font-semibold text-xs text-foreground block">
+                                      Blok Konten Terstruktur ({slideBlocks.length} Blok):
+                                    </span>
+                                    <div className="grid gap-2.5">
+                                      {slideBlocks.map((block: any, bIdx: number) => {
+                                        const blockType = (block.type || block.blockType || "paragraph");
+                                        return (
+                                          <div
+                                            key={block.id || `blk_${bIdx}`}
+                                            className="p-3 rounded-lg border border-border/70 bg-card hover:bg-accent/5 transition-colors space-y-1.5"
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <Badge variant="secondary" className="text-[9px] font-mono uppercase">
+                                                {String(blockType).replace("_", " ")}
+                                              </Badge>
+                                              {block.title ? (
+                                                <span className="font-semibold text-xs text-foreground">
+                                                  {block.title}
+                                                </span>
+                                              ) : null}
                                             </div>
-                                          ))}
-                                        </div>
-                                      ) : null}
 
-                                      {/* TABLE RENDERING */}
-                                      {block.blockType === "table" && block.metadata && block.metadata.headers ? (
-                                        <div className="overflow-x-auto pt-1">
-                                          <table className="w-full text-left text-[11px] border-collapse">
-                                            <thead>
-                                              <tr className="border-b bg-muted/30">
-                                                {block.metadata.headers.map((h: string, hIdx: number) => (
-                                                  <th key={hIdx} className="p-1 font-semibold">{h}</th>
+                                            {block.content ? (
+                                              <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
+                                                {block.content}
+                                              </p>
+                                            ) : null}
+
+                                            {Array.isArray(block.items) && block.items.length > 0 ? (
+                                              <ul className="list-disc list-inside space-y-0.5 text-xs text-foreground/90 pl-1">
+                                                {block.items.map((item: any, itemIdx: number) => (
+                                                  <li key={itemIdx}>{String(item)}</li>
                                                 ))}
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {(block.metadata.rows || []).map((row: any[], rIdx: number) => (
-                                                <tr key={rIdx} className="border-b border-border/40">
-                                                  {row.map((cell, cIdx) => (
-                                                    <td key={cIdx} className="p-1">{String(cell)}</td>
-                                                  ))}
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      ) : null}
+                                              </ul>
+                                            ) : null}
+
+                                            {/* STAT METRIC RENDERING */}
+                                            {blockType === "stat_metric" && block.metadata ? (
+                                              <div className="flex items-center gap-3 pt-1">
+                                                <span className="text-2xl font-black text-indigo-600">
+                                                  {block.metadata.value || block.metadata.stat}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                  {block.metadata.label || block.metadata.unit}
+                                                </span>
+                                              </div>
+                                            ) : null}
+
+                                            {/* KEY VALUE RENDERING */}
+                                            {blockType === "key_value" && block.metadata && block.metadata.pairs ? (
+                                              <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                                                {Object.entries(block.metadata.pairs).map(([k, v]) => (
+                                                  <div key={k} className="p-1.5 rounded bg-muted/40">
+                                                    <span className="font-semibold block text-muted-foreground">{k}:</span>
+                                                    <span className="text-foreground">{String(v)}</span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : null}
+
+                                            {/* TABLE RENDERING */}
+                                            {blockType === "table" && block.metadata && (block.metadata.headers || block.headers) ? (
+                                              <div className="overflow-x-auto pt-1">
+                                                <table className="w-full text-left text-[11px] border-collapse">
+                                                  <thead>
+                                                    <tr className="border-b bg-muted/30">
+                                                      {(block.metadata.headers || block.headers || []).map((h: string, hIdx: number) => (
+                                                        <th key={hIdx} className="p-1 font-semibold">{h}</th>
+                                                      ))}
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {(block.metadata.rows || block.rows || []).map((row: any[], rIdx: number) => (
+                                                      <tr key={rIdx} className="border-b border-border/40">
+                                                        {(Array.isArray(row) ? row : []).map((cell: any, cIdx: number) => (
+                                                          <td key={cIdx} className="p-1">{String(cell)}</td>
+                                                        ))}
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
-                                  ))}
-                                </div>
-                              </div>
+                                  </div>
+                                );
+                              })()}
 
                               {/* VISUAL DIRECTION & SPEAKER NOTES */}
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
@@ -3344,16 +3352,22 @@ export function PresentationPlanningPanel({
                                   <div className="flex items-center gap-1.5 font-semibold text-purple-900">
                                     <Palette className="h-3.5 w-3.5 text-purple-600" />
                                     <span>Arahan Visual Slide:</span>
-                                    <Badge variant="outline" className="ml-auto text-[9px] bg-purple-100/60 text-purple-800 border-purple-300">
-                                      {currentSlide.visualDirection.visualRequirement}
-                                    </Badge>
+                                    {typeof currentSlide.visualDirection === "object" && (currentSlide.visualDirection as any)?.visualRequirement ? (
+                                      <Badge variant="outline" className="ml-auto text-[9px] bg-purple-100/60 text-purple-800 border-purple-300">
+                                        {(currentSlide.visualDirection as any).visualRequirement}
+                                      </Badge>
+                                    ) : null}
                                   </div>
                                   <p className="text-[11px] text-purple-950/90 leading-relaxed">
-                                    {currentSlide.visualDirection.description}
+                                    {typeof currentSlide.visualDirection === "string"
+                                      ? currentSlide.visualDirection
+                                      : (currentSlide.visualDirection as any)?.description || (currentSlide.visualDirection as any)?.visualRequirement || "Arah visual terstruktur"}
                                   </p>
-                                  <div className="pt-1 text-[10px] text-purple-800/80">
-                                    <span>Saran Tata Letak: <strong>{currentSlide.visualDirection.suggestedLayout}</strong></span>
-                                  </div>
+                                  {typeof currentSlide.visualDirection === "object" && (currentSlide.visualDirection as any)?.suggestedLayout ? (
+                                    <div className="pt-1 text-[10px] text-purple-800/80">
+                                      <span>Saran Tata Letak: <strong>{(currentSlide.visualDirection as any).suggestedLayout}</strong></span>
+                                    </div>
+                                  ) : null}
                                 </div>
 
                                 {/* SPEAKER NOTES */}
@@ -3362,31 +3376,41 @@ export function PresentationPlanningPanel({
                                     <MessageSquare className="h-3.5 w-3.5 text-amber-600" />
                                     <span>Catatan Pemateri (Guru):</span>
                                     <span className="ml-auto text-[10px] text-amber-800/80">
-                                      ~{currentSlide.speakerNotes.estimatedDurationSeconds || 90} detik
+                                      ~{typeof currentSlide.speakerNotes === "object" ? (currentSlide.speakerNotes as any)?.estimatedDurationSeconds || 90 : 90} detik
                                     </span>
                                   </div>
-                                  <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-950/90 leading-relaxed">
-                                    {currentSlide.speakerNotes.talkingPoints.map((tp, tpIdx) => (
-                                      <li key={tpIdx}>{tp}</li>
-                                    ))}
-                                  </ul>
+                                  {(() => {
+                                    const notesObj = typeof currentSlide.speakerNotes === "object" ? currentSlide.speakerNotes : null;
+                                    const tPoints: string[] = Array.isArray(notesObj?.talkingPoints)
+                                      ? notesObj.talkingPoints
+                                      : typeof currentSlide.speakerNotes === "string" && currentSlide.speakerNotes.trim()
+                                      ? [currentSlide.speakerNotes.trim()]
+                                      : ["Jelaskan materi slide ini secara interaktif dan berikan kesempatan siswa bertanya."];
+                                    return (
+                                      <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-950/90 leading-relaxed">
+                                        {tPoints.map((tp, tpIdx) => (
+                                          <li key={tpIdx}>{tp}</li>
+                                        ))}
+                                      </ul>
+                                    );
+                                  })()}
                                 </div>
                               </div>
 
                               {/* EVIDENCE REFERENCES */}
-                              {currentSlide.evidenceReferences.length > 0 ? (
+                              {(currentSlide.evidenceReferences || []).length > 0 ? (
                                 <div className="pt-2 border-t border-border/50 text-[11px]">
                                   <span className="text-muted-foreground block mb-1 font-medium">
                                     Referensi Grounding Kurikulum / Modul:
                                   </span>
                                   <div className="flex flex-wrap gap-1.5">
-                                    {currentSlide.evidenceReferences.map((ev, evIdx) => (
+                                    {(currentSlide.evidenceReferences || []).map((ev: any, evIdx: number) => (
                                       <Badge
                                         key={evIdx}
                                         variant="outline"
                                         className="text-[10px] bg-background border-border/80 text-foreground"
                                       >
-                                        🏷️ {ev.source} {ev.field ? `• ${ev.field}` : ""}
+                                        🏷️ {typeof ev === "string" ? ev : `${ev.source || "Materi"} ${ev.field ? `• ${ev.field}` : ""}`}
                                       </Badge>
                                     ))}
                                   </div>

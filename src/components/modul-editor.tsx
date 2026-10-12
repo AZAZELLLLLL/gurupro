@@ -860,8 +860,8 @@ export function ModulEditor({
               <div>
                 <span className="text-muted-foreground block">Mutu AI Asli</span>
                 <span className="font-medium block">
-                  {modul.aiMetadata.originalQualityValidation?.decision ||
-                    modul.aiMetadata.qualityValidation?.decision ||
+                  {modul.aiMetadata?.originalQualityValidation?.decision ||
+                    modul.aiMetadata?.qualityValidation?.decision ||
                     "PASS"}
                 </span>
               </div>
@@ -871,14 +871,14 @@ export function ModulEditor({
               </div>
             </div>
 
-            {modul.aiMetadata.catatanKeterbatasan && (
+            {modul.aiMetadata?.catatanKeterbatasan && (
               <p className="text-muted-foreground text-xs pt-1 border-t">
                 <strong className="text-foreground">Catatan Keterbatasan:</strong>{" "}
                 {modul.aiMetadata.catatanKeterbatasan}
               </p>
             )}
-            {(modul.aiMetadata.originalQualityValidation?.decision === "REVISE" ||
-              modul.aiMetadata.qualityValidation?.decision === "REVISE") && (
+            {(modul.aiMetadata?.originalQualityValidation?.decision === "REVISE" ||
+              modul.aiMetadata?.qualityValidation?.decision === "REVISE") && (
               <p className="text-xs font-medium text-amber-700 dark:text-amber-400 pt-1">
                 Catatan Mutu: Modul ini awalnya ditandai perbaikan (REVISE). Guru disarankan memeriksa kembali butir pembelajaran dan asesmen sebelum publikasi.
               </p>
