@@ -99,6 +99,7 @@ export function assertValidPresentationReviewTransition(
 
 export const StartPresentationReviewInputSchema = z.object({
   contentResultId: z.string().min(1, "ID hasil generasi konten presentasi wajib diisi."),
+  contentSnapshot: z.any().optional(),
 });
 export type StartPresentationReviewInput = z.infer<typeof StartPresentationReviewInputSchema>;
 
@@ -106,6 +107,7 @@ export const ApprovePresentationInputSchema = z.object({
   contentResultId: z.string().min(1, "ID hasil generasi konten presentasi wajib diisi."),
   teacherNotes: z.string().max(3000).nullable().optional(),
   expectedVersion: z.number().int().optional(),
+  contentSnapshot: z.any().optional(),
 });
 export type ApprovePresentationInput = z.infer<typeof ApprovePresentationInputSchema>;
 
@@ -117,12 +119,14 @@ export const RejectPresentationInputSchema = z.object({
     .min(1, "Harap berikan catatan alasan penolakan presentasi untuk panduan perbaikan.")
     .max(3000),
   expectedVersion: z.number().int().optional(),
+  contentSnapshot: z.any().optional(),
 });
 export type RejectPresentationInput = z.infer<typeof RejectPresentationInputSchema>;
 
 export const UpdatePresentationReviewNotesInputSchema = z.object({
   contentResultId: z.string().min(1, "ID hasil generasi konten presentasi wajib diisi."),
   teacherNotes: z.string().max(3000).nullable().optional(),
+  contentSnapshot: z.any().optional(),
 });
 export type UpdatePresentationReviewNotesInput = z.infer<
   typeof UpdatePresentationReviewNotesInputSchema
@@ -130,6 +134,7 @@ export type UpdatePresentationReviewNotesInput = z.infer<
 
 export const GetPresentationReviewInputSchema = z.object({
   contentResultId: z.string().min(1, "ID hasil generasi konten presentasi wajib diisi."),
+  contentSnapshot: z.any().optional(),
 });
 export type GetPresentationReviewInput = z.infer<typeof GetPresentationReviewInputSchema>;
 

@@ -173,13 +173,29 @@ async function resolveResultRow(
       const { data, error } = await supabase
         .from("presentation_generation_results")
         .select("*")
-        .eq("id", contentResultId)
+        .or(`id.eq.${contentResultId},request_id.eq.${contentResultId}`)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (!error && data) return data;
     }
   } catch {}
-  return fallbackPresentationResults.get(contentResultId) || null;
+
+  const direct = fallbackPresentationResults.get(contentResultId);
+  if (direct) return direct;
+
+  for (const r of fallbackPresentationResults.values()) {
+    if (
+      r.id === contentResultId ||
+      r.request_id === contentResultId ||
+      r.content_package?.presentationId === contentResultId ||
+      r.generation_plan_id === contentResultId
+    ) {
+      return r;
+    }
+  }
+  return null;
 }
 
 async function resolveReviewRow(
@@ -191,15 +207,24 @@ async function resolveReviewRow(
       const { data, error } = await supabase
         .from("presentation_reviews")
         .select("*")
-        .eq("content_result_id", contentResultId)
+        .or(`content_result_id.eq.${contentResultId},presentation_id.eq.${contentResultId},generation_plan_id.eq.${contentResultId}`)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (!error && data) return data;
     }
   } catch {}
 
+  const direct = fallbackPresentationReviews.get(contentResultId);
+  if (direct) return direct;
+
   for (const r of fallbackPresentationReviews.values()) {
-    if (r.content_result_id === contentResultId) {
+    if (
+      r.content_result_id === contentResultId ||
+      r.presentation_id === contentResultId ||
+      r.generation_plan_id === contentResultId
+    ) {
       return r;
     }
   }

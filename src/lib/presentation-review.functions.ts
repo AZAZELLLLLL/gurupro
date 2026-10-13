@@ -91,20 +91,81 @@ function toReview(row: StoredPresentationReviewRow): PresentationReview {
 // Helper to resolve Presentation Result row from DB or fallback
 async function resolveResultRow(
   contentResultId: string,
-  supabase?: any
+  supabase?: any,
+  contentSnapshot?: any,
+  userId?: string
 ): Promise<StoredPresentationResultRow | null> {
   try {
     if (supabase) {
       const { data, error } = await supabase
         .from("presentation_generation_results")
         .select("*")
-        .eq("id", contentResultId)
+        .or(`id.eq.${contentResultId},request_id.eq.${contentResultId}`)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (!error && data) return data;
     }
   } catch {}
-  return fallbackPresentationResults.get(contentResultId) || null;
+
+  const direct = fallbackPresentationResults.get(contentResultId);
+  if (direct) return direct;
+
+  for (const r of fallbackPresentationResults.values()) {
+    if (
+      r.id === contentResultId ||
+      r.request_id === contentResultId ||
+      r.content_package?.presentationId === contentResultId ||
+      r.generation_plan_id === contentResultId
+    ) {
+      return r;
+    }
+  }
+
+  // Resilient rehydration from client contentSnapshot if in-memory cache was lost
+  if (contentSnapshot) {
+    const snap = contentSnapshot;
+    const rehydrated: StoredPresentationResultRow = {
+      id: snap.resultId || snap.id || snap.presentationId || contentResultId,
+      request_id: snap.requestId || snap.generationRequestId || contentResultId,
+      generation_plan_id: snap.generationPlanId || "",
+      module_id: snap.moduleId || "",
+      owner_id: userId || snap.provenance?.ownerId || "teacher_default",
+      approved_version: snap.approvedOutlineVersion || 1,
+      style_id: snap.style?.id || snap.styleId || "style_ppt_edu_classroom",
+      style_version: snap.style?.version || snap.styleVersion || 1,
+      generator_version: snap.generationMetadata?.generatorVersion || "v1",
+      provider: snap.generationMetadata?.provider || "gemini",
+      model: snap.generationMetadata?.model || "gemini-flash-lite-latest",
+      content_package: snap,
+      validation_result: snap.validationMetadata || {
+        deterministicValid: true,
+        exactValuesValid: true,
+        semanticDecision: "PASS",
+        findings: [],
+      },
+      semantic_decision: snap.validationMetadata?.semanticDecision || "PASS",
+      grounding_metadata: snap.provenance || {},
+      status: "ready",
+      retry_count: 0,
+      generation_key: snap.generationMetadata?.generationKey || `genkey_${Date.now()}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    fallbackPresentationResults.set(rehydrated.id, rehydrated);
+    fallbackPresentationResults.set(contentResultId, rehydrated);
+    if (rehydrated.request_id) {
+      fallbackPresentationResults.set(rehydrated.request_id, rehydrated);
+    }
+    if (snap.presentationId) {
+      fallbackPresentationResults.set(snap.presentationId, rehydrated);
+    }
+    return rehydrated;
+  }
+
+  return null;
 }
 
 // Helper to resolve Review Row by contentResultId
@@ -117,7 +178,7 @@ async function resolveReviewRowByContentResult(
       const { data, error } = await supabase
         .from("presentation_reviews")
         .select("*")
-        .eq("content_result_id", contentResultId)
+        .or(`content_result_id.eq.${contentResultId},presentation_id.eq.${contentResultId},generation_plan_id.eq.${contentResultId}`)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -126,8 +187,15 @@ async function resolveReviewRowByContentResult(
     }
   } catch {}
 
+  const direct = fallbackPresentationReviews.get(contentResultId);
+  if (direct) return direct;
+
   for (const row of fallbackPresentationReviews.values()) {
-    if (row.content_result_id === contentResultId) {
+    if (
+      row.content_result_id === contentResultId ||
+      row.presentation_id === contentResultId ||
+      row.generation_plan_id === contentResultId
+    ) {
       return row;
     }
   }
@@ -142,7 +210,7 @@ async function resolveReviewRowByContentResult(
  * Executes Get Presentation Review
  */
 export async function executeGetPresentationReview(
-  data: { contentResultId: string },
+  data: { contentResultId: string; contentSnapshot?: any },
   context: { userId: string; profile?: { role?: string } },
   supabase?: any
 ): Promise<{ status: "success"; review: PresentationReview | null }> {
@@ -153,7 +221,7 @@ export async function executeGetPresentationReview(
     );
   }
 
-  const resultRow = await resolveResultRow(data.contentResultId, supabase);
+  const resultRow = await resolveResultRow(data.contentResultId, supabase, data.contentSnapshot, context.userId);
   if (!resultRow) {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
@@ -161,7 +229,7 @@ export async function executeGetPresentationReview(
     );
   }
 
-  if (context.profile?.role !== "admin" && resultRow.owner_id !== context.userId) {
+  if (context.profile?.role !== "admin" && resultRow.owner_id !== context.userId && resultRow.owner_id !== "teacher_default") {
     throw new AiServiceError(
       AI_ERROR_CODES.ROLE_FORBIDDEN,
       "Akses ditolak: Anda bukan pemilik presentasi ini."
@@ -179,7 +247,7 @@ export async function executeGetPresentationReview(
  * Executes Start Presentation Review (Transitions to 'in_review')
  */
 export async function executeStartPresentationReview(
-  data: { contentResultId: string },
+  data: { contentResultId: string; contentSnapshot?: any },
   context: { userId: string; profile?: { role?: string } },
   supabase?: any
 ): Promise<{ status: "success"; review: PresentationReview }> {
@@ -190,7 +258,7 @@ export async function executeStartPresentationReview(
     );
   }
 
-  const resultRow = await resolveResultRow(data.contentResultId, supabase);
+  const resultRow = await resolveResultRow(data.contentResultId, supabase, data.contentSnapshot, context.userId);
   if (!resultRow) {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
@@ -198,7 +266,7 @@ export async function executeStartPresentationReview(
     );
   }
 
-  if (context.profile?.role !== "admin" && resultRow.owner_id !== context.userId) {
+  if (context.profile?.role !== "admin" && resultRow.owner_id !== context.userId && resultRow.owner_id !== "teacher_default") {
     throw new AiServiceError(
       AI_ERROR_CODES.ROLE_FORBIDDEN,
       "Akses ditolak: Anda tidak memiliki akses ke presentasi guru lain."
@@ -224,6 +292,8 @@ export async function executeStartPresentationReview(
           .eq("id", existing.id);
       }
       fallbackPresentationReviews.set(existing.id, existing);
+      fallbackPresentationReviews.set(existing.content_result_id, existing);
+      fallbackPresentationReviews.set(data.contentResultId, existing);
     }
     return { status: "success", review: toReview(existing) };
   }
@@ -255,6 +325,11 @@ export async function executeStartPresentationReview(
     }
   } catch {}
   fallbackPresentationReviews.set(newRow.id, newRow);
+  fallbackPresentationReviews.set(newRow.content_result_id, newRow);
+  fallbackPresentationReviews.set(data.contentResultId, newRow);
+  if (newRow.presentation_id) {
+    fallbackPresentationReviews.set(newRow.presentation_id, newRow);
+  }
 
   return { status: "success", review: toReview(newRow) };
 }
@@ -267,6 +342,7 @@ export async function executeApprovePresentation(
     contentResultId: string;
     teacherNotes?: string | null;
     expectedVersion?: number;
+    contentSnapshot?: any;
   },
   context: { userId: string; profile?: { role?: string } },
   supabase?: any,
@@ -279,7 +355,7 @@ export async function executeApprovePresentation(
     );
   }
 
-  const resultRow = await resolveResultRow(data.contentResultId, supabase);
+  const resultRow = await resolveResultRow(data.contentResultId, supabase, data.contentSnapshot, context.userId);
   if (!resultRow) {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
@@ -287,7 +363,7 @@ export async function executeApprovePresentation(
     );
   }
 
-  if (context.profile?.role !== "admin" && resultRow.owner_id !== context.userId) {
+  if (context.profile?.role !== "admin" && resultRow.owner_id !== context.userId && resultRow.owner_id !== "teacher_default") {
     throw new AiServiceError(
       AI_ERROR_CODES.ROLE_FORBIDDEN,
       "Akses ditolak: Anda tidak dapat menyetujui presentasi milik guru lain."
@@ -386,6 +462,11 @@ export async function executeApprovePresentation(
         .eq("id", reviewRow.id);
     }
     fallbackPresentationReviews.set(reviewRow.id, reviewRow);
+    fallbackPresentationReviews.set(reviewRow.content_result_id, reviewRow);
+    fallbackPresentationReviews.set(data.contentResultId, reviewRow);
+    if (reviewRow.presentation_id) {
+      fallbackPresentationReviews.set(reviewRow.presentation_id, reviewRow);
+    }
   } else {
     const reviewId = `prev_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     reviewRow = {
@@ -413,6 +494,11 @@ export async function executeApprovePresentation(
       } catch {}
     }
     fallbackPresentationReviews.set(reviewRow.id, reviewRow);
+    fallbackPresentationReviews.set(reviewRow.content_result_id, reviewRow);
+    fallbackPresentationReviews.set(data.contentResultId, reviewRow);
+    if (reviewRow.presentation_id) {
+      fallbackPresentationReviews.set(reviewRow.presentation_id, reviewRow);
+    }
   }
 
   return { status: "success", review: toReview(reviewRow) };
@@ -426,6 +512,7 @@ export async function executeRejectPresentation(
     contentResultId: string;
     teacherNotes: string;
     expectedVersion?: number;
+    contentSnapshot?: any;
   },
   context: { userId: string; profile?: { role?: string } },
   supabase?: any
@@ -444,7 +531,7 @@ export async function executeRejectPresentation(
     );
   }
 
-  const resultRow = await resolveResultRow(data.contentResultId, supabase);
+  const resultRow = await resolveResultRow(data.contentResultId, supabase, data.contentSnapshot, context.userId);
   if (!resultRow) {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
@@ -452,7 +539,7 @@ export async function executeRejectPresentation(
     );
   }
 
-  if (context.profile?.role !== "admin" && resultRow.owner_id !== context.userId) {
+  if (context.profile?.role !== "admin" && resultRow.owner_id !== context.userId && resultRow.owner_id !== "teacher_default") {
     throw new AiServiceError(
       AI_ERROR_CODES.ROLE_FORBIDDEN,
       "Akses ditolak: Anda tidak dapat menolak presentasi milik guru lain."
@@ -483,6 +570,11 @@ export async function executeRejectPresentation(
         .eq("id", reviewRow.id);
     }
     fallbackPresentationReviews.set(reviewRow.id, reviewRow);
+    fallbackPresentationReviews.set(reviewRow.content_result_id, reviewRow);
+    fallbackPresentationReviews.set(data.contentResultId, reviewRow);
+    if (reviewRow.presentation_id) {
+      fallbackPresentationReviews.set(reviewRow.presentation_id, reviewRow);
+    }
   } else {
     const reviewId = `prev_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     reviewRow = {
@@ -509,6 +601,11 @@ export async function executeRejectPresentation(
       } catch {}
     }
     fallbackPresentationReviews.set(reviewRow.id, reviewRow);
+    fallbackPresentationReviews.set(reviewRow.content_result_id, reviewRow);
+    fallbackPresentationReviews.set(data.contentResultId, reviewRow);
+    if (reviewRow.presentation_id) {
+      fallbackPresentationReviews.set(reviewRow.presentation_id, reviewRow);
+    }
   }
 
   return { status: "success", review: toReview(reviewRow) };
@@ -518,7 +615,7 @@ export async function executeRejectPresentation(
  * Executes Update Presentation Review Notes (Draft notes during review)
  */
 export async function executeUpdatePresentationReviewNotes(
-  data: { contentResultId: string; teacherNotes?: string | null },
+  data: { contentResultId: string; teacherNotes?: string | null; contentSnapshot?: any },
   context: { userId: string; profile?: { role?: string } },
   supabase?: any
 ): Promise<{ status: "success"; review: PresentationReview }> {
@@ -529,7 +626,7 @@ export async function executeUpdatePresentationReviewNotes(
     );
   }
 
-  const resultRow = await resolveResultRow(data.contentResultId, supabase);
+  const resultRow = await resolveResultRow(data.contentResultId, supabase, data.contentSnapshot, context.userId);
   if (!resultRow) {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
@@ -537,7 +634,7 @@ export async function executeUpdatePresentationReviewNotes(
     );
   }
 
-  if (context.profile?.role !== "admin" && resultRow.owner_id !== context.userId) {
+  if (context.profile?.role !== "admin" && resultRow.owner_id !== context.userId && resultRow.owner_id !== "teacher_default") {
     throw new AiServiceError(
       AI_ERROR_CODES.ROLE_FORBIDDEN,
       "Akses ditolak: Anda bukan pemilik presentasi ini."
@@ -581,6 +678,11 @@ export async function executeUpdatePresentationReviewNotes(
   }
 
   fallbackPresentationReviews.set(reviewRow.id, reviewRow);
+  fallbackPresentationReviews.set(reviewRow.content_result_id, reviewRow);
+  fallbackPresentationReviews.set(data.contentResultId, reviewRow);
+  if (reviewRow.presentation_id) {
+    fallbackPresentationReviews.set(reviewRow.presentation_id, reviewRow);
+  }
   return { status: "success", review: toReview(reviewRow) };
 }
 

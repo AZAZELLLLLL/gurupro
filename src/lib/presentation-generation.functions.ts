@@ -555,7 +555,11 @@ export async function executeGeneratePresentationContent(
     if (existingRowId) {
       return {
         status: "success",
-        result: contentPackage,
+        result: {
+          ...contentPackage,
+          id: existingRowId,
+          resultId: existingRowId,
+        },
         resultId: existingRowId,
       };
     }
@@ -593,10 +597,23 @@ export async function executeGeneratePresentationContent(
     } catch {}
 
     fallbackPresentationResults.set(resultId, storedResultRow);
+    if (contentPackage.presentationId) {
+      fallbackPresentationResults.set(contentPackage.presentationId, storedResultRow);
+    }
+    if (request.requestId) {
+      fallbackPresentationResults.set(request.requestId, storedResultRow);
+    }
+    if (request.generationPlanId) {
+      fallbackPresentationResults.set(request.generationPlanId, storedResultRow);
+    }
 
     return {
       status: "success",
-      result: contentPackage,
+      result: {
+        ...contentPackage,
+        id: resultId,
+        resultId,
+      },
       resultId,
     };
   } catch (err: any) {
@@ -634,7 +651,9 @@ export async function executeGetPresentationGenerationResult(
         const { data: dbRow } = await supabase
           .from("presentation_generation_results")
           .select("*")
-          .eq("id", data.resultId)
+          .or(`id.eq.${data.resultId},request_id.eq.${data.resultId}`)
+          .order("created_at", { ascending: false })
+          .limit(1)
           .maybeSingle();
         if (dbRow) row = dbRow;
       }
@@ -642,6 +661,20 @@ export async function executeGetPresentationGenerationResult(
 
     if (!row) {
       row = fallbackPresentationResults.get(data.resultId) || null;
+    }
+
+    if (!row) {
+      for (const r of fallbackPresentationResults.values()) {
+        if (
+          r.id === data.resultId ||
+          r.request_id === data.resultId ||
+          r.content_package?.presentationId === data.resultId ||
+          r.generation_plan_id === data.resultId
+        ) {
+          row = r;
+          break;
+        }
+      }
     }
 
     if (!row) {
@@ -660,7 +693,11 @@ export async function executeGetPresentationGenerationResult(
 
     return {
       status: "success",
-      result: row.content_package,
+      result: {
+        ...row.content_package,
+        id: row.id,
+        resultId: row.id,
+      },
     };
   } catch (err: any) {
     throw normalizeAiError(err);

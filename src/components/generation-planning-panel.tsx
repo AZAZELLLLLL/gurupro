@@ -1852,7 +1852,10 @@ export function PresentationPlanningPanel({
 
   useEffect(() => {
     if (generatedPresentationContent) {
-      const resultId = (generatedPresentationContent as any).id || generatedPresentationContent.presentationId;
+      const resultId =
+        (generatedPresentationContent as any).resultId ||
+        (generatedPresentationContent as any).id ||
+        generatedPresentationContent.presentationId;
       if (resultId) {
         void loadPresentationReview(resultId);
       }
@@ -2724,7 +2727,11 @@ export function PresentationPlanningPanel({
                             disabled={renderingPptx}
                             onClick={() => {
                               if (generatedPresentationContent) {
-                                void renderPresentationPptx(generatedPresentationContent.presentationId, true);
+                                const targetId =
+                                  (generatedPresentationContent as any).resultId ||
+                                  (generatedPresentationContent as any).id ||
+                                  generatedPresentationContent.presentationId;
+                                void renderPresentationPptx(targetId, true);
                               }
                             }}
                             variant="outline"
@@ -2741,7 +2748,11 @@ export function PresentationPlanningPanel({
                           disabled={!generatedPresentationContent || renderingPptx}
                           onClick={() => {
                             if (generatedPresentationContent) {
-                              void renderPresentationPptx(generatedPresentationContent.presentationId);
+                              const targetId =
+                                (generatedPresentationContent as any).resultId ||
+                                (generatedPresentationContent as any).id ||
+                                generatedPresentationContent.presentationId;
+                              void renderPresentationPptx(targetId);
                             }
                           }}
                           variant="secondary"
@@ -2965,6 +2976,7 @@ export function PresentationPlanningPanel({
                       {/* PPT-1E: TEACHER REVIEW & APPROVAL CARD */}
                       {(() => {
                         const contentResultId =
+                          (generatedPresentationContent as any).resultId ||
                           (generatedPresentationContent as any).id ||
                           generatedPresentationContent.presentationId;
                         const reviewStatus = presentationReview?.reviewStatus || "generated";
@@ -3097,16 +3109,46 @@ export function PresentationPlanningPanel({
                                       </Button>
                                     </>
                                   ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => void startPresentationReview(contentResultId)}
-                                      disabled={reviewingPresentation}
-                                      className="h-8 gap-1.5 text-xs text-muted-foreground"
-                                    >
-                                      <RefreshCw className="h-3.5 w-3.5" />
-                                      Buka Ulang Peninjauan
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                      {renderingPptx ? (
+                                        <Button size="sm" disabled className="h-8 gap-1.5 text-xs bg-indigo-600 text-white">
+                                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                          Sedang Merender PPTX...
+                                        </Button>
+                                      ) : presentationArtifact ? (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => {
+                                            void downloadApprovedPresentationPptx(presentationArtifact.id);
+                                          }}
+                                          disabled={presentationQualityEvaluation?.status !== "passed"}
+                                          className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                                        >
+                                          <Download className="h-3.5 w-3.5" />
+                                          Unduh File PPTX Nyata
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => void renderPresentationPptx(contentResultId)}
+                                          className="h-8 gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                                        >
+                                          <Sparkles className="h-3.5 w-3.5" />
+                                          Render File PPTX Sekarang
+                                        </Button>
+                                      )}
+
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => void startPresentationReview(contentResultId)}
+                                        disabled={reviewingPresentation}
+                                        className="h-8 gap-1.5 text-xs text-muted-foreground"
+                                      >
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                        Buka Ulang Peninjauan
+                                      </Button>
+                                    </div>
                                   )}
                                 </div>
 

@@ -542,9 +542,14 @@ export function useGenerationPlan({
         })) as any;
 
         if (res.status === "success" && res.result) {
-          setGeneratedPresentationContent(res.result);
+          const contentWithId = {
+            ...res.result,
+            id: res.resultId || (res.result as any).id || res.result.presentationId,
+            resultId: res.resultId || (res.result as any).id || res.result.presentationId,
+          };
+          setGeneratedPresentationContent(contentWithId);
           toast.success("Konten presentasi edukatif AI (PPT-1B) berhasil digenerate dan divalidasi!");
-          return res.result as PresentationContentPackage;
+          return contentWithId as PresentationContentPackage;
         }
       } catch (err: any) {
         console.error("[generatePresentationContent] Error:", err);
@@ -566,8 +571,13 @@ export function useGenerationPlan({
           data: { resultId },
         })) as any;
         if (res.status === "success" && res.result) {
-          setGeneratedPresentationContent(res.result);
-          return res.result;
+          const contentWithId = {
+            ...res.result,
+            id: res.resultId || (res.result as any).id || res.result.presentationId,
+            resultId: res.resultId || (res.result as any).id || res.result.presentationId,
+          };
+          setGeneratedPresentationContent(contentWithId);
+          return contentWithId;
         }
       } catch (err: any) {
         console.warn("[loadPresentationContent] Error:", err);
@@ -642,41 +652,53 @@ export function useGenerationPlan({
     setRenderStage("idle");
   }, []);
 
-  const loadPresentationReview = useCallback(async (contentResultId: string) => {
-    try {
-      const res = (await getPresentationReviewServerFn({
-        data: { contentResultId },
-      })) as any;
-      if (res.status === "success" && res.review) {
-        setPresentationReview(res.review);
-        return res.review;
+  const loadPresentationReview = useCallback(
+    async (contentResultId: string) => {
+      try {
+        const res = (await getPresentationReviewServerFn({
+          data: {
+            contentResultId,
+            contentSnapshot: generatedPresentationContent || undefined,
+          },
+        })) as any;
+        if (res.status === "success" && res.review) {
+          setPresentationReview(res.review);
+          return res.review;
+        }
+      } catch (err: any) {
+        console.warn("[loadPresentationReview] Error:", err);
       }
-    } catch (err: any) {
-      console.warn("[loadPresentationReview] Error:", err);
-    }
-    return null;
-  }, []);
+      return null;
+    },
+    [generatedPresentationContent]
+  );
 
-  const startPresentationReview = useCallback(async (contentResultId: string) => {
-    setReviewingPresentation(true);
-    setPresentationReviewError(null);
-    try {
-      const res = (await startPresentationReviewServerFn({
-        data: { contentResultId },
-      })) as any;
-      if (res.status === "success" && res.review) {
-        setPresentationReview(res.review);
-        return res.review;
+  const startPresentationReview = useCallback(
+    async (contentResultId: string) => {
+      setReviewingPresentation(true);
+      setPresentationReviewError(null);
+      try {
+        const res = (await startPresentationReviewServerFn({
+          data: {
+            contentResultId,
+            contentSnapshot: generatedPresentationContent || undefined,
+          },
+        })) as any;
+        if (res.status === "success" && res.review) {
+          setPresentationReview(res.review);
+          return res.review;
+        }
+      } catch (err: any) {
+        const msg = err.message || "Gagal memulai peninjauan presentasi.";
+        setPresentationReviewError(msg);
+        toast.error(msg);
+      } finally {
+        setReviewingPresentation(false);
       }
-    } catch (err: any) {
-      const msg = err.message || "Gagal memulai peninjauan presentasi.";
-      setPresentationReviewError(msg);
-      toast.error(msg);
-    } finally {
-      setReviewingPresentation(false);
-    }
-    return null;
-  }, []);
+      return null;
+    },
+    [generatedPresentationContent]
+  );
 
   const approvePresentation = useCallback(
     async (contentResultId: string, teacherNotes?: string, expectedVersion?: number) => {
@@ -684,12 +706,20 @@ export function useGenerationPlan({
       setPresentationReviewError(null);
       try {
         const res = (await approvePresentationServerFn({
-          data: { contentResultId, teacherNotes, expectedVersion },
+          data: {
+            contentResultId,
+            teacherNotes,
+            expectedVersion,
+            contentSnapshot: generatedPresentationContent || undefined,
+          },
         })) as any;
         if (res.status === "success" && res.review) {
           setPresentationReview(res.review);
           toast.success("Presentasi berhasil disetujui oleh guru!");
-          if (presentationArtifact?.id) {
+          // Trigger PPTX rendering automatically if not yet rendered
+          if (!presentationArtifact?.id) {
+            void renderPresentationPptx(contentResultId);
+          } else {
             void evaluatePresentationQuality(presentationArtifact.id, true);
           }
           return res.review;
@@ -703,7 +733,12 @@ export function useGenerationPlan({
       }
       return null;
     },
-    []
+    [
+      generatedPresentationContent,
+      presentationArtifact?.id,
+      renderPresentationPptx,
+      evaluatePresentationQuality,
+    ]
   );
 
   const rejectPresentation = useCallback(
@@ -712,7 +747,12 @@ export function useGenerationPlan({
       setPresentationReviewError(null);
       try {
         const res = (await rejectPresentationServerFn({
-          data: { contentResultId, teacherNotes, expectedVersion },
+          data: {
+            contentResultId,
+            teacherNotes,
+            expectedVersion,
+            contentSnapshot: generatedPresentationContent || undefined,
+          },
         })) as any;
         if (res.status === "success" && res.review) {
           setPresentationReview(res.review);
@@ -728,14 +768,18 @@ export function useGenerationPlan({
       }
       return null;
     },
-    []
+    [generatedPresentationContent]
   );
 
   const updatePresentationReviewNotes = useCallback(
     async (contentResultId: string, teacherNotes?: string) => {
       try {
         const res = (await updatePresentationReviewNotesServerFn({
-          data: { contentResultId, teacherNotes },
+          data: {
+            contentResultId,
+            teacherNotes,
+            contentSnapshot: generatedPresentationContent || undefined,
+          },
         })) as any;
         if (res.status === "success" && res.review) {
           setPresentationReview(res.review);
@@ -747,7 +791,7 @@ export function useGenerationPlan({
       }
       return null;
     },
-    []
+    [generatedPresentationContent]
   );
 
   const resetPresentationReview = useCallback(() => {
