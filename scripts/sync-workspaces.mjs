@@ -9,6 +9,8 @@ const files = [
   "src/lib/ai/image-validator.ts",
   "src/lib/ai/providers/openai-image-provider.ts",
   "src/lib/ai/providers/gemini-image-provider.ts",
+  "src/lib/ai/providers/pollinations-image-provider.ts",
+  "src/lib/ai/providers/dual-illustration-router.ts",
   "src/lib/ai/providers/illustration-provider-factory.ts",
   "tests/ai/illustration-generation-engine.test.mjs",
   "tests/ai/live-openai-test.mjs",
