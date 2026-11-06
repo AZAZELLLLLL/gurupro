@@ -561,7 +561,7 @@ export function useGenerationPlan({
       }
       return null;
     },
-    [preparedPresentationRequest, preparePresentationRequest]
+    [plan, preparedPresentationRequest, preparePresentationRequest]
   );
 
   const loadPresentationContent = useCallback(
@@ -590,6 +590,89 @@ export function useGenerationPlan({
   const resetPresentationContent = useCallback(() => {
     setGeneratedPresentationContent(null);
     setPresentationGenerationError(null);
+  }, []);
+
+  const loadPresentationQualityEvaluation = useCallback(
+    async (artifactId: string) => {
+      if (!artifactId) return null;
+      try {
+        const res = (await getPresentationQualityEvaluationServerFn({
+          data: { artifactId },
+        })) as any;
+        if (res.status === "success") {
+          setPresentationQualityEvaluation(res.evaluation);
+          return res.evaluation;
+        }
+      } catch (err: any) {
+        console.warn("[loadPresentationQualityEvaluation] Error:", err);
+      }
+      return null;
+    },
+    []
+  );
+
+  const evaluatePresentationQuality = useCallback(
+    async (artifactId: string, forceReevaluate = false) => {
+      if (!artifactId) return null;
+      setEvaluatingPresentationQuality(true);
+      setPresentationQualityError(null);
+      try {
+        const res = (await evaluatePresentationQualityServerFn({
+          data: { artifactId, forceReevaluate },
+        })) as any;
+        if (res.status === "success" && res.evaluation) {
+          setPresentationQualityEvaluation(res.evaluation);
+          if (res.evaluation.status === "passed") {
+            toast.success("Dokumen PPTX lolos validasi mutu (Quality Gate PASS)! Berkas siap diunduh.");
+          } else {
+            toast.error("Validasi mutu mendeteksi kendala pada presentasi. Periksa catatan temuan.");
+          }
+          return res.evaluation;
+        }
+      } catch (err: any) {
+        const msg = err.message || "Gagal menjalankan evaluasi mutu presentasi.";
+        setPresentationQualityError(msg);
+        toast.error(`Quality Gate gagal: ${msg}`);
+      } finally {
+        setEvaluatingPresentationQuality(false);
+      }
+      return null;
+    },
+    []
+  );
+
+  const downloadApprovedPresentationPptx = useCallback(
+    async (artifactId: string) => {
+      if (!artifactId) return null;
+      try {
+        const res = (await downloadPresentationPptxServerFn({
+          data: { artifactId },
+        })) as any;
+        if (res.status === "success") {
+          if (typeof window !== "undefined" && res.downloadUrl) {
+            const a = document.createElement("a");
+            a.href = res.downloadUrl;
+            a.download = res.filename;
+            a.target = "_blank";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          }
+          toast.success("Mengunduh dokumen PowerPoint (.pptx)...");
+          return res;
+        }
+      } catch (err: any) {
+        const msg = err.message || "Gagal mengunduh presentasi.";
+        toast.error(`Unduhan ditolak: ${msg}`);
+      }
+      return null;
+    },
+    []
+  );
+
+  const resetPresentationQualityEvaluation = useCallback(() => {
+    setPresentationQualityEvaluation(null);
+    setPresentationQualityError(null);
   }, []);
 
   const renderPresentationPptx = useCallback(
@@ -627,7 +710,7 @@ export function useGenerationPlan({
         setRenderingPptx(false);
       }
     },
-    []
+    [generatedPresentationContent, evaluatePresentationQuality]
   );
 
   const loadPresentationArtifact = useCallback(async (artifactId: string) => {
@@ -797,89 +880,6 @@ export function useGenerationPlan({
   const resetPresentationReview = useCallback(() => {
     setPresentationReview(null);
     setPresentationReviewError(null);
-  }, []);
-
-  const loadPresentationQualityEvaluation = useCallback(
-    async (artifactId: string) => {
-      if (!artifactId) return null;
-      try {
-        const res = (await getPresentationQualityEvaluationServerFn({
-          data: { artifactId },
-        })) as any;
-        if (res.status === "success") {
-          setPresentationQualityEvaluation(res.evaluation);
-          return res.evaluation;
-        }
-      } catch (err: any) {
-        console.warn("[loadPresentationQualityEvaluation] Error:", err);
-      }
-      return null;
-    },
-    []
-  );
-
-  const evaluatePresentationQuality = useCallback(
-    async (artifactId: string, forceReevaluate = false) => {
-      if (!artifactId) return null;
-      setEvaluatingPresentationQuality(true);
-      setPresentationQualityError(null);
-      try {
-        const res = (await evaluatePresentationQualityServerFn({
-          data: { artifactId, forceReevaluate },
-        })) as any;
-        if (res.status === "success" && res.evaluation) {
-          setPresentationQualityEvaluation(res.evaluation);
-          if (res.evaluation.status === "passed") {
-            toast.success("Dokumen PPTX lolos validasi mutu (Quality Gate PASS)! Berkas siap diunduh.");
-          } else {
-            toast.error("Validasi mutu mendeteksi kendala pada presentasi. Periksa catatan temuan.");
-          }
-          return res.evaluation;
-        }
-      } catch (err: any) {
-        const msg = err.message || "Gagal menjalankan evaluasi mutu presentasi.";
-        setPresentationQualityError(msg);
-        toast.error(`Quality Gate gagal: ${msg}`);
-      } finally {
-        setEvaluatingPresentationQuality(false);
-      }
-      return null;
-    },
-    []
-  );
-
-  const downloadApprovedPresentationPptx = useCallback(
-    async (artifactId: string) => {
-      if (!artifactId) return null;
-      try {
-        const res = (await downloadPresentationPptxServerFn({
-          data: { artifactId },
-        })) as any;
-        if (res.status === "success") {
-          if (typeof window !== "undefined" && res.downloadUrl) {
-            const a = document.createElement("a");
-            a.href = res.downloadUrl;
-            a.download = res.filename;
-            a.target = "_blank";
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-          }
-          toast.success("Mengunduh dokumen PowerPoint (.pptx)...");
-          return res;
-        }
-      } catch (err: any) {
-        const msg = err.message || "Gagal mengunduh presentasi.";
-        toast.error(`Unduhan ditolak: ${msg}`);
-      }
-      return null;
-    },
-    []
-  );
-
-  const resetPresentationQualityEvaluation = useCallback(() => {
-    setPresentationQualityEvaluation(null);
-    setPresentationQualityError(null);
   }, []);
 
   return {
