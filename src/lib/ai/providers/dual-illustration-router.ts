@@ -100,14 +100,14 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
     }
 
     if (!primary) {
-      primary = new PollinationsImageProvider();
+      primary = new PollinationsImageProvider({ geminiApiKey: geminiKey });
     }
 
     this.primaryProvider = primary;
     this.fallbackProvider = fallback || undefined;
     this.communityProvider =
       options?.communityProvider ??
-      (primary instanceof PollinationsImageProvider ? undefined : new PollinationsImageProvider());
+      (primary instanceof PollinationsImageProvider ? undefined : new PollinationsImageProvider({ geminiApiKey: geminiKey }));
   }
 
   async validateRequest(

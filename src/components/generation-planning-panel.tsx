@@ -377,6 +377,62 @@ export function IllustrationPlanningPanel({
               </div>
             </CardHeader>
             <CardContent className="pt-4 grid gap-4">
+              {/* SECTION / BAB SELECTOR FOR PER-SECTION ACCURACY */}
+              {sections && sections.length > 0 && (
+                <div className="rounded-lg border bg-primary/5 p-3 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 text-primary" />
+                      Pilih Bab / Materi Target Ilustrasi:
+                    </Label>
+                    <span className="text-[11px] text-muted-foreground font-medium">
+                      {sections.filter((s) => s.ilustrasi).length} dari {sections.length} bab memiliki gambar
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {sections.map((sec, idx) => {
+                      const isCurrent = selectedTargetSection === sec.id;
+                      const hasImage = Boolean(sec.ilustrasi);
+                      return (
+                        <button
+                          key={sec.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTargetSection(sec.id);
+                            const cleanSub = sec.judul.replace(/^(\d+[\.\)]|\s*Bab\s*\d+:?)\s*/i, "").trim();
+                            const pts = sec.poin && sec.poin.length > 0 ? sec.poin : [`Sub-topik: ${cleanSub}`];
+                            setFormOutline({
+                              ...formOutline,
+                              title: `Ilustrasi: ${sec.judul}`,
+                              mainSubject: cleanSub,
+                              educationalFocus: `Memvisualisasikan konsep ${cleanSub} agar siswa dapat memahami keterkaitan materi secara visual.`,
+                              supportingElements: pts.slice(0, 4),
+                              environmentBackground: `Diagram visual edukatif konseptual dengan latar belakang studio bersih dan kontras tinggi untuk materi ${cleanSub}.`,
+                              sectionId: sec.id,
+                            });
+                            toast.info(`Outline dimuat untuk Bab ${idx + 1}: ${cleanSub}`);
+                          }}
+                          className={`text-xs px-2.5 py-1.5 rounded-md border flex items-center gap-1.5 transition-colors ${
+                            isCurrent
+                              ? "bg-primary text-primary-foreground border-primary font-medium shadow-sm"
+                              : hasImage
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+                              : "bg-background text-foreground border-border hover:bg-muted"
+                          }`}
+                        >
+                          {hasImage ? (
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                          ) : (
+                            <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                          )}
+                          Bab {idx + 1}: {sec.judul.length > 25 ? sec.judul.slice(0, 22) + "..." : sec.judul}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="grid gap-2">
                 <Label htmlFor="ill-title" className="text-xs font-medium">
                   Judul Ilustrasi
@@ -1051,7 +1107,7 @@ export function IllustrationPlanningPanel({
                                     Menghitung checksum SHA-256 dan mengamankan rekaman jejak pedagogis ke database.
                                   </p>
                                 </div>
-                                <Button
+                                 <Button
                                   size="sm"
                                   onClick={async () => {
                                     if (generationResult?.generationId) {
@@ -1076,7 +1132,11 @@ export function IllustrationPlanningPanel({
                                   className="text-xs gap-1.5 shrink-0 bg-primary"
                                 >
                                   <Database className="h-3.5 w-3.5" />
-                                  {persistingAsset ? "Menyimpan Aset..." : "Simpan Aset Permanen (VIS-1C)"}
+                                  {persistingAsset
+                                    ? "Menyimpan Aset..."
+                                    : selectedTargetSection && sections.find((s) => s.id === selectedTargetSection)
+                                    ? `Simpan & Tautkan ke: ${sections.find((s) => s.id === selectedTargetSection)?.judul}`
+                                    : "Simpan Aset Permanen (VIS-1C)"}
                                 </Button>
                               </div>
                             ) : (

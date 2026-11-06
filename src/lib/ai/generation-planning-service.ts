@@ -59,7 +59,7 @@ export function generateInitialIllustrationOutline(
   }
 
   const educationalFocus = `Memvisualisasikan konsep ${mainSubject} agar siswa kelas ${modul.kelas || "terkait"} dapat mengamati keterkaitan komponen materi secara konseptual.`;
-  const environment = `Ruang kelas atau lingkungan kontekstual terapan materi ${mainSubject}, bersih dengan pencahayaan jelas.`;
+  const environment = `Diagram visual edukatif konseptual dengan latar belakang studio bersih dan kontras tinggi untuk materi ${mainSubject}.`;
   const composition = "Komposisi seimbang dengan subjek utama di bagian tengah, elemen pendukung terdistribusi rapi di sisi kiri dan kanan.";
   const perspectiveView = "Tampilan isometrik atau perspektif 3/4 dengan sudut pandang mata normal (*eye-level*).";
 
@@ -72,6 +72,7 @@ export function generateInitialIllustrationOutline(
   const labelsText = supportingElements.slice(0, 3).map((e) => e.slice(0, 30));
 
   const thingsToAvoid = [
+    "Ruang kelas kosong, meja rapat kantor, atau ruangan kosong tanpa objek materi pembelajaran",
     "Teks berjejal atau paragraf panjang di dalam gambar",
     "Visual gelap dengan kontras rendah",
     "Elemen dekoratif membingungkan yang tidak relevan dengan kurikulum",

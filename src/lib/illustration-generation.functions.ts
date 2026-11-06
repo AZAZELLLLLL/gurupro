@@ -1083,6 +1083,13 @@ export async function executeGenerateModuleIllustrations(
       importantVisualDetails: s.isi
         ? [s.isi.slice(0, 100)]
         : [`Visualisasi representatif ${cleanSubtopic}`],
+      environmentBackground: `Diagram visual edukatif konseptual dengan latar belakang studio bersih dan kontras tinggi untuk materi ${cleanSubtopic}.`,
+      thingsToAvoid: [
+        "Ruang kelas kosong, meja rapat kantor, atau ruangan kosong tanpa objek materi pembelajaran",
+        "Teks berjejal atau paragraf panjang di dalam gambar",
+        "Visual gelap dengan kontras rendah",
+        "Elemen dekoratif membingungkan yang tidak relevan dengan kurikulum",
+      ],
       sectionId: s.id,
     };
 
