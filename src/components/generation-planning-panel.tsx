@@ -1721,8 +1721,16 @@ export function IllustrationPlanningPanel({
                             <AlertTitle className="text-xs font-semibold">
                               {generationResult.error?.code || "GENERATION_FAILED"}
                             </AlertTitle>
-                            <AlertDescription className="text-xs mt-1">
-                              {generationResult.error?.message || "Provider tidak dapat menghasilkan gambar untuk permintaan ini."}
+                            <AlertDescription className="text-xs mt-1 space-y-1.5">
+                              <div>{generationResult.error?.message || "Provider tidak dapat menghasilkan gambar untuk permintaan ini."}</div>
+                              {(generationResult.error?.message?.toLowerCase().includes("expired") ||
+                                generationResult.error?.message?.toLowerCase().includes("quota") ||
+                                generationResult.error?.message?.toLowerCase().includes("rate limit")) ? (
+                                <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-[11px] font-sans">
+                                  <span className="font-semibold block">Cara Mengatasi Kendala Kredensial AI:</span>
+                                  <span>Kunci OpenAI saat ini telah kedaluwarsa (expired) atau kuota gratis Gemini gambar bernilai 0. Perbarui nilai <code>OPENAI_API_KEY</code> di file <code>.env</code> dengan kunci OpenAI aktif (memiliki saldo), atau tautkan akun penagihan (billing) pada Google Cloud Console untuk Gemini.</span>
+                                </div>
+                              ) : null}
                             </AlertDescription>
                           </Alert>
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
