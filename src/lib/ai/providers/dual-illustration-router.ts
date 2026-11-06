@@ -75,13 +75,15 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
     let primary: IllustrationGenerationProvider | null = null;
     let fallback: IllustrationGenerationProvider | null = null;
 
-    if (preferredPrimary === "gemini" && geminiKey && geminiKey.trim().length > 0) {
+    if (preferredPrimary === "pollinations") {
+      primary = new PollinationsImageProvider({ geminiApiKey: geminiKey });
+    } else if (preferredPrimary === "gemini" && geminiKey && geminiKey.trim().length > 0) {
       primary = new GeminiImageProvider({ apiKey: geminiKey.trim() });
     } else if (preferredPrimary === "openai" && openAiKey && openAiKey.trim().length > 0) {
       primary = new OpenAiImageProvider({ apiKey: openAiKey.trim() });
     }
 
-    // If preferred primary wasn't available, check the other key
+    // If preferred primary wasn't available, check keys
     if (!primary) {
       if (geminiKey && geminiKey.trim().length > 0) {
         primary = new GeminiImageProvider({ apiKey: geminiKey.trim() });
@@ -90,11 +92,13 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
       }
     }
 
-    // Set fallback if key is available and distinct from primary
+    // Set fallback if distinct from primary
     if (primary) {
       if (primary.providerName === "gemini" && openAiKey && openAiKey.trim().length > 0) {
         fallback = new OpenAiImageProvider({ apiKey: openAiKey.trim() });
       } else if (primary.providerName === "openai" && geminiKey && geminiKey.trim().length > 0) {
+        fallback = new GeminiImageProvider({ apiKey: geminiKey.trim() });
+      } else if (primary.providerName === "pollinations" && geminiKey && geminiKey.trim().length > 0) {
         fallback = new GeminiImageProvider({ apiKey: geminiKey.trim() });
       }
     }
@@ -151,10 +155,12 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
       err.code === AI_ERROR_CODES.GENERATION_FAILED ||
       err.code === AI_ERROR_CODES.PROVIDER_UNAVAILABLE ||
       err.code === AI_ERROR_CODES.AI_TIMEOUT ||
+      err.statusCode === 401 ||
       err.statusCode === 500 ||
       err.statusCode === 502 ||
       err.statusCode === 503 ||
       err.statusCode === 504 ||
+      err.message?.includes("401") ||
       err.message?.includes("500") ||
       err.message?.includes("502") ||
       err.message?.includes("503") ||
@@ -163,7 +169,9 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
       err.message?.toLowerCase().includes("timeout") ||
       err.message?.toLowerCase().includes("network") ||
       err.message?.toLowerCase().includes("econnreset") ||
-      err.message?.toLowerCase().includes("expired");
+      err.message?.toLowerCase().includes("expired") ||
+      err.message?.toLowerCase().includes("unauthorized") ||
+      err.message?.toLowerCase().includes("invalid api key");
 
     return isRateLimit || isUpstreamFailure;
   }

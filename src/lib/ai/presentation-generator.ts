@@ -209,6 +209,9 @@ export function serializeSlideGroundedEvidence(
     if (s.keyPoints && s.keyPoints.length > 0) {
       parts.push(`  Poin Wajib: ${s.keyPoints.join("; ")}`);
     }
+    if ((s as any).contentBlocks && (s as any).contentBlocks.length > 0) {
+      parts.push(`  Uraian Materi Sumber: ${(s as any).contentBlocks.join(" | ")}`);
+    }
     if (s.visualDirection) {
       parts.push(`  Arah Visual: ${s.visualDirection}`);
     }
@@ -542,6 +545,109 @@ async function callAiProvider(
   throw normalizeAiError(lastError);
 }
 
+function normalizePedagogicalType(
+  raw: any,
+  fallback: SlidePedagogicalType = "concept_explanation"
+): SlidePedagogicalType {
+  if (!raw || typeof raw !== "string") return fallback;
+  const lower = raw.toLowerCase().trim().replace(/[\s-]+/g, "_");
+
+  if (
+    lower === "opening" ||
+    lower === "title" ||
+    lower === "cover" ||
+    lower === "intro" ||
+    lower === "introduction"
+  ) {
+    return "introduction";
+  }
+  if (
+    lower.includes("objective") ||
+    lower.includes("tujuan") ||
+    lower.includes("capaian")
+  ) {
+    return "learning_objective";
+  }
+  if (lower.includes("example") || lower.includes("contoh")) {
+    return "example";
+  }
+  if (lower.includes("process") || lower.includes("proses") || lower.includes("alur")) {
+    return "process";
+  }
+  if (
+    lower.includes("application") ||
+    lower.includes("penerapan") ||
+    lower.includes("aplikasi")
+  ) {
+    return "application";
+  }
+  if (lower.includes("case") || lower.includes("kasus")) {
+    return "case_study";
+  }
+  if (
+    lower.includes("compare") ||
+    lower.includes("comparison") ||
+    lower.includes("perbandingan")
+  ) {
+    return "comparison";
+  }
+  if (
+    lower.includes("activity") ||
+    lower.includes("aktivitas") ||
+    lower.includes("kegiatan") ||
+    lower.includes("praktik")
+  ) {
+    return "activity";
+  }
+  if (
+    lower.includes("exercise") ||
+    lower.includes("latihan") ||
+    lower.includes("tugas") ||
+    lower.includes("soal")
+  ) {
+    return "exercise";
+  }
+  if (lower.includes("reflection") || lower.includes("refleksi")) {
+    return "reflection";
+  }
+  if (
+    lower.includes("summary") ||
+    lower.includes("rangkuman") ||
+    lower.includes("kesimpulan") ||
+    lower.includes("penutup")
+  ) {
+    return "summary";
+  }
+  if (
+    lower.includes("concept") ||
+    lower.includes("konsep") ||
+    lower.includes("materi") ||
+    lower.includes("explanation")
+  ) {
+    return "concept_explanation";
+  }
+
+  const validTypes = [
+    "introduction",
+    "learning_objective",
+    "concept_explanation",
+    "example",
+    "process",
+    "application",
+    "case_study",
+    "comparison",
+    "activity",
+    "exercise",
+    "reflection",
+    "summary",
+  ];
+  if (validTypes.includes(lower)) {
+    return lower as SlidePedagogicalType;
+  }
+
+  return fallback;
+}
+
 /**
  * 7. Parses AI model response text into PresentationContentPackage candidate
  */
@@ -580,7 +686,16 @@ function parseAiPresentationResponse(
     const slideId = matchingReqSlide ? matchingReqSlide.id : s.slideId || `slide_${idx + 1}`;
     const order = idx + 1;
     const title = s.title || (matchingReqSlide ? matchingReqSlide.slideTitle : `Slide ${order}`);
-    const pedagogicalType = s.pedagogicalType || (matchingReqSlide ? matchingReqSlide.pedagogicalType : "concept_explanation");
+    const defaultPedType =
+      idx === 0
+        ? "introduction"
+        : idx === rawSlides.length - 1
+        ? "summary"
+        : "concept_explanation";
+    const pedagogicalType = normalizePedagogicalType(
+      s.pedagogicalType,
+      matchingReqSlide?.pedagogicalType || defaultPedType
+    );
     const purpose = s.purpose || (matchingReqSlide ? matchingReqSlide.purpose : title);
 
     const contentBlocks: PresentationContentBlock[] = (s.contentBlocks || []).map((blk: any, bIdx: number) => {
@@ -670,7 +785,7 @@ function parseAiPresentationResponse(
       moduleId: request.moduleId,
       planId: request.generationPlanId,
       requestId: request.requestId,
-      ownerId: request.created_by,
+      ownerId: request.created_by || (request as any).createdBy || (request as any).ownerId || "system_teacher",
       sourceReferences: request.sourceReferences || [],
       evidenceReferences: request.evidenceReferences || [],
     },
@@ -769,7 +884,7 @@ export async function generatePresentationContent(
     const registeredPrompt = getRegisteredPrompt(CANONICAL_CONTENT_PROMPT_VERSION);
     const userPrompt = registeredPrompt.buildUserPrompt({
       requestId: request.requestId,
-      moduleTitle: plan.moduleId,
+      moduleTitle: request.approvedOutline?.title || plan.moduleId,
       title: request.approvedOutline.title,
       learningObjectives: [request.approvedOutline.objective],
       targetAudience: request.approvedOutline.targetAudience,
@@ -926,6 +1041,7 @@ export async function generatePresentationContent(
       generationKey,
     };
   } catch (err: any) {
+    console.error("[generatePresentationContent] Error caught:", err?.message || err);
     const normalized = normalizeAiError(err);
     return {
       status: "error",
@@ -933,7 +1049,7 @@ export async function generatePresentationContent(
       generationKey: "",
       error: {
         code: normalized.code,
-        message: normalized.userMessage || normalized.message,
+        message: normalized.message || normalized.userMessage,
       },
     };
   } finally {

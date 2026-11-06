@@ -83,7 +83,7 @@ export class PollinationsImageProvider implements IllustrationGenerationProvider
 
   private async buildRefinedPrompt(request: IllustrationGenerationRequest): Promise<string> {
     const raw = request.assembledPrompt?.fullPrompt || "";
-    const outline = (request as any).outlineSnapshot || {};
+    const outline = (request as any).approvedOutline || (request as any).outlineSnapshot || {};
     
     // Extract core subject, points, and style
     const topic = (outline.mainSubject || outline.title || request.assembledPrompt?.subjectDescription || "")
@@ -95,7 +95,14 @@ export class PollinationsImageProvider implements IllustrationGenerationProvider
       ? outline.supportingElements.join(", ")
       : "";
 
-    const styleName = request.assembledPrompt?.styleDirectives?.split(".")[0]?.replace("Style Name: ", "") || "Flat Educational";
+    const details = Array.isArray(outline.importantVisualDetails) && outline.importantVisualDetails.length > 0
+      ? outline.importantVisualDetails.join(", ")
+      : "";
+
+    const styleName =
+      request.styleDefinition?.name ||
+      request.assembledPrompt?.styleDirectives?.split(".")[0]?.replace("Style Name: ", "") ||
+      "Flat Educational Vector";
 
     // 1. Attempt prompt refinement via active Gemini text model if key is present
     const geminiKey = this.geminiApiKey || getServerEnv("GEMINI_API_KEY");
@@ -103,7 +110,7 @@ export class PollinationsImageProvider implements IllustrationGenerationProvider
     if (geminiKey && topic) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
 
         const geminiRes = await this.fetchFn(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${geminiKey}`,
@@ -115,14 +122,15 @@ export class PollinationsImageProvider implements IllustrationGenerationProvider
                 parts: [{
                   text: `You are an expert educational illustrator and prompt engineer for student textbook graphics.
 Lesson Topic: ${topic}
-Key Educational Elements: ${supporting || topic}
+Key Educational Elements: ${supporting || details || topic}
+Educational Focus: ${outline.educationalFocus || topic}
 Visual Style: ${styleName}
 
 Task: Generate a concise, highly descriptive visual prompt in English (30 to 45 words) suitable for diffusion image models (Flux/SDXL).
 CRITICAL RULES:
-1. Directly illustrate the specific educational objects, diagrams, technical components, historical devices, or scientific models matching "${topic}".
+1. Directly illustrate the specific educational objects, scientific diagrams, anatomy, technical components, historical devices, or step-by-step models matching "${topic}".
 2. NEVER illustrate an empty classroom, meeting room, generic desk, or boardroom.
-3. Use a modern 2D educational vector style with clean shapes, vibrant pedagogical colors, and clean white background.
+3. Match the visual style: ${styleName}. Use clean shapes, vibrant pedagogical colors, and clean white background.
 4. Output ONLY the raw English prompt text, no quotes, no markdown.`
                 }]
               }]
@@ -152,7 +160,7 @@ CRITICAL RULES:
       .replace(/\s+/g, " ")
       .trim();
 
-    let cleanElements = (supporting || "")
+    let cleanElements = (supporting || details || "")
       .replace(/ruang kelas/gi, "")
       .replace(/lingkungan kontekstual/gi, "")
       .replace(/\s+/g, " ")
@@ -160,6 +168,13 @@ CRITICAL RULES:
 
     // Map common topics to rich English educational terms
     const domainKeywords: Record<string, string> = {
+      pernapasan: "human respiratory system anatomy diagram, lungs, trachea, bronchus, alveoli gas exchange detail",
+      paru: "human lungs and alveoli anatomy diagram, oxygen carbon dioxide exchange",
+      ekskresi: "human excretory system diagram, kidneys, nephron, bladder anatomy",
+      ginjal: "human kidney anatomy diagram, cortex, medulla, nephron filtration unit",
+      darah: "human circulatory system diagram, heart chambers, arteries, veins blood flow",
+      jantung: "human heart anatomy cross section diagram, atria, ventricles, cardiac valves",
+      pencernaan: "human digestive system anatomy diagram, stomach, intestines, liver",
       internet: "computer network history, ARPANET mainframe computer, telegraph precursors, data packet routing diagram",
       jaringan: "computer network topology, connected nodes, routers, digital data cables",
       hardware: "computer hardware components, motherboard, CPU, RAM chips diagram",
@@ -168,6 +183,12 @@ CRITICAL RULES:
       sel: "biological cell anatomy diagram, nucleus, mitochondria, cell membrane",
       fotosintesis: "plant photosynthesis diagram, sunlight, chloroplast, glucose and oxygen cycle",
       atom: "atomic structure diagram, central nucleus, orbiting electrons",
+      akuntansi: "accounting ledger worksheet diagram, debit and credit columns, financial balance sheet",
+      jurnal: "accounting general journal ledger entry form, double entry bookkeeping format",
+      listrik: "electrical circuit diagram, battery, resistors, switch, voltmeter",
+      mesin: "automotive internal combustion engine cutaway diagram, pistons, valves, crankshaft",
+      kimia: "chemical molecular structure model, covalent bonds, atoms",
+      tata_surya: "solar system diagram, sun, orbiting planets, asteroid belt",
     };
 
     let extraVisuals = "";

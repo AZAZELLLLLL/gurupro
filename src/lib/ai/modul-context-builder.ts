@@ -64,8 +64,8 @@ export function buildDeterministicQueries(
   const cleanTopik = cleanClaimOrTopicText(input.topik).trim() || input.topik.trim();
   const cleanMapel = input.mapel?.trim() || "";
 
-  // Query A: Core Topic
-  const topicCoreQuery = `${cleanTopik} ${cleanMapel}`.trim();
+  // Query A: Core Topic (Focus on clean topic for exact phrase matching)
+  const topicCoreQuery = cleanTopik;
 
   // Query B: Learning Objectives & Fundamental Concepts
   const objectivesQuery = `${cleanTopik} capaian pembelajaran tujuan materi konsep kompetensi`.trim();
@@ -225,7 +225,7 @@ function evaluateSectionCoverage(
   return {
     topicMaterial: evaluateBucket(
       topicKeywords.length > 0 ? topicKeywords : queryBundle.topicCoreQuery.split(/\s+/).filter((w) => w.length >= 3),
-      0.35,
+      0.20,
     ),
     learningObjectives: evaluateBucket(
       ["tujuan", "capaian", "kompetensi", "konsep", "prinsip", "dasar", "memahami", "menjelaskan", "overview", "introduction"],

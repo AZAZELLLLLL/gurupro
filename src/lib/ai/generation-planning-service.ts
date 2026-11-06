@@ -63,10 +63,22 @@ export function generateInitialIllustrationOutline(
   const composition = "Komposisi seimbang dengan subjek utama di bagian tengah, elemen pendukung terdistribusi rapi di sisi kiri dan kanan.";
   const perspectiveView = "Tampilan isometrik atau perspektif 3/4 dengan sudut pandang mata normal (*eye-level*).";
 
+  const isiSnippets = rawIsi
+    ? rawIsi
+        .split(/[.\n]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length >= 20 && s.length <= 120)
+        .slice(0, 3)
+    : [];
+
   const importantVisualDetails = [
     `Detail struktur utama dari ${mainSubject}`,
-    "Warna dan kontras yang jelas untuk membedakan antar-bagian",
-    "Gaya visual informatif dan ramah siswa",
+    ...(isiSnippets.length > 0
+      ? isiSnippets
+      : [
+          "Warna dan kontras yang jelas untuk membedakan antar-bagian",
+          "Gaya visual informatif dan ramah siswa",
+        ]),
   ];
 
   const labelsText = supportingElements.slice(0, 3).map((e) => e.slice(0, 30));
@@ -170,8 +182,13 @@ export function generateInitialPresentationOutline(
       purpose: `Mengupas konsep inti dan langkah penerapan pada sub-materi ${sec.judul}.`,
       keyPoints: points,
       contentBlocks: [
-        sec.isi ? sec.isi.slice(0, 180) + (sec.isi.length > 180 ? "..." : "") : `Penjelasan mengenai ${sec.judul}`,
-      ],
+        ...(sec.poin && sec.poin.length > 0 ? sec.poin.slice(0, 3).map((p) => `• ${p}`) : []),
+        sec.isi
+          ? sec.isi.length > 300
+            ? sec.isi.slice(0, 300) + "..."
+            : sec.isi
+          : `Penjelasan mengenai ${sec.judul}`,
+      ].filter(Boolean),
       visualDirection: "Struktur split-screen (tengah/kiri: penjelasan butir inti, kanan: diagram/ruang ilustrasi).",
       sourceReferences: [`modul:${modul.id}`, `section:${sec.id}`],
       evidenceReferences: evidenceRefs,
