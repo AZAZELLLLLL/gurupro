@@ -96,8 +96,18 @@ export class PollinationsImageProvider implements IllustrationGenerationProvider
       : "";
 
     const details = Array.isArray(outline.importantVisualDetails) && outline.importantVisualDetails.length > 0
-      ? outline.importantVisualDetails.join(", ")
+      ? outline.importantVisualDetails.join("; ")
       : "";
+
+    const avoidList = Array.isArray(outline.thingsToAvoid) && outline.thingsToAvoid.length > 0
+      ? outline.thingsToAvoid
+      : [
+          "Peta dunia atau bola dunia (globe) acak yang tidak berhubungan dengan topik",
+          "Ruang kelas kosong",
+          "Meja rapat kantor",
+          "Teks berjejal",
+          "Distorsi bentuk",
+        ];
 
     const styleName =
       request.styleDefinition?.name ||
@@ -112,6 +122,28 @@ export class PollinationsImageProvider implements IllustrationGenerationProvider
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 12000);
 
+        const promptInstruction = `You are an expert educational illustrator and technical prompt engineer for text-to-image models (Flux/SDXL).
+A teacher has designed and APPROVED a specific visual outline for an educational lesson.
+Your mission is to translate and synthesize this APPROVED OUTLINE into a rich, cohesive, faithful visual prompt in English (60 to 90 words).
+
+TEACHER'S APPROVED OUTLINE (Strict Ground Truth):
+- Lesson Subject: ${topic}
+- Educational Focus: ${outline.educationalFocus || topic}
+- Required Supporting Elements: ${supporting || topic}
+- Key Visual Details from Lesson: ${details || topic}
+- Visual Setting & Background: ${outline.environmentBackground || "Clean, high-contrast pedagogical background"}
+- Composition & Perspective: ${outline.composition || "Balanced composition"}. View: ${outline.perspectiveView || "Eye-level"}
+- Subject Action/State: ${outline.poseAction || "Active demonstration"}
+- Visual Style: ${styleName}
+- Strictly Avoid (Negative Constraints): ${avoidList.join(", ")}
+
+STRICT GENERATION RULES:
+1. FIDELITY: Depict the EXACT educational subject, supporting elements, and visual details specified in the outline.
+2. NEVER replace the subject with unrelated generic metaphors or random objects (e.g. do NOT draw a random world map or globe unless the topic is explicitly global geography/cartography; do NOT draw empty classrooms or meeting rooms).
+3. If the topic represents Indonesian national, civic, historical, or cultural concepts (e.g. Pancasila, Garuda, UUD 1945, proklamasi, gotong royong), accurately describe authentic Indonesian symbols, landmarks, or citizens.
+4. Output the positive visual prompt followed by a brief negative clause: "Avoid: [unrelated elements, distortions]".
+5. Output ONLY the raw descriptive prompt text, no quotes, no markdown.`;
+
         const geminiRes = await this.fetchFn(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${geminiKey}`,
           {
@@ -120,20 +152,9 @@ export class PollinationsImageProvider implements IllustrationGenerationProvider
             body: JSON.stringify({
               contents: [{
                 parts: [{
-                  text: `You are an expert educational illustrator and prompt engineer for student textbook graphics.
-Lesson Topic: ${topic}
-Key Educational Elements: ${supporting || details || topic}
-Educational Focus: ${outline.educationalFocus || topic}
-Visual Style: ${styleName}
-
-Task: Generate a concise, highly descriptive visual prompt in English (30 to 45 words) suitable for diffusion image models (Flux/SDXL).
-CRITICAL RULES:
-1. Directly illustrate the specific educational objects, scientific diagrams, anatomy, technical components, historical devices, or step-by-step models matching "${topic}".
-2. NEVER illustrate an empty classroom, meeting room, generic desk, or boardroom.
-3. Match the visual style: ${styleName}. Use clean shapes, vibrant pedagogical colors, and clean white background.
-4. Output ONLY the raw English prompt text, no quotes, no markdown.`
-                }]
-              }]
+                  text: promptInstruction,
+                }],
+              }],
             }),
             signal: controller.signal,
           }
@@ -143,7 +164,7 @@ CRITICAL RULES:
         if (geminiRes.ok) {
           const data = await geminiRes.json();
           const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-          if (candidate && candidate.length > 15) {
+          if (candidate && candidate.length > 20) {
             return candidate.replace(/^["'`]|["'`]$/g, "").trim().substring(0, 800);
           }
         }
@@ -160,14 +181,36 @@ CRITICAL RULES:
       .replace(/\s+/g, " ")
       .trim();
 
-    let cleanElements = (supporting || details || "")
+    let cleanElements = (supporting || "")
       .replace(/ruang kelas/gi, "")
       .replace(/lingkungan kontekstual/gi, "")
       .replace(/\s+/g, " ")
       .trim();
 
-    // Map common topics to rich English educational terms
+    let cleanDetails = (details || "")
+      .replace(/ruang kelas/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    // Map common Indonesian curriculum topics to rich English educational terms
     const domainKeywords: Record<string, string> = {
+      // PKn / Civics
+      pancasila: "Garuda Pancasila national emblem, golden eagle, five heraldic symbols red and white shield, star, chain, banyan tree, bull head, rice and cotton, Bhinneka Tunggal Ika banner",
+      garuda: "Garuda Pancasila golden eagle national emblem with red and white shield on chest",
+      norma: "Indonesian civic harmony, diverse citizens practicing legal justice, moral ethics, and social courtesy",
+      uud: "Indonesian 1945 constitution document, scales of justice, national civic order",
+      hukum: "scales of justice, legal gavel, Indonesian law book, civic order",
+      demokrasi: "democratic voting booth, citizen casting ballot in ballot box, civic participation",
+      "gotong royong": "Indonesian community members working together harmoniously, cleaning village, mutual cooperation",
+      "warga negara": "responsible Indonesian citizens, students in school uniforms, respectful community cooperation",
+      hak: "balance of civic rights and responsibilities, scales of justice, community harmony",
+      kewajiban: "civic duties, traffic discipline at traffic light, paying taxes, obeying laws",
+      // Sejarah
+      proklamasi: "Soekarno and Hatta reading 1945 Indonesian proclamation of independence manuscript with microphone and Indonesian flag",
+      rengasdengklok: "historical discussion table in wooden house, Soekarno Hatta and youth leaders with proclamation draft and typewriter",
+      "sumpah pemuda": "1928 youth pledge congress, passionate Indonesian historical youth delegates raising flag",
+      kemerdekaan: "Indonesian independence celebration, red and white flag hoisting, national heroes",
+      // Biologi / IPA
       pernapasan: "human respiratory system anatomy diagram, lungs, trachea, bronchus, alveoli gas exchange detail",
       paru: "human lungs and alveoli anatomy diagram, oxygen carbon dioxide exchange",
       ekskresi: "human excretory system diagram, kidneys, nephron, bladder anatomy",
@@ -175,20 +218,39 @@ CRITICAL RULES:
       darah: "human circulatory system diagram, heart chambers, arteries, veins blood flow",
       jantung: "human heart anatomy cross section diagram, atria, ventricles, cardiac valves",
       pencernaan: "human digestive system anatomy diagram, stomach, intestines, liver",
-      internet: "computer network history, ARPANET mainframe computer, telegraph precursors, data packet routing diagram",
-      jaringan: "computer network topology, connected nodes, routers, digital data cables",
-      hardware: "computer hardware components, motherboard, CPU, RAM chips diagram",
-      perangkat: "computing devices, input output system architecture",
-      algoritma: "step by step visual flowchart diagram, clear logic execution blocks",
       sel: "biological cell anatomy diagram, nucleus, mitochondria, cell membrane",
       fotosintesis: "plant photosynthesis diagram, sunlight, chloroplast, glucose and oxygen cycle",
-      atom: "atomic structure diagram, central nucleus, orbiting electrons",
+      ekosistem: "ecological food web diagram, producers, consumers, decomposers in natural habitat",
+      "rantai makanan": "food chain diagram, grass, herbivores, predators, decomposers with trophic level arrows",
+      tumbuhan: "plant anatomy diagram, roots, stem, leaves, flower reproductive organs",
+      // Fisika / Kimia
+      atom: "atomic structure diagram, central nucleus with protons and neutrons, orbiting electrons in energy shells",
+      molekul: "chemical molecular 3D ball-and-stick model, covalent bonds, atoms",
+      kimia: "chemistry laboratory apparatus, beakers, test tubes, chemical reaction formula diagram",
+      listrik: "electrical circuit diagram, battery source, copper wires, resistors, switch, lightbulb",
+      magnet: "magnetic field lines diagram around bar magnet, north and south poles, iron filings",
+      "tata surya": "solar system diagram, glowing sun, eight orbiting planets in sequential order",
+      tata_surya: "solar system diagram, glowing sun, eight orbiting planets in sequential order",
+      gaya: "physics force vectors diagram, applied force, gravity, friction, normal force arrows",
+      newton: "Sir Isaac Newton laws of motion demonstration diagram, action-reaction force vectors",
+      // Matematika
+      geometri: "geometric 3D shapes collection, cube, sphere, cylinder, cone, pyramid with dimension lines",
+      pecahan: "fraction visual pie chart and bar models showing numerator and denominator divisions",
+      grafik: "mathematical Cartesian coordinate plane with labeled X and Y axes and linear function line",
+      statistika: "statistical bar graph, line chart, data distribution diagram with clear axes",
+      // Jaringan & Komputer
+      internet: "computer network architecture, data packets routing through servers and optical cables",
+      jaringan: "computer network topology, connected nodes, MikroTik routers, switch, ethernet cables",
+      routing: "network static routing topology diagram, multiple routers, client PCs, gateway IP connections",
+      hardware: "computer hardware architecture diagram, motherboard, CPU processor, RAM chips, storage",
+      perangkat: "computing devices, input output system architecture",
+      algoritma: "step by step visual flowchart diagram, clear logic execution blocks",
+      // Ekonomi & Akuntansi
       akuntansi: "accounting ledger worksheet diagram, debit and credit columns, financial balance sheet",
       jurnal: "accounting general journal ledger entry form, double entry bookkeeping format",
-      listrik: "electrical circuit diagram, battery, resistors, switch, voltmeter",
+      pasar: "economic supply and demand curve graph, market equilibrium price and quantity intersect",
+      uang: "financial currency exchange, bank vault, digital banking transactions diagram",
       mesin: "automotive internal combustion engine cutaway diagram, pistons, valves, crankshaft",
-      kimia: "chemical molecular structure model, covalent bonds, atoms",
-      tata_surya: "solar system diagram, sun, orbiting planets, asteroid belt",
     };
 
     let extraVisuals = "";
@@ -202,8 +264,9 @@ CRITICAL RULES:
 
     const visualSubject = extraVisuals ? `${cleanTopic} (${extraVisuals})` : cleanTopic;
     const elementsClause = cleanElements ? `, featuring ${cleanElements}` : "";
+    const detailsClause = cleanDetails ? `, details: ${cleanDetails.slice(0, 150)}` : "";
 
-    return `Flat 2D educational vector infographic illustrating ${visualSubject}${elementsClause}. Modern textbook illustration style, clear pedagogical diagram, vibrant colors, clean white background, high contrast, no empty rooms, no text distortion.`.substring(0, 500);
+    return `Flat 2D educational vector infographic illustrating ${visualSubject}${elementsClause}${detailsClause}. Modern textbook illustration style, clear pedagogical diagram, vibrant colors, clean white background, high contrast. Avoid: random world map, globe, empty classroom, meeting room, distorted text, watermark.`.substring(0, 800);
   }
 
   async generate(request: IllustrationGenerationRequest): Promise<IllustrationGenerationResult> {

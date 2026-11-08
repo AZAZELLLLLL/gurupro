@@ -84,6 +84,7 @@ export function generateInitialIllustrationOutline(
   const labelsText = supportingElements.slice(0, 3).map((e) => e.slice(0, 30));
 
   const thingsToAvoid = [
+    "Peta dunia atau bola dunia (globe) acak yang tidak berhubungan dengan materi pelajaran",
     "Ruang kelas kosong, meja rapat kantor, atau ruangan kosong tanpa objek materi pembelajaran",
     "Teks berjejal atau paragraf panjang di dalam gambar",
     "Visual gelap dengan kontras rendah",

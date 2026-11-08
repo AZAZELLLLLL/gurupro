@@ -401,13 +401,38 @@ export function IllustrationPlanningPanel({
                             setSelectedTargetSection(sec.id);
                             const cleanSub = sec.judul.replace(/^(\d+[\.\)]|\s*Bab\s*\d+:?)\s*/i, "").trim();
                             const pts = sec.poin && sec.poin.length > 0 ? sec.poin : [`Sub-topik: ${cleanSub}`];
+                            const rawIsi = (sec as any).isi || "";
+                            const isiSnippets = rawIsi
+                              ? rawIsi
+                                  .split(/[.\n]+/)
+                                  .map((s: string) => s.trim())
+                                  .filter((s: string) => s.length >= 20 && s.length <= 120)
+                                  .slice(0, 3)
+                              : [];
+                            const importantDetails = [
+                              `Detail struktur utama dari ${cleanSub}`,
+                              ...(isiSnippets.length > 0
+                                ? isiSnippets
+                                : [
+                                    "Warna dan kontras yang jelas untuk membedakan antar-bagian",
+                                    "Gaya visual informatif dan ramah siswa",
+                                  ]),
+                            ];
                             setFormOutline({
                               ...formOutline,
                               title: `Ilustrasi: ${sec.judul}`,
                               mainSubject: cleanSub,
                               educationalFocus: `Memvisualisasikan konsep ${cleanSub} agar siswa dapat memahami keterkaitan materi secara visual.`,
                               supportingElements: pts.slice(0, 4),
+                              importantVisualDetails: importantDetails,
                               environmentBackground: `Diagram visual edukatif konseptual dengan latar belakang studio bersih dan kontras tinggi untuk materi ${cleanSub}.`,
+                              thingsToAvoid: [
+                                "Peta dunia atau bola dunia (globe) acak yang tidak berhubungan dengan materi pelajaran",
+                                "Ruang kelas kosong, meja rapat kantor, atau ruangan kosong tanpa objek materi pembelajaran",
+                                "Teks berjejal atau paragraf panjang di dalam gambar",
+                                "Visual gelap dengan kontras rendah",
+                                "Elemen dekoratif membingungkan yang tidak relevan dengan kurikulum",
+                              ],
                               sectionId: sec.id,
                             });
                             toast.info(`Outline dimuat untuk Bab ${idx + 1}: ${cleanSub}`);
