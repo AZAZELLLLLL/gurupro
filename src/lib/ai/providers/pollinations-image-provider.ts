@@ -114,46 +114,77 @@ export class PollinationsImageProvider implements IllustrationGenerationProvider
       request.assembledPrompt?.styleDirectives?.split(".")[0]?.replace("Style Name: ", "") ||
       "Flat Educational Vector";
 
-    // 1. Attempt prompt refinement via active Gemini text model if key is present
-    const geminiKey = this.geminiApiKey || getServerEnv("GEMINI_API_KEY");
-
-    if (geminiKey && topic) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-        const promptInstruction = `You are an expert educational illustrator and technical prompt engineer for text-to-image models (Flux/SDXL).
-A teacher has designed and APPROVED a specific visual outline for an educational lesson.
-Your mission is to translate and synthesize this APPROVED OUTLINE into a rich, cohesive, faithful visual prompt in English (60 to 90 words).
+    // 1. Attempt prompt refinement via intelligent LLM synthesis (Pollinations Text or Gemini)
+    const promptInstruction = `You are an expert educational illustrator and technical prompt engineer for text-to-image models.
+A teacher has designed and APPROVED a specific visual outline for an educational textbook lesson.
+Your mission is to translate and synthesize this APPROVED OUTLINE into a rich, cohesive, faithful visual prompt in English (45 to 70 words).
 
 TEACHER'S APPROVED OUTLINE (Strict Ground Truth):
 - Lesson Subject: ${topic}
 - Educational Focus: ${outline.educationalFocus || topic}
 - Required Supporting Elements: ${supporting || topic}
 - Key Visual Details from Lesson: ${details || topic}
-- Visual Setting & Background: ${outline.environmentBackground || "Clean, high-contrast pedagogical background"}
-- Composition & Perspective: ${outline.composition || "Balanced composition"}. View: ${outline.perspectiveView || "Eye-level"}
-- Subject Action/State: ${outline.poseAction || "Active demonstration"}
+- Visual Setting & Background: ${outline.environmentBackground || "Clean, high-contrast white pedagogical background"}
+- Composition: ${outline.composition || "Balanced composition"}
 - Visual Style: ${styleName}
-- Strictly Avoid (Negative Constraints): ${avoidList.join(", ")}
 
-STRICT GENERATION RULES:
-1. FIDELITY: Depict the EXACT educational subject, supporting elements, and visual details specified in the outline.
-2. NEVER replace the subject with unrelated generic metaphors or random objects (e.g. do NOT draw a random world map or globe unless the topic is explicitly global geography/cartography; do NOT draw empty classrooms or meeting rooms).
-3. If the topic represents Indonesian national, civic, historical, or cultural concepts (e.g. Pancasila, Garuda, UUD 1945, proklamasi, gotong royong), accurately describe authentic Indonesian symbols, landmarks, or citizens.
-4. Output the positive visual prompt followed by a brief negative clause: "Avoid: [unrelated elements, distortions]".
-5. Output ONLY the raw descriptive prompt text, no quotes, no markdown.`;
+CRITICAL RULES:
+1. FIDELITY: Accurately depict the EXACT educational subject, authentic Indonesian national/civic symbols (e.g. Garuda Pancasila shield, heraldic emblems), or technical/scientific objects specified in the outline.
+2. POSITIVE PROMPT ONLY: Describe ONLY what must be drawn. NEVER mention the words 'avoid', 'negative', 'do not', 'world map', 'globe', or include negative clauses.
+3. VECTOR TEXTBOOK STYLE: Describe a flat 2D educational vector illustration for an Indonesian school textbook, vibrant colors, isolated on crisp clean white background, high contrast, crisp graphic design.
+Output ONLY the raw descriptive prompt text, no quotes, no markdown.`;
+
+    // Try free resilient Pollinations text endpoint first (or Gemini if available)
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+      const res = await this.fetchFn("https://text.pollinations.ai/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "system", content: "You are an expert prompt engineer for educational illustrations. Output only raw descriptive prompt." },
+            { role: "user", content: promptInstruction },
+          ],
+          model: "openai",
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const candidate = (await res.text()).trim();
+        if (candidate && candidate.length > 20 && !candidate.startsWith("{") && !candidate.startsWith("<")) {
+          // Clean quotes and ensure no negative words
+          const cleanPrompt = candidate
+            .replace(/^["'`]|["'`]$/g, "")
+            .replace(/\b(?:avoid|do not depict|negative prompt)\b.*$/i, "")
+            .trim();
+          if (cleanPrompt.length > 20) {
+            return cleanPrompt.substring(0, 800);
+          }
+        }
+      }
+    } catch (pollErr: any) {
+      console.warn("[PollinationsImageProvider] Pollinations text refinement notice:", pollErr.message);
+    }
+
+    // Secondary attempt via Gemini if key is available
+    const geminiKey = this.geminiApiKey || getServerEnv("GEMINI_API_KEY");
+    if (geminiKey && topic) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const geminiRes = await this.fetchFn(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${geminiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               contents: [{
-                parts: [{
-                  text: promptInstruction,
-                }],
+                parts: [{ text: promptInstruction }],
               }],
             }),
             signal: controller.signal,
@@ -165,7 +196,7 @@ STRICT GENERATION RULES:
           const data = await geminiRes.json();
           const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
           if (candidate && candidate.length > 20) {
-            return candidate.replace(/^["'`]|["'`]$/g, "").trim().substring(0, 800);
+            return candidate.replace(/^["'`]|["'`]$/g, "").replace(/\b(?:avoid|do not depict)\b.*$/i, "").trim().substring(0, 800);
           }
         }
       } catch (geminiErr: any) {
@@ -173,24 +204,25 @@ STRICT GENERATION RULES:
       }
     }
 
-    // 2. High-quality deterministic fallback prompt synthesis
-    let cleanTopic = (topic || "Educational subject")
-      .replace(/ruang kelas/gi, "")
-      .replace(/lingkungan kontekstual/gi, "")
-      .replace(/terapan materi/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    // 2. High-quality deterministic fallback prompt synthesis (Zero negative prompt keywords)
+    const cleanBoilerplate = (str: string) =>
+      str
+        .replace(/dunia\s*(?:kerja|usaha|industri|dudi)/gi, "professional workshop")
+        .replace(/ruang\s*kelas/gi, "")
+        .replace(/lingkungan\s*kontekstual/gi, "")
+        .replace(/terapan\s*materi/gi, "")
+        .replace(/ruang\s*lingkup/gi, "")
+        .replace(/standar\s*kompetensi/gi, "")
+        .replace(/urgensi\s*pemahaman/gi, "")
+        .replace(/relevansi\s*terhadap/gi, "")
+        .replace(/tujuan\s*(?:umum|pembelajaran)/gi, "")
+        .replace(/peta\s*dunia|bola\s*dunia|globe/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
 
-    let cleanElements = (supporting || "")
-      .replace(/ruang kelas/gi, "")
-      .replace(/lingkungan kontekstual/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    let cleanDetails = (details || "")
-      .replace(/ruang kelas/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    let cleanTopic = cleanBoilerplate(topic || "Educational subject");
+    let cleanElements = cleanBoilerplate(supporting || "");
+    let cleanDetails = cleanBoilerplate(details || "");
 
     // Map common Indonesian curriculum topics to rich English educational terms
     const domainKeywords: Record<string, string> = {
@@ -245,12 +277,17 @@ STRICT GENERATION RULES:
       hardware: "computer hardware architecture diagram, motherboard, CPU processor, RAM chips, storage",
       perangkat: "computing devices, input output system architecture",
       algoritma: "step by step visual flowchart diagram, clear logic execution blocks",
-      // Ekonomi & Akuntansi
+      // Kejuruan / Bisnis / Teknik
       akuntansi: "accounting ledger worksheet diagram, debit and credit columns, financial balance sheet",
       jurnal: "accounting general journal ledger entry form, double entry bookkeeping format",
       pasar: "economic supply and demand curve graph, market equilibrium price and quantity intersect",
       uang: "financial currency exchange, bank vault, digital banking transactions diagram",
+      bisnis: "business planning canvas diagram, revenue streams, customer segments, value proposition flowchart",
+      wirausaha: "entrepreneurship visual diagram, innovative product design, artisan workshop tools",
       mesin: "automotive internal combustion engine cutaway diagram, pistons, valves, crankshaft",
+      otomotif: "automotive workshop schematic, vehicle powertrain and brake caliper technical diagram",
+      las: "welding technician in safety helmet and protective gear operating arc welding tool in workshop",
+      listrik_instalasi: "building electrical installation schematic, circuit breaker panel, wiring conduit",
     };
 
     let extraVisuals = "";
@@ -266,8 +303,9 @@ STRICT GENERATION RULES:
     const elementsClause = cleanElements ? `, featuring ${cleanElements}` : "";
     const detailsClause = cleanDetails ? `, details: ${cleanDetails.slice(0, 150)}` : "";
 
-    return `Flat 2D educational vector infographic illustrating ${visualSubject}${elementsClause}${detailsClause}. Modern textbook illustration style, clear pedagogical diagram, vibrant colors, clean white background, high contrast. Avoid: random world map, globe, empty classroom, meeting room, distorted text, watermark.`.substring(0, 800);
+    return `Flat 2D vector graphic design for Indonesian school textbook. Educational infographic illustrating ${visualSubject}${elementsClause}${detailsClause}. Clean graphic lines, vibrant colors, isolated on crisp clean white background, sharp vector details, high pedagogical clarity.`.substring(0, 800);
   }
+
 
   async generate(request: IllustrationGenerationRequest): Promise<IllustrationGenerationResult> {
     const validation = await this.validateRequest(request);

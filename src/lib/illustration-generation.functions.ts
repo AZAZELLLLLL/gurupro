@@ -1070,21 +1070,58 @@ export async function executeGenerateModuleIllustrations(
       }
     }
 
+    // Filter out abstract meta-pedagogical statements that cause diffusion models to hallucinate
+    const bannedPatterns = [
+      /dunia\s*(?:kerja|usaha|industri|dudi)/i,
+      /ruang\s*lingkup/i,
+      /standar\s*kompetensi/i,
+      /urgensi\s*pemahaman/i,
+      /relevansi\s*terhadap/i,
+      /indikator\s*capaian/i,
+      /tujuan\s*(?:umum|pembelajaran)/i,
+      /kehidupan\s*berbangsa/i,
+    ];
+    const rawPoinList = Array.isArray(s.poin) ? s.poin : [];
+    const filteredPoints = rawPoinList
+      .map((p: string) => p.trim())
+      .filter((p: string) => p.length > 0 && !bannedPatterns.some((pattern) => pattern.test(p)));
+
+    const rawIsiSnippets = s.isi
+      ? s.isi
+          .split(/[.\n]+/)
+          .map((str: string) => str.trim())
+          .filter((str: string) => str.length >= 20 && str.length <= 150 && !bannedPatterns.some((pattern) => pattern.test(str)))
+          .slice(0, 3)
+      : [];
+
+    const sectionVisualDetails = [
+      `Detail struktur utama dari ${cleanSubtopic}`,
+      ...(rawIsiSnippets.length > 0
+        ? rawIsiSnippets
+        : [
+            "Warna dan kontras yang jelas untuk membedakan antar-bagian",
+            "Gaya visual informatif dan ramah siswa",
+          ]),
+    ];
+
     // Contextual section outline grounded on actual subtopic
     const sectionOutline = {
       ...(plan.outline as any),
       title: `Ilustrasi: ${s.judul}`,
       mainSubject: cleanSubtopic,
-      educationalFocus: `Memvisualisasikan materi pembelajaran sub-topik ${cleanSubtopic} untuk siswa kelas ${modul.kelas || "terkait"}.`,
+      educationalFocus: `Memvisualisasikan konsep ${cleanSubtopic} agar siswa kelas ${modul.kelas || "terkait"} dapat mengamati keterkaitan komponen materi secara konseptual.`,
       supportingElements:
-        Array.isArray(s.poin) && s.poin.length > 0
-          ? s.poin.slice(0, 4)
-          : [`Sub-topik: ${cleanSubtopic}`],
-      importantVisualDetails: s.isi
-        ? [s.isi.slice(0, 100)]
-        : [`Visualisasi representatif ${cleanSubtopic}`],
+        filteredPoints.length > 0
+          ? filteredPoints.slice(0, 4)
+          : [
+              `Komponen struktur ${cleanSubtopic}`,
+              `Bagan alur kerja ${cleanSubtopic}`,
+              `Objek materi esensial ${cleanSubtopic}`,
+            ],
+      importantVisualDetails: sectionVisualDetails,
       environmentBackground: `Diagram visual edukatif konseptual dengan latar belakang studio bersih dan kontras tinggi untuk materi ${cleanSubtopic}.`,
       thingsToAvoid: [
+        "Peta dunia atau bola dunia (globe) acak yang tidak berhubungan dengan materi pelajaran",
         "Ruang kelas kosong, meja rapat kantor, atau ruangan kosong tanpa objek materi pembelajaran",
         "Teks berjejal atau paragraf panjang di dalam gambar",
         "Visual gelap dengan kontras rendah",

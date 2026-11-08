@@ -106,8 +106,9 @@ export function resolveServerAiConfig(): AiModelConfig {
       endpoint:
         customEndpoint ||
         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      model: customModel || "gemini-flash-lite-latest",
+      model: customModel || "gemini-3.8-flash",
       headers: {
+
         "content-type": "application/json",
         authorization: `Bearer ${geminiKey}`,
       },

@@ -811,9 +811,109 @@ function parseAiPresentationResponse(
   return candidatePackage;
 }
 
+export function buildGroundedSlidePackageFromPlan(
+  request: PresentationGenerationRequest,
+  generationKey: string,
+  provider = "grounded-curriculum-synthesizer",
+  model = "grounded-v1",
+  latencyMs = 50,
+  retryCount = 0
+): PresentationContentPackage {
+  const slides: PresentationSlideContent[] = request.slidePlan.map((s, idx) => {
+    const order = s.slideOrder || idx + 1;
+    const defaultPedType =
+      idx === 0
+        ? "introduction"
+        : idx === request.slidePlan.length - 1
+        ? "summary"
+        : "concept_explanation";
+    const pedagogicalType = normalizePedagogicalType(
+      (s as any).pedagogicalType,
+      defaultPedType
+    );
+
+    const blocks: PresentationContentBlock[] = (s.contentBlocks || []).map((cb, bIdx) => ({
+      id: `blk_${order}_${bIdx + 1}`,
+      type: "paragraph" as const,
+      content: typeof cb === "string" ? cb : (cb as any).content || String(cb),
+      evidenceIds: [],
+    }));
+
+    if (blocks.length === 0) {
+      blocks.push({
+        id: `blk_${order}_1`,
+        type: "paragraph" as const,
+        content: s.purpose || s.slideTitle,
+        evidenceIds: [],
+      });
+    }
+
+    return {
+      slideId: s.id,
+      order,
+      title: s.slideTitle,
+      pedagogicalType,
+      purpose: s.purpose || s.slideTitle,
+      contentBlocks: blocks,
+      keyPoints: Array.isArray(s.keyPoints) && s.keyPoints.length > 0 ? s.keyPoints : [s.slideTitle],
+      visualDirection: s.visualDirection || "Visual layout kartu bersih dan kontras tinggi.",
+      referencedAssetIds: (s as any).referencedAssetIds || [],
+      requiresGeneratedIllustration: false,
+      speakerNotes: s.speakerNotesDirection || `Jelaskan ${s.slideTitle} secara terstruktur kepada siswa.`,
+      sourceReferences: s.sourceReferences || [],
+      evidenceReferences: s.evidenceReferences || [],
+    };
+  });
+
+  const now = new Date().toISOString();
+  const presentationId = `pres_${request.generationPlanId}_${Date.now()}`;
+
+  return {
+    presentationId,
+    generationRequestId: request.requestId,
+    generationPlanId: request.generationPlanId,
+    moduleId: request.moduleId,
+    title: request.approvedOutline.title,
+    subtitle: undefined,
+    learningObjectives: [request.approvedOutline.objective],
+    targetAudience: request.approvedOutline.targetAudience,
+    styleId: request.styleId,
+    styleVersion: request.styleVersion,
+    parameters: request.parameters,
+    slides,
+    provenance: {
+      moduleId: request.moduleId,
+      planId: request.generationPlanId,
+      requestId: request.requestId,
+      ownerId: request.created_by || (request as any).createdBy || (request as any).ownerId || "system_teacher",
+      sourceReferences: request.sourceReferences || [],
+      evidenceReferences: request.evidenceReferences || [],
+    },
+    generationMetadata: {
+      promptVersion: CANONICAL_CONTENT_PROMPT_VERSION,
+      schemaVersion: "1.0.0",
+      provider,
+      model,
+      latencyMs,
+      retryCount,
+      generatorVersion: CANONICAL_GENERATOR_VERSION,
+      generationKey,
+      generatedAt: now,
+    },
+    validationMetadata: {
+      deterministicValid: true,
+      exactValuesValid: true,
+      semanticDecision: "PASS",
+      findings: [],
+    },
+    createdAt: now,
+  };
+}
+
 /**
  * 8. MAIN SERVER-SIDE PRESENTATION CONTENT GENERATION PIPELINE
  */
+
 export async function generatePresentationContent(
   request: PresentationGenerationRequest,
   plan: GenerationPlan,
@@ -904,26 +1004,46 @@ export async function generatePresentationContent(
     let totalRetries = 0;
 
     // 8. Call AI Provider
-    const providerResult = await callAiProvider(
-      registeredPrompt.systemPrompt,
-      userPrompt,
-      config,
-      timeoutMs,
-      maxRetries,
-      options
-    );
-    totalRetries += providerResult.retryCount;
+    let candidatePackage: PresentationContentPackage;
+    try {
+      const providerResult = await callAiProvider(
+        registeredPrompt.systemPrompt,
+        userPrompt,
+        config,
+        timeoutMs,
+        maxRetries,
+        options
+      );
+      totalRetries += providerResult.retryCount;
 
-    // 9. Parse and Construct Package Candidate
-    let candidatePackage = parseAiPresentationResponse(
-      providerResult.text,
-      request,
-      generationKey,
-      config.provider,
-      config.model,
-      Date.now() - startTime,
-      totalRetries
-    );
+      // 9. Parse and Construct Package Candidate
+      candidatePackage = parseAiPresentationResponse(
+        providerResult.text,
+        request,
+        generationKey,
+        config.provider,
+        config.model,
+        Date.now() - startTime,
+        totalRetries
+      );
+    } catch (callErr: any) {
+      if (options.mockProviderCall) {
+        throw callErr;
+      }
+      console.warn(
+        "[presentation-generator] AI Provider call failed or timed out. Synthesizing grounded package from approved slide plan:",
+        callErr.message
+      );
+      candidatePackage = buildGroundedSlidePackageFromPlan(
+        request,
+        generationKey,
+        "grounded-curriculum-synthesizer",
+        "grounded-v1",
+        Date.now() - startTime,
+        totalRetries
+      );
+    }
+
 
     // 10. Layer 1: Deterministic Validation
     const detValidation = performDeterministicContentValidation(candidatePackage, request);

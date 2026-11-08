@@ -51,25 +51,50 @@ export function generateInitialIllustrationOutline(
   const rawPoin = targetSection?.poin || [];
   const rawIsi = targetSection?.isi || modul.ringkasan || "";
 
+  // Clean out abstract meta-pedagogical boilerplate while preserving substantive subject content
+  const filterCurriculumBoilerplate = (list: string[]): string[] => {
+    return list
+      .map((p) =>
+        p
+          .replace(/dunia\s*(?:kerja|usaha|industri|dudi)/gi, "")
+          .replace(/ruang\s*lingkup/gi, "")
+          .replace(/standar\s*kompetensi/gi, "")
+          .replace(/urgensi\s*pemahaman/gi, "")
+          .replace(/relevansi\s*terhadap/gi, "")
+          .replace(/indikator\s*capaian/gi, "")
+          .replace(/tujuan\s*(?:umum|pembelajaran)/gi, "")
+          .replace(/peta\s*dunia|bola\s*dunia/gi, "")
+          .replace(/^[-*•\d.]+\s*/, "")
+          .replace(/\s+/g, " ")
+          .trim()
+      )
+      .filter((p) => p.length >= 5);
+  };
+
   // Grounded extraction
   const mainSubject = subjectTitle.replace(/^(\d+[\.\)]|\s*Bab\s*\d+:?)\s*/i, "").trim();
-  const supportingElements = rawPoin.slice(0, 4).map((p) => p.trim());
-  if (supportingElements.length === 0) {
-    supportingElements.push(`Visualisasi materi ${mainSubject}`);
-  }
+  const filteredPoin = filterCurriculumBoilerplate(rawPoin);
+  const supportingElements = filteredPoin.length > 0
+    ? filteredPoin.slice(0, 4)
+    : [
+        `Objek visual utama ${mainSubject}`,
+        `Bagan konsep materi ${mainSubject}`,
+        `Simbol dan elemen ${mainSubject}`,
+      ];
+
 
   const educationalFocus = `Memvisualisasikan konsep ${mainSubject} agar siswa kelas ${modul.kelas || "terkait"} dapat mengamati keterkaitan komponen materi secara konseptual.`;
   const environment = `Diagram visual edukatif konseptual dengan latar belakang studio bersih dan kontras tinggi untuk materi ${mainSubject}.`;
   const composition = "Komposisi seimbang dengan subjek utama di bagian tengah, elemen pendukung terdistribusi rapi di sisi kiri dan kanan.";
   const perspectiveView = "Tampilan isometrik atau perspektif 3/4 dengan sudut pandang mata normal (*eye-level*).";
 
-  const isiSnippets = rawIsi
+  const rawSnippets = rawIsi
     ? rawIsi
         .split(/[.\n]+/)
         .map((s) => s.trim())
-        .filter((s) => s.length >= 20 && s.length <= 120)
-        .slice(0, 3)
+        .filter((s) => s.length >= 20 && s.length <= 150)
     : [];
+  const isiSnippets = filterCurriculumBoilerplate(rawSnippets).slice(0, 3);
 
   const importantVisualDetails = [
     `Detail struktur utama dari ${mainSubject}`,

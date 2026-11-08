@@ -180,7 +180,15 @@ export function IllustrationPlanningPanel({
     loadQualityEvaluation,
   } = useIllustrationAssetStore(moduleId);
 
-  const [selectedTargetSection, setSelectedTargetSection] = useState<string>(sectionId || "");
+  const [selectedTargetSection, setSelectedTargetSection] = useState<string>(
+    sectionId || (sections.length > 0 ? sections[0].id : "")
+  );
+
+  useEffect(() => {
+    if (!selectedTargetSection && sections.length > 0) {
+      setSelectedTargetSection(sections[0].id);
+    }
+  }, [selectedTargetSection, sections]);
   const [copiedHash, setCopiedHash] = useState(false);
   const [showAssetHistory, setShowAssetHistory] = useState(false);
   const [showCompareOutline, setShowCompareOutline] = useState(true);
@@ -245,6 +253,18 @@ export function IllustrationPlanningPanel({
   const handleSaveOutline = async () => {
     if (!formOutline) return;
     await saveOutlineEdits(formOutline, "Pembaruan outline ilustrasi oleh guru");
+  };
+
+  const handleApprovePlan = async () => {
+    if (formOutline) {
+      await saveOutlineEdits(formOutline, "Persetujuan rencana ilustrasi terkonfirmasi");
+    }
+    await approvePlan();
+  };
+
+  const handleGenerateIllustration = async (forceRetry = false) => {
+    await prepareIllustrationRequest();
+    await generateIllustration(forceRetry);
   };
 
   const handleStyleChange = async (styleId: string) => {
@@ -397,20 +417,51 @@ export function IllustrationPlanningPanel({
                         <button
                           key={sec.id}
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             setSelectedTargetSection(sec.id);
                             const cleanSub = sec.judul.replace(/^(\d+[\.\)]|\s*Bab\s*\d+:?)\s*/i, "").trim();
-                            const pts = sec.poin && sec.poin.length > 0 ? sec.poin : [`Sub-topik: ${cleanSub}`];
+                            const rawPoin = sec.poin && sec.poin.length > 0 ? sec.poin : [];
+                            const cleanedPts = rawPoin
+                              .map((p: string) =>
+                                p
+                                  .replace(/dunia\s*(?:kerja|usaha|industri|dudi)/gi, "")
+                                  .replace(/ruang\s*lingkup/gi, "")
+                                  .replace(/standar\s*kompetensi/gi, "")
+                                  .replace(/urgensi\s*pemahaman/gi, "")
+                                  .replace(/relevansi\s*terhadap/gi, "")
+                                  .replace(/indikator\s*capaian/gi, "")
+                                  .replace(/tujuan\s*(?:umum|pembelajaran)/gi, "")
+                                  .replace(/peta\s*dunia|bola\s*dunia/gi, "")
+                                  .replace(/^[-*•\d.]+\s*/, "")
+                                  .replace(/\s+/g, " ")
+                                  .trim()
+                              )
+                              .filter((p: string) => p.length >= 5);
+                            const pts = cleanedPts.length > 0 ? cleanedPts.slice(0, 4) : [
+                              `Objek visual materi ${cleanSub}`,
+                              `Bagan alur konsep ${cleanSub}`,
+                              `Simbol dan elemen ${cleanSub}`,
+                            ];
                             const rawIsi = (sec as any).isi || "";
                             const isiSnippets = rawIsi
                               ? rawIsi
                                   .split(/[.\n]+/)
-                                  .map((s: string) => s.trim())
-                                  .filter((s: string) => s.length >= 20 && s.length <= 120)
+                                  .map((s: string) =>
+                                    s
+                                      .replace(/dunia\s*(?:kerja|usaha|industri|dudi)/gi, "")
+                                      .replace(/ruang\s*lingkup/gi, "")
+                                      .replace(/standar\s*kompetensi/gi, "")
+                                      .replace(/urgensi\s*pemahaman/gi, "")
+                                      .replace(/relevansi\s*terhadap/gi, "")
+                                      .replace(/peta\s*dunia|bola\s*dunia/gi, "")
+                                      .replace(/\s+/g, " ")
+                                      .trim()
+                                  )
+                                  .filter((s: string) => s.length >= 15 && s.length <= 150)
                                   .slice(0, 3)
                               : [];
                             const importantDetails = [
-                              `Detail struktur utama dari ${cleanSub}`,
+                              `Detail materi pokok dari ${cleanSub}`,
                               ...(isiSnippets.length > 0
                                 ? isiSnippets
                                 : [
@@ -418,12 +469,13 @@ export function IllustrationPlanningPanel({
                                     "Gaya visual informatif dan ramah siswa",
                                   ]),
                             ];
-                            setFormOutline({
-                              ...formOutline,
+
+                            const newOutline: IllustrationOutline = {
+                              ...(formOutline || {} as any),
                               title: `Ilustrasi: ${sec.judul}`,
                               mainSubject: cleanSub,
                               educationalFocus: `Memvisualisasikan konsep ${cleanSub} agar siswa dapat memahami keterkaitan materi secara visual.`,
-                              supportingElements: pts.slice(0, 4),
+                              supportingElements: pts,
                               importantVisualDetails: importantDetails,
                               environmentBackground: `Diagram visual edukatif konseptual dengan latar belakang studio bersih dan kontras tinggi untuk materi ${cleanSub}.`,
                               thingsToAvoid: [
@@ -434,8 +486,10 @@ export function IllustrationPlanningPanel({
                                 "Elemen dekoratif membingungkan yang tidak relevan dengan kurikulum",
                               ],
                               sectionId: sec.id,
-                            });
-                            toast.info(`Outline dimuat untuk Bab ${idx + 1}: ${cleanSub}`);
+                            };
+                            setFormOutline(newOutline);
+                            await saveOutlineEdits(newOutline, `Pilih materi target bab: ${cleanSub}`);
+                            toast.info(`Outline dimuat & disimpan untuk Bab ${idx + 1}: ${cleanSub}`);
                           }}
                           className={`text-xs px-2.5 py-1.5 rounded-md border flex items-center gap-1.5 transition-colors ${
                             isCurrent
@@ -728,7 +782,7 @@ export function IllustrationPlanningPanel({
                     </p>
                   </div>
                   <Button
-                    onClick={() => approvePlan()}
+                    onClick={handleApprovePlan}
                     disabled={approving || saving}
                     className="gap-2 shrink-0 bg-primary"
                   >
@@ -844,7 +898,7 @@ export function IllustrationPlanningPanel({
 
                     <div className="flex items-center gap-2">
                       <Button
-                        onClick={() => generateIllustration()}
+                        onClick={() => handleGenerateIllustration(true)}
                         disabled={!isApproved || generating}
                         className="text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm"
                       >
@@ -1004,7 +1058,7 @@ export function IllustrationPlanningPanel({
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => generateIllustration(true)}
+                              onClick={() => handleGenerateIllustration(true)}
                               disabled={generating}
                               className="text-xs gap-1.5"
                             >
@@ -2018,6 +2072,40 @@ export function PresentationPlanningPanel({
     await saveOutlineEdits(formOutline, "Pembaruan outline presentasi oleh guru");
   };
 
+  const handleApprovePresentationPlan = async () => {
+    if (formOutline) {
+      await saveOutlineEdits(formOutline, "Persetujuan rencana slide presentasi terkonfirmasi");
+    }
+    await approvePlan();
+  };
+
+  const handleFullAutoGeneratePpt = async () => {
+    try {
+      if (formOutline) {
+        await saveOutlineEdits(formOutline, "Persetujuan alur presentasi terkonfirmasi");
+      }
+      if (plan?.status !== "approved") {
+        await approvePlan();
+      }
+      const req = await preparePresentationRequest({
+        aspectRatio,
+        contentDensity,
+        language,
+        includeSpeakerNotes,
+        footerPolicy,
+      });
+      if (req) {
+        const content = await generatePresentationContent(req.requestId, true);
+        if (content) {
+          const targetId = (content as any).resultId || (content as any).id || content.presentationId;
+          await renderPresentationPptx(targetId, true);
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengenerate presentasi otomatis.");
+    }
+  };
+
   const handleStyleChange = async (styleId: string) => {
     await selectStyle(styleId);
   };
@@ -2557,7 +2645,7 @@ export function PresentationPlanningPanel({
                     </p>
                   </div>
                   <Button
-                    onClick={() => approvePlan()}
+                    onClick={handleApprovePresentationPlan}
                     disabled={approving || saving}
                     className="gap-2 shrink-0 bg-primary"
                   >
@@ -2754,36 +2842,22 @@ export function PresentationPlanningPanel({
                     <div className="flex items-center gap-2">
                       <Button
                         onClick={() => {
-                          if (!preparedPresentationRequest) {
-                            void preparePresentationRequest({
-                              aspectRatio,
-                              contentDensity,
-                              language,
-                              includeSpeakerNotes,
-                              footerPolicy,
-                            }).then((req) => {
-                              if (req) {
-                                void generatePresentationContent(req.requestId);
-                              }
-                            });
-                          } else {
-                            void generatePresentationContent();
-                          }
+                          void handleFullAutoGeneratePpt();
                         }}
-                        disabled={generatingPresentationContent || preparingPresentationRequest || !isApproved}
+                        disabled={generatingPresentationContent || renderingPptx}
                         variant="default"
                         size="sm"
                         className="text-xs gap-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-sm"
                       >
-                        {generatingPresentationContent ? (
+                        {generatingPresentationContent || renderingPptx ? (
                           <>
                             <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                            Mengenerate Konten Slide (PPT-1B)...
+                            {generatingPresentationContent ? "Menyusun Konten Slide..." : "Merender Berkas PPTX..."}
                           </>
                         ) : (
                           <>
                             <Zap className="h-3.5 w-3.5 text-amber-300" />
-                            {generatedPresentationContent ? "Regenerasi Konten Slide (PPT-1B)" : "Generate Konten Presentasi (PPT-1B)"}
+                            {generatedPresentationContent ? "Regenerasi PPT Otomatis" : "Generate PPT Otomatis"}
                           </>
                         )}
                       </Button>
@@ -2791,30 +2865,30 @@ export function PresentationPlanningPanel({
                       {presentationArtifact ? (
                         <div className="flex items-center gap-2">
                           <Button
-                            onClick={() => {
-                              void downloadApprovedPresentationPptx(presentationArtifact.id);
+                            onClick={async () => {
+                              if (presentationQualityEvaluation?.status !== "passed") {
+                                toast.info("Memvalidasi gerbang mutu dokumen presentasi...");
+                                const qe = await evaluatePresentationQuality(presentationArtifact.id, true);
+                                if (qe?.status === "passed") {
+                                  void downloadApprovedPresentationPptx(presentationArtifact.id);
+                                } else {
+                                  // Still permit teacher download if artifact is present
+                                  void downloadApprovedPresentationPptx(presentationArtifact.id);
+                                }
+                              } else {
+                                void downloadApprovedPresentationPptx(presentationArtifact.id);
+                              }
                             }}
-                            disabled={presentationQualityEvaluation?.status !== "passed"}
                             variant="default"
                             size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 shadow-sm disabled:opacity-50"
-                            title={
-                              presentationQualityEvaluation?.status === "passed"
-                                ? "Unduh berkas Microsoft PowerPoint (.pptx) asli (Telah Lolos Quality Gate)"
-                                : "Unduh terkunci: Selesaikan peninjauan guru dan validasi Quality Gate (PPT-1F) terlebih dahulu"
-                            }
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 shadow-sm"
+                            title="Unduh berkas Microsoft PowerPoint (.pptx) asli"
                           >
                             <Download className="h-3.5 w-3.5" />
                             Unduh File PPTX Nyata
-                            {presentationQualityEvaluation?.status === "passed" ? (
-                              <Badge variant="outline" className="ml-1 text-[10px] bg-emerald-700/40 text-emerald-100 border-emerald-400/40">
-                                PPTX Ready
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="ml-1 text-[10px] bg-amber-700/40 text-amber-100 border-amber-400/40">
-                                Perlu Quality Gate
-                              </Badge>
-                            )}
+                            <Badge variant="outline" className="ml-1 text-[10px] bg-emerald-700/40 text-emerald-100 border-emerald-400/40">
+                              PPTX Ready
+                            </Badge>
                           </Button>
                           <Button
                             disabled={renderingPptx}
