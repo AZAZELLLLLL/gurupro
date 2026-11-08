@@ -31,14 +31,12 @@ import type {
 } from "../illustration-generation-contract";
 import { GeminiImageProvider } from "./gemini-image-provider";
 import { OpenAiImageProvider } from "./openai-image-provider";
-import { PollinationsImageProvider } from "./pollinations-image-provider";
 
 export interface DualIllustrationRouterOptions {
   primaryProvider?: IllustrationGenerationProvider;
   fallbackProvider?: IllustrationGenerationProvider;
-  communityProvider?: IllustrationGenerationProvider;
-  primaryName?: "gemini" | "openai" | "pollinations";
-  fallbackName?: "gemini" | "openai" | "pollinations";
+  primaryName?: "gemini" | "openai";
+  fallbackName?: "gemini" | "openai";
   geminiApiKey?: string;
   openAiApiKey?: string;
 }
@@ -47,13 +45,11 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
   readonly providerName = "dual-router";
   readonly primaryProvider: IllustrationGenerationProvider;
   readonly fallbackProvider?: IllustrationGenerationProvider;
-  readonly communityProvider?: IllustrationGenerationProvider;
 
   constructor(options?: DualIllustrationRouterOptions) {
     if (options?.primaryProvider) {
       this.primaryProvider = options.primaryProvider;
       this.fallbackProvider = options.fallbackProvider;
-      this.communityProvider = options.communityProvider;
       return;
     }
 
@@ -63,55 +59,51 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
     const preferredPrimary = (
       options?.primaryName ||
       getServerEnv("AI_IMAGE_PRIMARY") ||
-      "gemini"
+      "openai"
     ).toLowerCase();
 
     const preferredFallback = (
       options?.fallbackName ||
       getServerEnv("AI_IMAGE_FALLBACK") ||
-      (preferredPrimary === "gemini" ? "openai" : "gemini")
+      (preferredPrimary === "openai" ? "gemini" : "openai")
     ).toLowerCase();
 
     let primary: IllustrationGenerationProvider | null = null;
     let fallback: IllustrationGenerationProvider | null = null;
 
-    if (preferredPrimary === "pollinations") {
-      primary = new PollinationsImageProvider({ geminiApiKey: geminiKey });
+    if (preferredPrimary === "openai" && openAiKey && openAiKey.trim().length > 0) {
+      primary = new OpenAiImageProvider({ apiKey: openAiKey.trim() });
     } else if (preferredPrimary === "gemini" && geminiKey && geminiKey.trim().length > 0) {
       primary = new GeminiImageProvider({ apiKey: geminiKey.trim() });
-    } else if (preferredPrimary === "openai" && openAiKey && openAiKey.trim().length > 0) {
-      primary = new OpenAiImageProvider({ apiKey: openAiKey.trim() });
     }
 
     // If preferred primary wasn't available, check keys
     if (!primary) {
-      if (geminiKey && geminiKey.trim().length > 0) {
-        primary = new GeminiImageProvider({ apiKey: geminiKey.trim() });
-      } else if (openAiKey && openAiKey.trim().length > 0) {
+      if (openAiKey && openAiKey.trim().length > 0) {
         primary = new OpenAiImageProvider({ apiKey: openAiKey.trim() });
+      } else if (geminiKey && geminiKey.trim().length > 0) {
+        primary = new GeminiImageProvider({ apiKey: geminiKey.trim() });
       }
     }
 
     // Set fallback if distinct from primary
     if (primary) {
-      if (primary.providerName === "gemini" && openAiKey && openAiKey.trim().length > 0) {
+      if (primary.providerName === "openai" && geminiKey && geminiKey.trim().length > 0) {
+        fallback = new GeminiImageProvider({ apiKey: geminiKey.trim() });
+      } else if (primary.providerName === "gemini" && openAiKey && openAiKey.trim().length > 0) {
         fallback = new OpenAiImageProvider({ apiKey: openAiKey.trim() });
-      } else if (primary.providerName === "openai" && geminiKey && geminiKey.trim().length > 0) {
-        fallback = new GeminiImageProvider({ apiKey: geminiKey.trim() });
-      } else if (primary.providerName === "pollinations" && geminiKey && geminiKey.trim().length > 0) {
-        fallback = new GeminiImageProvider({ apiKey: geminiKey.trim() });
       }
     }
 
     if (!primary) {
-      primary = new PollinationsImageProvider({ geminiApiKey: geminiKey });
+      throw new AiServiceError(
+        AI_ERROR_CODES.PROVIDER_UNAVAILABLE,
+        "Konfigurasi provider AI belum siap: Kunci API resmi (OPENAI_API_KEY atau GEMINI_API_KEY) belum disetel pada file .env."
+      );
     }
 
     this.primaryProvider = primary;
     this.fallbackProvider = fallback || undefined;
-    this.communityProvider =
-      options?.communityProvider ??
-      (primary instanceof PollinationsImageProvider ? undefined : new PollinationsImageProvider({ geminiApiKey: geminiKey }));
   }
 
   async validateRequest(
@@ -277,46 +269,6 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
           `[DualIllustrationRouter] Fallback provider (${this.fallbackProvider.providerName}) also failed:`,
           fallbackErr
         );
-        // 4. Check if Community Provider is available as a resilient fallback
-        if (this.communityProvider && this.isRetryableFailoverError(fallbackErr)) {
-          console.warn(
-            `[DualIllustrationRouter] Commercial providers (${this.primaryProvider.providerName} & ${this.fallbackProvider.providerName}) unavailable or exceeded quota. Failing over to community provider (${this.communityProvider.providerName})...`
-          );
-          try {
-            const communityResult = await this.communityProvider.generate(request);
-            if (communityResult.status === "succeeded") {
-              trackProductEvent({
-                eventName: PRODUCT_EVENT_NAMES.AI_GENERATION_SUCCESS,
-                feature: "ai_core",
-                metadata: {
-                  provider: this.communityProvider.providerName,
-                  failover: true,
-                  community_fallback: true,
-                  requestId: request.requestId,
-                },
-              });
-              return {
-                ...communityResult,
-                metadata: {
-                  ...(communityResult as any).metadata,
-                  failoverUsed: true,
-                  communityFallback: true,
-                  primaryProvider: this.primaryProvider.providerName,
-                  primaryError: primaryErr.message || primaryErr.code,
-                  fallbackProvider: this.fallbackProvider.providerName,
-                  fallbackError: fallbackErr.message || fallbackErr.code,
-                  resolvedProvider: this.communityProvider.providerName,
-                },
-              };
-            }
-          } catch (communityErr: any) {
-            console.error(
-              `[DualIllustrationRouter] Community provider (${this.communityProvider.providerName}) also failed:`,
-              communityErr
-            );
-          }
-        }
-
         trackProductEvent({
           eventName: PRODUCT_EVENT_NAMES.AI_PROVIDER_UNAVAILABLE,
           feature: "ai_core",
@@ -328,33 +280,8 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
         });
         throw new AiServiceError(
           fallbackErr.code || AI_ERROR_CODES.AI_UPSTREAM_ERROR,
-          `Generasi ilustrasi gagal pada provider utama (${this.primaryProvider.providerName}: ${primaryErr.message}) dan fallback (${this.fallbackProvider.providerName}: ${fallbackErr.message}).`
+          `Generasi ilustrasi gagal pada provider utama (${this.primaryProvider.providerName}: ${primaryErr.message}) dan fallback (${this.fallbackProvider.providerName}: ${fallbackErr.message}). Silakan periksa kunci API pada file .env.`
         );
-      }
-    }
-
-    // If no fallback was configured or primary failed with retryable, check community provider
-    if (this.communityProvider && this.isRetryableFailoverError(primaryErr)) {
-      console.warn(
-        `[DualIllustrationRouter] Primary provider (${this.primaryProvider.providerName}) failed. Failing over to community provider (${this.communityProvider.providerName})...`
-      );
-      try {
-        const communityResult = await this.communityProvider.generate(request);
-        if (communityResult.status === "succeeded") {
-          return {
-            ...communityResult,
-            metadata: {
-              ...(communityResult as any).metadata,
-              failoverUsed: true,
-              communityFallback: true,
-              primaryProvider: this.primaryProvider.providerName,
-              primaryError: primaryErr.message || primaryErr.code,
-              resolvedProvider: this.communityProvider.providerName,
-            },
-          };
-        }
-      } catch (communityErr: any) {
-        console.error(`[DualIllustrationRouter] Community provider failed:`, communityErr);
       }
     }
 

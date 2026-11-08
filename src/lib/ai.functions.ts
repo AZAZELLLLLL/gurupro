@@ -108,6 +108,7 @@ function resolveAiConfig(): AiProviderConfig {
   const lovableKey = getEnvValue("LOVABLE_API_KEY");
   const geminiKey = getEnvValue("GEMINI_API_KEY");
   const openAiKey = getEnvValue("OPENAI_API_KEY");
+  const anthropicKey = getEnvValue("ANTHROPIC_API_KEY") || getEnvValue("CLAUDE_API_KEY");
   const customModel = getEnvValue("AI_MODEL");
   const customEndpoint = getEnvValue("AI_ENDPOINT");
 
@@ -115,7 +116,6 @@ function resolveAiConfig(): AiProviderConfig {
     return {
       provider: "lovable",
       endpoint: customEndpoint || "https://ai.gateway.lovable.dev/v1/chat/completions",
-      // Model valid pada Lovable Gateway (gemini-3.7-flash tidak ada)
       model: customModel || "google/gemini-2.5-flash",
       headers: {
         "content-type": "application/json",
@@ -131,7 +131,7 @@ function resolveAiConfig(): AiProviderConfig {
       endpoint:
         customEndpoint ||
         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      model: customModel || "gemini-3.8-flash",
+      model: customModel || "gemini-3.6-flash",
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${geminiKey}`,
@@ -151,11 +151,24 @@ function resolveAiConfig(): AiProviderConfig {
     };
   }
 
+  if (anthropicKey) {
+    return {
+      provider: "anthropic",
+      endpoint: customEndpoint || "https://api.anthropic.com/v1/messages",
+      model: customModel || "claude-3-5-sonnet-20241022",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+    };
+  }
+
   console.error(
-    "[GuruPro AI Error] AI generation failed: No API key found in server environment. Checked LOVABLE_API_KEY, GEMINI_API_KEY, and OPENAI_API_KEY.",
+    "[GuruPro AI Error] AI generation failed: No API key found in server environment. Checked LOVABLE_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, and ANTHROPIC_API_KEY.",
   );
   throw new Error(
-    "Konfigurasi AI belum siap di server: API Key (LOVABLE_API_KEY atau GEMINI_API_KEY) belum disetel pada file .env server.",
+    "Konfigurasi AI belum siap di server: API Key (GEMINI_API_KEY, OPENAI_API_KEY, atau ANTHROPIC_API_KEY) belum disetel pada file .env server.",
   );
 }
 
@@ -182,7 +195,7 @@ async function askAi(system: string, user: string): Promise<string> {
       signal: AbortSignal.timeout(60000), // 60 detik batas waktu
     });
   } catch (err: any) {
-    console.warn(`[GuruPro AI] Primary provider ${config.provider} call issue (${err?.message}). Trying resilient fallback...`);
+    console.warn(`[GuruPro AI] Primary provider ${config.provider} call issue (${err?.message}). Trying fallback...`);
   }
 
   // If primary provider succeeded, return parsed content
@@ -196,29 +209,32 @@ async function askAi(system: string, user: string): Promise<string> {
     } catch {}
   }
 
-  // Resilient Fallback: Pollinations OpenAI-compatible JSON text API
-  try {
-    const fbRes = await fetch("https://text.pollinations.ai/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        model: "openai",
-        jsonMode: true,
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (fbRes.ok) {
-      const fbText = (await fbRes.text()).trim();
-      if (fbText && fbText.length > 30) {
-        return fbText;
+  // Official Gemini Failover: Try gemini-3.5-flash if primary model was different
+  if (config.provider === "gemini" && config.model !== "gemini-3.5-flash") {
+    try {
+      const secRes = await fetch(config.endpoint, {
+        method: "POST",
+        headers: config.headers,
+        body: JSON.stringify({
+          model: "gemini-3.5-flash",
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          response_format: { type: "json_object" },
+        }),
+        signal: AbortSignal.timeout(45000),
+      });
+      if (secRes.ok) {
+        const secJson = (await secRes.json()) as { choices?: Array<{ message?: { content?: string } }> };
+        const secContent = secJson.choices?.[0]?.message?.content;
+        if (secContent && secContent.trim()) {
+          return secContent;
+        }
       }
+    } catch (secErr: any) {
+      console.warn("[GuruPro AI] Gemini secondary model notice:", secErr?.message);
     }
-  } catch (fbErr: any) {
-    console.warn("[GuruPro AI] Resilient text fallback notice:", fbErr?.message);
   }
 
   if (res) {

@@ -87,6 +87,8 @@ export function resolveServerAiConfig(): AiModelConfig {
   const customModel = getServerEnv("AI_MODEL");
   const customEndpoint = getServerEnv("AI_ENDPOINT");
 
+  const anthropicKey = getServerEnv("ANTHROPIC_API_KEY") || getServerEnv("CLAUDE_API_KEY");
+
   if (lovableKey) {
     return {
       provider: "lovable",
@@ -106,9 +108,8 @@ export function resolveServerAiConfig(): AiModelConfig {
       endpoint:
         customEndpoint ||
         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      model: customModel || "gemini-3.8-flash",
+      model: customModel || "gemini-3.6-flash",
       headers: {
-
         "content-type": "application/json",
         authorization: `Bearer ${geminiKey}`,
       },
@@ -127,9 +128,22 @@ export function resolveServerAiConfig(): AiModelConfig {
     };
   }
 
+  if (anthropicKey) {
+    return {
+      provider: "anthropic",
+      endpoint: customEndpoint || "https://api.anthropic.com/v1/messages",
+      model: customModel || "claude-3-5-sonnet-20241022",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+    };
+  }
+
   throw new AiServiceError(
     AI_ERROR_CODES.AI_PROVIDER_ERROR,
-    "Konfigurasi AI server belum siap: Kunci API (LOVABLE_API_KEY, GEMINI_API_KEY, atau OPENAI_API_KEY) belum disetel pada server environment.",
+    "Konfigurasi AI server belum siap: Kunci API (LOVABLE_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, atau ANTHROPIC_API_KEY) belum disetel pada server environment.",
   );
 }
 

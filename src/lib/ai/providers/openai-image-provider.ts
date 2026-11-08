@@ -56,13 +56,11 @@ export class OpenAiImageProvider implements IllustrationGenerationProvider {
   private resolveDimensions(aspectRatio: IllustrationAspectRatio): { size: string; width: number; height: number } {
     switch (aspectRatio) {
       case "16:9":
-        return { size: "1536x864", width: 1536, height: 864 };
+        return { size: "1792x1024", width: 1792, height: 1024 };
       case "9:16":
-        return { size: "864x1536", width: 864, height: 1536 };
+        return { size: "1024x1792", width: 1024, height: 1792 };
       case "4:3":
-        return { size: "1024x768", width: 1024, height: 768 };
       case "3:4":
-        return { size: "768x1024", width: 768, height: 1024 };
       case "1:1":
       default:
         return { size: "1024x1024", width: 1024, height: 1024 };
@@ -116,6 +114,7 @@ export class OpenAiImageProvider implements IllustrationGenerationProvider {
     prompt: string;
     n: number;
     size?: string;
+    response_format?: string;
   } {
     const dim = this.resolveDimensions(request.generationParameters.aspectRatio);
 
@@ -134,11 +133,17 @@ export class OpenAiImageProvider implements IllustrationGenerationProvider {
       );
     }
 
+    const payloadModel =
+      this.model === "gpt-image-2" || !this.model.startsWith("dall-e")
+        ? "dall-e-3"
+        : this.model;
+
     return {
-      model: this.model,
+      model: payloadModel,
       prompt: promptParts.join("\n\n"),
       n: 1,
       size: dim.size,
+      response_format: "b64_json",
     };
   }
 
