@@ -55,7 +55,11 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
       return;
     }
 
-    const hfToken = options?.hfToken || getServerEnv("HF_TOKEN") || getServerEnv("HUGGINGFACE_API_KEY");
+    const hfToken =
+      options?.hfToken ||
+      getServerEnv("HF_TOKEN") ||
+      getServerEnv("HG_API_KEY") ||
+      getServerEnv("HUGGINGFACE_API_KEY");
     const geminiKey = options?.geminiApiKey || getServerEnv("GEMINI_API_KEY");
     const openAiKey = options?.openAiApiKey || getServerEnv("OPENAI_API_KEY");
 

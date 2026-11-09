@@ -45,10 +45,12 @@ export class HuggingFaceImageProvider implements IllustrationGenerationProvider 
     this.apiKey =
       options?.apiKey ||
       getServerEnv("HF_TOKEN") ||
+      getServerEnv("HG_API_KEY") ||
       getServerEnv("HUGGINGFACE_API_KEY");
     this.model =
       options?.model ||
       getServerEnv("HF_IMAGE_MODEL") ||
+      getServerEnv("HG_IMAGE_MODEL") ||
       "black-forest-labs/FLUX.1-schnell";
     this.baseUrl =
       options?.baseUrl ||

@@ -45,7 +45,10 @@ export function resolveIllustrationGenerationProvider(): IllustrationGenerationP
     return _mockProvider;
   }
 
-  const hfToken = getServerEnv("HF_TOKEN") || getServerEnv("HUGGINGFACE_API_KEY");
+  const hfToken =
+    getServerEnv("HF_TOKEN") ||
+    getServerEnv("HG_API_KEY") ||
+    getServerEnv("HUGGINGFACE_API_KEY");
   const geminiKey = getServerEnv("GEMINI_API_KEY");
   const openAiKey = getServerEnv("OPENAI_API_KEY");
 
