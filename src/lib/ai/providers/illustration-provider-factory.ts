@@ -45,12 +45,18 @@ export function resolveIllustrationGenerationProvider(): IllustrationGenerationP
     return _mockProvider;
   }
 
+  const hfToken = getServerEnv("HF_TOKEN") || getServerEnv("HUGGINGFACE_API_KEY");
   const geminiKey = getServerEnv("GEMINI_API_KEY");
   const openAiKey = getServerEnv("OPENAI_API_KEY");
 
-  // 2. Dual-Provider Router if at least one API key is present
-  if ((geminiKey && geminiKey.trim().length > 0) || (openAiKey && openAiKey.trim().length > 0)) {
+  // 2. Multi-Provider Router if at least one API key is present
+  if (
+    (hfToken && hfToken.trim().length > 0) ||
+    (geminiKey && geminiKey.trim().length > 0) ||
+    (openAiKey && openAiKey.trim().length > 0)
+  ) {
     return new DualIllustrationRouter({
+      hfToken: hfToken?.trim(),
       geminiApiKey: geminiKey?.trim(),
       openAiApiKey: openAiKey?.trim(),
     });
@@ -58,6 +64,6 @@ export function resolveIllustrationGenerationProvider(): IllustrationGenerationP
 
   throw new AiServiceError(
     AI_ERROR_CODES.PROVIDER_UNAVAILABLE,
-    "Konfigurasi provider AI belum siap: Kunci API gambar (GEMINI_API_KEY atau OPENAI_API_KEY) belum disetel pada server environment."
+    "Konfigurasi provider AI belum siap: Kunci API gambar (HF_TOKEN, GEMINI_API_KEY, atau OPENAI_API_KEY) belum disetel pada server environment."
   );
 }

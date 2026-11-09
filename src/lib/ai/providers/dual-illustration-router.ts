@@ -31,12 +31,14 @@ import type {
 } from "../illustration-generation-contract";
 import { GeminiImageProvider } from "./gemini-image-provider";
 import { OpenAiImageProvider } from "./openai-image-provider";
+import { HuggingFaceImageProvider } from "./huggingface-image-provider";
 
 export interface DualIllustrationRouterOptions {
   primaryProvider?: IllustrationGenerationProvider;
   fallbackProvider?: IllustrationGenerationProvider;
-  primaryName?: "gemini" | "openai";
-  fallbackName?: "gemini" | "openai";
+  primaryName?: "gemini" | "openai" | "huggingface";
+  fallbackName?: "gemini" | "openai" | "huggingface";
+  hfToken?: string;
   geminiApiKey?: string;
   openAiApiKey?: string;
 }
@@ -53,33 +55,47 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
       return;
     }
 
+    const hfToken = options?.hfToken || getServerEnv("HF_TOKEN") || getServerEnv("HUGGINGFACE_API_KEY");
     const geminiKey = options?.geminiApiKey || getServerEnv("GEMINI_API_KEY");
     const openAiKey = options?.openAiApiKey || getServerEnv("OPENAI_API_KEY");
 
-    const preferredPrimary = (
-      options?.primaryName ||
-      getServerEnv("AI_IMAGE_PRIMARY") ||
-      "openai"
-    ).toLowerCase();
+    const envPrimary = (getServerEnv("AI_IMAGE_PRIMARY") || "").toLowerCase();
+
+    // Default primary: If HF_TOKEN exists, prioritize huggingface (FLUX free), otherwise openai
+    const defaultPrimary =
+      envPrimary ||
+      (hfToken && hfToken.trim().length > 0
+        ? "huggingface"
+        : (openAiKey && openAiKey.trim().length > 0 ? "openai" : "gemini"));
+
+    const preferredPrimary = (options?.primaryName || defaultPrimary).toLowerCase();
 
     const preferredFallback = (
       options?.fallbackName ||
       getServerEnv("AI_IMAGE_FALLBACK") ||
-      (preferredPrimary === "openai" ? "gemini" : "openai")
+      (preferredPrimary === "huggingface" ? "gemini" : (preferredPrimary === "openai" ? "huggingface" : "gemini"))
     ).toLowerCase();
 
-    let primary: IllustrationGenerationProvider | null = null;
-    let fallback: IllustrationGenerationProvider | null = null;
+    const createNamedProvider = (name: string): IllustrationGenerationProvider | null => {
+      if (name === "huggingface" && hfToken && hfToken.trim().length > 0) {
+        return new HuggingFaceImageProvider({ apiKey: hfToken.trim() });
+      }
+      if (name === "openai" && openAiKey && openAiKey.trim().length > 0) {
+        return new OpenAiImageProvider({ apiKey: openAiKey.trim() });
+      }
+      if (name === "gemini" && geminiKey && geminiKey.trim().length > 0) {
+        return new GeminiImageProvider({ apiKey: geminiKey.trim() });
+      }
+      return null;
+    };
 
-    if (preferredPrimary === "openai" && openAiKey && openAiKey.trim().length > 0) {
-      primary = new OpenAiImageProvider({ apiKey: openAiKey.trim() });
-    } else if (preferredPrimary === "gemini" && geminiKey && geminiKey.trim().length > 0) {
-      primary = new GeminiImageProvider({ apiKey: geminiKey.trim() });
-    }
+    let primary: IllustrationGenerationProvider | null = createNamedProvider(preferredPrimary);
 
-    // If preferred primary wasn't available, check keys
+    // If preferred primary wasn't available, check available keys
     if (!primary) {
-      if (openAiKey && openAiKey.trim().length > 0) {
+      if (hfToken && hfToken.trim().length > 0) {
+        primary = new HuggingFaceImageProvider({ apiKey: hfToken.trim() });
+      } else if (openAiKey && openAiKey.trim().length > 0) {
         primary = new OpenAiImageProvider({ apiKey: openAiKey.trim() });
       } else if (geminiKey && geminiKey.trim().length > 0) {
         primary = new GeminiImageProvider({ apiKey: geminiKey.trim() });
@@ -87,18 +103,29 @@ export class DualIllustrationRouter implements IllustrationGenerationProvider {
     }
 
     // Set fallback if distinct from primary
+    let fallback: IllustrationGenerationProvider | null = null;
     if (primary) {
-      if (primary.providerName === "openai" && geminiKey && geminiKey.trim().length > 0) {
-        fallback = new GeminiImageProvider({ apiKey: geminiKey.trim() });
-      } else if (primary.providerName === "gemini" && openAiKey && openAiKey.trim().length > 0) {
-        fallback = new OpenAiImageProvider({ apiKey: openAiKey.trim() });
+      if (preferredFallback !== primary.providerName) {
+        fallback = createNamedProvider(preferredFallback);
+      }
+      if (!fallback) {
+        const order = ["huggingface", "gemini", "openai"];
+        for (const candidate of order) {
+          if (candidate !== primary.providerName) {
+            const candidateProvider = createNamedProvider(candidate);
+            if (candidateProvider) {
+              fallback = candidateProvider;
+              break;
+            }
+          }
+        }
       }
     }
 
     if (!primary) {
       throw new AiServiceError(
         AI_ERROR_CODES.PROVIDER_UNAVAILABLE,
-        "Konfigurasi provider AI belum siap: Kunci API resmi (OPENAI_API_KEY atau GEMINI_API_KEY) belum disetel pada file .env."
+        "Konfigurasi provider AI belum siap: Kunci API resmi (HF_TOKEN, OPENAI_API_KEY, atau GEMINI_API_KEY) belum disetel pada file .env."
       );
     }
 
