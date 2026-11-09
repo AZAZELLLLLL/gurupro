@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ArsipRouteImport } from './routes/arsip'
+import { Route as AsistenGuruRouteImport } from './routes/asisten-guru'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DaftarRouteImport } from './routes/daftar'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -36,6 +37,11 @@ const IndexRoute = IndexRouteImport.update({
 const ArsipRoute = ArsipRouteImport.update({
   id: '/arsip',
   path: '/arsip',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AsistenGuruRoute = AsistenGuruRouteImport.update({
+  id: '/asisten-guru',
+  path: '/asisten-guru',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -122,6 +128,7 @@ const KelasKelasIdRoute = KelasKelasIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/arsip': typeof ArsipRoute
+  '/asisten-guru': typeof AsistenGuruRoute
   '/auth': typeof AuthRoute
   '/daftar': typeof DaftarRoute
   '/dashboard': typeof DashboardRoute
@@ -142,6 +149,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/arsip': typeof ArsipRoute
+  '/asisten-guru': typeof AsistenGuruRoute
   '/auth': typeof AuthRoute
   '/daftar': typeof DaftarRoute
   '/dashboard': typeof DashboardRoute
@@ -163,6 +171,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/arsip': typeof ArsipRoute
+  '/asisten-guru': typeof AsistenGuruRoute
   '/auth': typeof AuthRoute
   '/daftar': typeof DaftarRoute
   '/dashboard': typeof DashboardRoute
@@ -185,6 +194,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/arsip'
+    | '/asisten-guru'
     | '/auth'
     | '/daftar'
     | '/dashboard'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/arsip'
+    | '/asisten-guru'
     | '/auth'
     | '/daftar'
     | '/dashboard'
@@ -225,6 +236,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/arsip'
+    | '/asisten-guru'
     | '/auth'
     | '/daftar'
     | '/dashboard'
@@ -246,6 +258,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ArsipRoute: typeof ArsipRoute
+  AsistenGuruRoute: typeof AsistenGuruRoute
   AuthRoute: typeof AuthRoute
   DaftarRoute: typeof DaftarRoute
   DashboardRoute: typeof DashboardRoute
@@ -278,6 +291,13 @@ declare module '@tanstack/react-router' {
       path: '/arsip'
       fullPath: '/arsip'
       preLoaderRoute: typeof ArsipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/asisten-guru': {
+      id: '/asisten-guru'
+      path: '/asisten-guru'
+      fullPath: '/asisten-guru'
+      preLoaderRoute: typeof AsistenGuruRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -398,6 +418,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ArsipRoute: ArsipRoute,
+  AsistenGuruRoute: AsistenGuruRoute,
   AuthRoute: AuthRoute,
   DaftarRoute: DaftarRoute,
   DashboardRoute: DashboardRoute,
