@@ -76,10 +76,18 @@ const STARTER_PROMPTS = [
   },
 ];
 
+const DEFAULT_SESSION: ChatSession = {
+  id: "ses_default",
+  title: "Percakapan Baru",
+  messages: [],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
 export function AsistenGuruPage() {
   const navigate = useNavigate();
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string>("");
+  const [sessions, setSessions] = useState<ChatSession[]>([DEFAULT_SESSION]);
+  const [activeSessionId, setActiveSessionId] = useState<string>("ses_default");
   const [inputMessage, setInputMessage] = useState("");
   const [contextMateri, setContextMateri] = useState("");
   const [showContextModal, setShowContextModal] = useState(false);
@@ -106,9 +114,6 @@ export function AsistenGuruPage() {
     } catch (e) {
       console.error("Failed to load chat sessions:", e);
     }
-
-    // Default new session if empty
-    createNewSession();
   }, []);
 
   // Save sessions to localStorage
@@ -139,8 +144,8 @@ export function AsistenGuruPage() {
     e.stopPropagation();
     const updated = sessions.filter((s) => s.id !== id);
     if (updated.length === 0) {
-      persistSessions([]);
-      createNewSession();
+      persistSessions([DEFAULT_SESSION]);
+      setActiveSessionId(DEFAULT_SESSION.id);
     } else {
       persistSessions(updated);
       if (activeSessionId === id) {
@@ -151,17 +156,16 @@ export function AsistenGuruPage() {
   };
 
   const activeSession =
-    sessions.find((s) => s.id === activeSessionId) || sessions[0];
+    sessions.find((s) => s.id === activeSessionId) || sessions[0] || DEFAULT_SESSION;
+  const currentMessages = activeSession?.messages || [];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeSession?.messages, isLoading]);
+  }, [currentMessages.length, isLoading]);
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputMessage).trim();
     if (!text || isLoading) return;
-
-    if (!activeSession) return;
 
     const userMsg: ChatMessage = {
       id: "msg_user_" + Date.now(),
@@ -170,24 +174,37 @@ export function AsistenGuruPage() {
       createdAt: new Date().toISOString(),
     };
 
-    // Auto update session title if this is the first message
     const updatedTitle =
-      activeSession.messages.length === 0
+      currentMessages.length === 0
         ? text.slice(0, 32) + (text.length > 32 ? "..." : "")
-        : activeSession.title;
+        : (activeSession?.title || "Percakapan Baru");
 
-    const updatedMessages = [...activeSession.messages, userMsg];
+    const updatedMessages = [...currentMessages, userMsg];
 
-    const updatedSessions = sessions.map((s) =>
-      s.id === activeSession.id
-        ? {
-            ...s,
+    const targetSessionId = activeSession?.id || DEFAULT_SESSION.id;
+    const sessionExists = sessions.some((s) => s.id === targetSessionId);
+
+    const updatedSessions = sessionExists
+      ? sessions.map((s) =>
+          s.id === targetSessionId
+            ? {
+                ...s,
+                title: updatedTitle,
+                messages: updatedMessages,
+                updatedAt: new Date().toISOString(),
+              }
+            : s
+        )
+      : [
+          {
+            ...activeSession,
+            id: targetSessionId,
             title: updatedTitle,
             messages: updatedMessages,
             updatedAt: new Date().toISOString(),
-          }
-        : s
-    );
+          },
+          ...sessions,
+        ];
 
     persistSessions(updatedSessions);
     setInputMessage("");
@@ -213,8 +230,8 @@ export function AsistenGuruPage() {
         createdAt: new Date().toISOString(),
       };
 
-      const finalSessions = sessions.map((s) =>
-        s.id === activeSession.id
+      const finalSessions = updatedSessions.map((s) =>
+        s.id === targetSessionId
           ? {
               ...s,
               title: updatedTitle,
@@ -384,7 +401,7 @@ export function AsistenGuruPage() {
 
         {/* CONTAINER PESAN */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-          {activeSession?.messages.length === 0 ? (
+          {currentMessages.length === 0 ? (
             /* EMPTY HERO STATE */
             <div className="mx-auto my-auto max-w-2xl text-center py-8">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm mb-4">
@@ -429,7 +446,7 @@ export function AsistenGuruPage() {
           ) : (
             /* MESSAGE LIST */
             <div className="mx-auto max-w-3xl space-y-5">
-              {activeSession.messages.map((m) => {
+              {currentMessages.map((m) => {
                 const isUser = m.role === "user";
                 return (
                   <div
