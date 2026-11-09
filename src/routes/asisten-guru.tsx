@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { chatWithGuruAiServerFn } from "@/lib/asisten-guru.functions";
 import { Button } from "@/components/ui/button";
+import { ChatMarkdownRenderer } from "@/components/chat-markdown-renderer";
 
 export const Route = createFileRoute("/asisten-guru")({
   component: AsistenGuruPage,
@@ -466,9 +467,13 @@ export function AsistenGuruPage() {
                           : "border border-border bg-card text-foreground"
                       }`}
                     >
-                      <div className="whitespace-pre-wrap font-sans">
-                        {m.content}
-                      </div>
+                      {isUser ? (
+                        <div className="whitespace-pre-wrap font-sans">
+                          {m.content}
+                        </div>
+                      ) : (
+                        <ChatMarkdownRenderer content={m.content} />
+                      )}
 
                       {!isUser && (
                         <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2 text-muted-foreground">
