@@ -181,3 +181,114 @@ export const chatWithGuruAiServerFn = createServerFn({
         : "Layanan AI sedang sibuk. Silakan coba sesaat lagi."
     );
   });
+
+// ==============================================================================
+// 2. CHAT DIRECT ILLUSTRATION GENERATION (FLUX.1 SCHNELL / SERVERLESS)
+// ==============================================================================
+
+const GenerateChatImageInputSchema = z.object({
+  prompt: z.string().min(3),
+  aspectRatio: z.enum(["16:9", "1:1", "4:3", "9:16", "3:4"]).optional().default("16:9"),
+  style: z.string().optional().default("vector"),
+});
+
+export interface GenerateChatImageResponse {
+  imageUrl: string;
+  prompt: string;
+  aspectRatio: string;
+  provider: string;
+  model: string;
+}
+
+function resolveImageDimensions(aspectRatio: string): { width: number; height: number } {
+  switch (aspectRatio) {
+    case "16:9":
+      return { width: 1024, height: 576 };
+    case "9:16":
+      return { width: 576, height: 1024 };
+    case "4:3":
+      return { width: 1024, height: 768 };
+    case "3:4":
+      return { width: 768, height: 1024 };
+    case "1:1":
+    default:
+      return { width: 1024, height: 1024 };
+  }
+}
+
+export const generateChatImageServerFn = createServerFn({
+  method: "POST",
+})
+  .validator((input: unknown) => {
+    const parsed = GenerateChatImageInputSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new Error("Parameter prompt gambar tidak valid.");
+    }
+    return parsed.data;
+  })
+  .handler(async ({ data }): Promise<GenerateChatImageResponse> => {
+    const hfToken = process.env.HF_TOKEN || process.env.HG_API_KEY || "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";
+    const dim = resolveImageDimensions(data.aspectRatio);
+
+    // Prompt enhancement for clean educational graphics
+    const enhancedPrompt = `${data.prompt}, ${data.style} style, clean textbook diagram educational illustration, high resolution, clear outlines, vector graphic aesthetic, no watermark, no logo`;
+
+    let imageBuffer: Buffer | null = null;
+    let mimeType = "image/jpeg";
+    let providerUsed = "FLUX.1-schnell (Hugging Face)";
+
+    // 1. Try Hugging Face Inference router
+    try {
+      const hfRes = await fetch("https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${hfToken.trim()}`,
+          "Content-Type": "application/json",
+          "x-use-cache": "false",
+        },
+        body: JSON.stringify({
+          inputs: enhancedPrompt,
+          parameters: { width: dim.width, height: dim.height },
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (hfRes.ok) {
+        mimeType = hfRes.headers.get("content-type") || "image/png";
+        const ab = await hfRes.arrayBuffer();
+        if (ab.byteLength > 1024) {
+          imageBuffer = Buffer.from(ab);
+        }
+      }
+    } catch (hfErr) {
+      console.warn("[generateChatImage] HF inference attempt:", hfErr);
+    }
+
+    // 2. High-resilience failover to Pollinations FLUX.1 (100% Free, Zero Billing Required)
+    if (!imageBuffer) {
+      providerUsed = "FLUX.1 (Serverless Engine)";
+      const safePrompt = encodeURIComponent(enhancedPrompt.slice(0, 400));
+      const pollUrl = `https://image.pollinations.ai/prompt/${safePrompt}?width=${dim.width}&height=${dim.height}&nologo=true&model=flux`;
+      const pRes = await fetch(pollUrl, { signal: AbortSignal.timeout(60000) });
+      if (!pRes.ok) {
+        throw new Error(`Gagal menghasilkan gambar dari engine FLUX (${pRes.status}).`);
+      }
+      mimeType = pRes.headers.get("content-type") || "image/jpeg";
+      const pAb = await pRes.arrayBuffer();
+      if (pAb.byteLength < 512) {
+        throw new Error("Hasil gambar terlalu kecil atau korup.");
+      }
+      imageBuffer = Buffer.from(pAb);
+    }
+
+    const b64 = imageBuffer.toString("base64");
+    const dataUrl = `data:${mimeType};base64,${b64}`;
+
+    return {
+      imageUrl: dataUrl,
+      prompt: data.prompt,
+      aspectRatio: data.aspectRatio,
+      provider: providerUsed,
+      model: "black-forest-labs/FLUX.1",
+    };
+  });

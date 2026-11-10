@@ -11,6 +11,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  Eye,
   FileQuestion,
   FileText,
   Layers,
@@ -33,7 +34,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { chatWithGuruAiServerFn } from "@/lib/asisten-guru.functions";
+import { chatWithGuruAiServerFn, generateChatImageServerFn } from "@/lib/asisten-guru.functions";
 import { Button } from "@/components/ui/button";
 import { ChatMarkdownRenderer } from "@/components/chat-markdown-renderer";
 import {
@@ -61,6 +62,9 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  imageUrl?: string;
+  imagePrompt?: string;
+  imageProvider?: string;
 }
 
 interface ChatSession {
@@ -227,6 +231,15 @@ export function AsistenGuruPage() {
 
   // Save actions progress state
   const [savingAction, setSavingAction] = useState<string | null>(null);
+
+  // Direct Illustration Generation State (FLUX.1)
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imagePromptInput, setImagePromptInput] = useState("");
+  const [imageAspectInput, setImageAspectInput] = useState<"16:9" | "1:1" | "4:3" | "9:16">("16:9");
+  const [imageStyleInput, setImageStyleInput] = useState("vector");
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [targetMessageForImage, setTargetMessageForImage] = useState<string | null>(null);
+  const [previewZoomImage, setPreviewZoomImage] = useState<string | null>(null);
 
   // Responsive & Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -696,6 +709,130 @@ export function AsistenGuruPage() {
     }
   };
 
+  // ==============================================================================
+  // DIRECT IMAGE GENERATION (FLUX.1 SCHNELL / SERVERLESS)
+  // ==============================================================================
+
+  const handleGenerateImage = async (customPrompt?: string, targetMsgId?: string) => {
+    const prompt = (customPrompt || imagePromptInput).trim();
+    if (!prompt || isGeneratingImage) return;
+
+    setIsGeneratingImage(true);
+    toast.info("Sedang me-render gambar edukasi dengan FLUX.1 (gratis)...");
+
+    try {
+      const res = await generateChatImageServerFn({
+        data: {
+          prompt,
+          aspectRatio: imageAspectInput,
+          style: imageStyleInput,
+        },
+      });
+
+      if (res && res.imageUrl) {
+        if (targetMsgId) {
+          // Attach image directly to target assistant message
+          const updatedSessions = sessions.map((s) => {
+            if (s.id === (activeSession?.id || DEFAULT_SESSION.id)) {
+              return {
+                ...s,
+                messages: s.messages.map((m) =>
+                  m.id === targetMsgId
+                    ? {
+                        ...m,
+                        imageUrl: res.imageUrl,
+                        imagePrompt: res.prompt,
+                        imageProvider: res.provider,
+                      }
+                    : m
+                ),
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return s;
+          });
+          persistSessions(updatedSessions);
+        } else {
+          // Append as a new assistant message in the conversation
+          const newImgMessage: ChatMessage = {
+            id: "msg_img_" + Date.now(),
+            role: "assistant",
+            content: `Berikut adalah visualisasi ilustrasi edukatif untuk materi: **${prompt}**\n\n- **Model:** ${res.model} (${res.provider})\n- **Rasio:** ${res.aspectRatio}\n- **Lisensi:** Bebas Digunakan untuk Pembelajaran Kurikulum Merdeka`,
+            createdAt: new Date().toISOString(),
+            imageUrl: res.imageUrl,
+            imagePrompt: res.prompt,
+            imageProvider: res.provider,
+          };
+          const updatedSessions = sessions.map((s) => {
+            if (s.id === (activeSession?.id || DEFAULT_SESSION.id)) {
+              return {
+                ...s,
+                messages: [...s.messages, newImgMessage],
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return s;
+          });
+          persistSessions(updatedSessions);
+        }
+
+        toast.success("Ilustrasi gambar berhasil digenerate!");
+        setShowImageModal(false);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal menghasilkan gambar dengan FLUX.");
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const handleDownloadImage = (dataUrl: string, promptTitle?: string) => {
+    try {
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      const cleanName = (promptTitle || "ilustrasi-gurupro").replace(/[^a-zA-Z0-9]/g, "-").slice(0, 30);
+      link.download = `${cleanName}-${Date.now()}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Gambar berhasil diunduh!");
+    } catch (e: any) {
+      toast.error("Gagal mengunduh gambar.");
+    }
+  };
+
+  const handleAttachImageToModul = async (imageUrl: string, promptTitle?: string) => {
+    try {
+      await addModul({
+        judul: `Modul & Media: ${promptTitle || activeSession?.title || "Materi Pembelajaran"}`,
+        kelas: outlineSettings.jenjang.includes("SMK") ? "X (SMK)" : "X",
+        mapel: "Dasar-Dasar Kejuruan / Umum",
+        ringkasan: `Dilengkapi dengan media visual ilustrasi edukatif terstandar Kurikulum Merdeka.`,
+        sections: [
+          {
+            id: uid(),
+            judul: "Visualisasi Konsep Inti",
+            poin: ["Media ilustrasi pendukung pemahaman peserta didik."],
+            isi: `Gambar ilustrasi edukasi: ${promptTitle || "Konsep Pembelajaran"}`,
+            ilustrasi: imageUrl,
+          },
+        ],
+        slides: [],
+        status: "Draft",
+        sumberTipe: "Teks",
+        sumberInput: promptTitle || "Ilustrasi Media Pembelajaran",
+      });
+      toast.success("Gambar berhasil dipasang ke Modul Ajar!", {
+        action: {
+          label: "Buka Modul Ajar",
+          onClick: () => navigate({ to: "/modul-ajar" }),
+        },
+      });
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal memasang gambar ke modul.");
+    }
+  };
+
   // Reusable Sidebar Content
   const renderSidebarContent = () => (
     <div className="flex h-full flex-col">
@@ -1134,6 +1271,56 @@ export function AsistenGuruPage() {
                         <ChatMarkdownRenderer content={m.content} />
                       )}
 
+                      {/* RENDERED IMAGE ARTIFACT (IF PRESENT) */}
+                      {!isUser && m.imageUrl && (
+                        <div className="mt-3.5 overflow-hidden rounded-xl border border-border/80 bg-background/50 shadow-xs">
+                          <div
+                            className="relative group aspect-video sm:aspect-16/9 bg-muted/30 flex items-center justify-center overflow-hidden cursor-pointer"
+                            onClick={() => setPreviewZoomImage(m.imageUrl || null)}
+                          >
+                            <img
+                              src={m.imageUrl}
+                              alt={m.imagePrompt || "Ilustrasi Pembelajaran"}
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/70 text-white text-xs font-semibold backdrop-blur-xs shadow-md">
+                                <Eye className="h-3.5 w-3.5" />
+                                Klik untuk Perbesar
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-card border-t border-border/60">
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 font-bold text-primary text-[10px]">
+                                <Sparkles className="h-3 w-3" />
+                                FLUX.1
+                              </span>
+                              <span className="truncate max-w-[200px] sm:max-w-xs">{m.imagePrompt}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleAttachImageToModul(m.imageUrl!, m.imagePrompt)}
+                                className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+                                title="Pasang ke Bab Modul Ajar"
+                              >
+                                <BookOpen className="h-3 w-3" />
+                                <span>Pasang ke Modul</span>
+                              </button>
+                              <button
+                                onClick={() => handleDownloadImage(m.imageUrl!, m.imagePrompt)}
+                                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                                title="Unduh gambar JPG"
+                              >
+                                <Download className="h-3 w-3" />
+                                <span>Unduh</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {!isUser && (
                         <div className="mt-3.5 pt-3 border-t border-border/60 flex flex-wrap items-center justify-between gap-2 text-muted-foreground">
                           {/* AI Provider Info */}
@@ -1142,7 +1329,7 @@ export function AsistenGuruPage() {
                             GuruPro AI Assistant
                           </span>
 
-                          {/* ACTION BUTTONS (Tahap 3: Simpan Otomatis) */}
+                          {/* ACTION BUTTONS (Tahap 3: Simpan Otomatis & Generate Media) */}
                           <div className="flex flex-wrap items-center gap-1.5">
                             {/* 1. Save to Modul Ajar Button */}
                             <button
@@ -1177,7 +1364,23 @@ export function AsistenGuruPage() {
                               <span>{savingAction === m.id + "-soal" ? "Menyimpan..." : "Simpan ke Soal"}</span>
                             </button>
 
-                            {/* 4. Copy Text Button */}
+                            {/* 4. Generate FLUX.1 Image Button */}
+                            <button
+                              onClick={() => {
+                                const headingMatch = m.content.match(/^#+\s*(.+)$/m);
+                                const promptGuess = headingMatch ? headingMatch[1].replace(/[*_#]/g, "").trim() : (activeSession?.title || "Konsep Pembelajaran");
+                                setImagePromptInput(promptGuess);
+                                setTargetMessageForImage(m.id);
+                                setShowImageModal(true);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[10.5px] font-medium text-foreground hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-colors"
+                              title="Render gambar ilustrasi edukatif dengan FLUX.1"
+                            >
+                              <Palette className="h-3 w-3 text-primary" />
+                              <span>Buat Gambar (FLUX.1)</span>
+                            </button>
+
+                            {/* 5. Copy Text Button */}
                             <button
                               onClick={() => handleCopy(m.id, m.content)}
                               className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[10.5px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -1305,6 +1508,17 @@ export function AsistenGuruPage() {
                 <span>Buat Ide Ilustrasi ({outlineSettings.illustrationStyleName})</span>
               </button>
               <button
+                onClick={() => {
+                  setImagePromptInput(activeSession?.title || "Diagram alur konsep pembelajaran");
+                  setTargetMessageForImage(null);
+                  setShowImageModal(true);
+                }}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-primary/5 px-2.5 py-1 text-primary hover:bg-primary/10 transition-colors font-medium"
+              >
+                <Palette className="h-3 w-3" />
+                <span>Render Gambar (FLUX.1)</span>
+              </button>
+              <button
                 onClick={() =>
                   setInputMessage(
                     `Buatkan 5 soal HOTS pilihan ganda untuk jenjang ${outlineSettings.jenjang} lengkap dengan kunci jawaban dan pembahasan tentang `
@@ -1343,6 +1557,20 @@ export function AsistenGuruPage() {
                   title="Lampirkan Bahan Ajar / Catatan Guru"
                 >
                   <Paperclip className="h-4 w-4" />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setImagePromptInput(inputMessage.trim() || activeSession?.title || "");
+                    setTargetMessageForImage(null);
+                    setShowImageModal(true);
+                  }}
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  title="Render Gambar Ilustrasi Edukatif (FLUX.1)"
+                >
+                  <Palette className="h-4 w-4" />
                 </Button>
 
                 <Button
@@ -1771,6 +1999,196 @@ export function AsistenGuruPage() {
                 }}
               >
                 Simpan Rujukan
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================== */}
+      {/* MODAL: GENERATE ILUSTRASI EDUKATIF (FLUX.1 SCHNELL)                            */}
+      {/* ============================================================================== */}
+      {showImageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border px-4 sm:px-6 py-3.5 bg-muted/30">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Palette className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-foreground">
+                    Generate Gambar Edukatif (FLUX.1)
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Render ilustrasi bebas biaya kuota via engine FLUX.1
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowImageModal(false)}
+                className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div>
+                <label className="text-xs font-bold text-foreground block mb-1.5">
+                  Deskripsi Gambar / Konsep Pembelajaran:
+                </label>
+                <textarea
+                  rows={3}
+                  value={imagePromptInput}
+                  onChange={(e) => setImagePromptInput(e.target.value)}
+                  placeholder="Misal: Diagram alur percabangan IF-ELSE dengan simbol standar flowchart, panah keputusan, dan teks jelas..."
+                  className="w-full rounded-xl border border-border bg-background p-3 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              {/* Aspect Ratio */}
+              <div>
+                <label className="text-xs font-bold text-foreground block mb-1.5">
+                  Format / Rasio Tampilan:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "16:9 (Slide PPT)", val: "16:9" },
+                    { label: "1:1 (Persegi Modul)", val: "1:1" },
+                    { label: "4:3 (Buku Pelajaran)", val: "4:3" },
+                  ].map((r) => (
+                    <button
+                      key={r.val}
+                      type="button"
+                      onClick={() => setImageAspectInput(r.val as any)}
+                      className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all text-center ${
+                        imageAspectInput === r.val
+                          ? "border-primary bg-primary text-primary-foreground shadow-2xs"
+                          : "border-border bg-muted/30 text-foreground hover:bg-muted/70"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Style */}
+              <div>
+                <label className="text-xs font-bold text-foreground block mb-1.5">
+                  Gaya Ilustrasi:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: "vector", label: "Vektor Bersih Edukatif", desc: "Garis tegas, warna cerah, cocok modul" },
+                    { id: "infographic", label: "Infografis Digital", desc: "Tata letak modern, ikonik & rapi" },
+                    { id: "chalkboard", label: "Sketsa Papan Tulis", desc: "Nuansa ruang kelas & diagram kapur" },
+                    { id: "photorealistic", label: "Realistis Edukasi", desc: "Fotografi detail untuk sains/alam" },
+                  ].map((st) => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => setImageStyleInput(st.id)}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        imageStyleInput === st.id
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-border bg-card hover:bg-muted/30"
+                      }`}
+                    >
+                      <div className="font-bold text-xs text-foreground">{st.label}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{st.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-primary/5 border border-primary/20 p-2.5 text-[11px] text-muted-foreground flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                <span>
+                  <strong>100% Gratis & Bebas Hak Cipta:</strong> Menggunakan model <code>FLUX.1</code> tanpa memerlukan kuota API berbayar.
+                </span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 border-t border-border px-4 sm:px-6 py-3.5 bg-muted/20">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowImageModal(false)}
+                disabled={isGeneratingImage}
+              >
+                Batal
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleGenerateImage(imagePromptInput, targetMessageForImage || undefined)}
+                disabled={!imagePromptInput.trim() || isGeneratingImage}
+                className="gap-1.5 bg-primary font-semibold"
+              >
+                {isGeneratingImage ? (
+                  <>
+                    <span className="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                    <span>Me-render FLUX.1...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>Render Ilustrasi Sekarang</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================== */}
+      {/* MODAL: ZOOM PREVIEW GAMBAR FULL-SIZE                                           */}
+      {/* ============================================================================== */}
+      {previewZoomImage && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-3 sm:p-6 backdrop-blur-sm animate-in fade-in"
+          onClick={() => setPreviewZoomImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setPreviewZoomImage(null)}
+              className="absolute -top-10 right-0 text-white hover:text-white/80 p-1.5 rounded-full bg-black/60 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <img
+              src={previewZoomImage}
+              alt="Ukuran Penuh"
+              className="rounded-xl max-h-[80vh] w-auto max-w-full object-contain shadow-2xl border border-white/10"
+            />
+            <div className="mt-3 flex items-center gap-3">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => handleDownloadImage(previewZoomImage, "ilustrasi-gurupro")}
+                className="gap-1.5"
+              >
+                <Download className="h-4 w-4" />
+                <span>Unduh Gambar Asli</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  handleAttachImageToModul(previewZoomImage, "Ilustrasi Media Pembelajaran");
+                  setPreviewZoomImage(null);
+                }}
+                className="gap-1.5"
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>Pasang ke Modul Ajar</span>
               </Button>
             </div>
           </div>

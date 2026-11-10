@@ -209,6 +209,26 @@ export class HuggingFaceImageProvider implements IllustrationGenerationProvider 
             continue;
           }
 
+          // If HF serverless returns 410 (deprecated model), 402 (pre-paid credits needed), or persistent 400/500
+          if (status === 410 || status === 402 || status === 400 || (status >= 500 && attempt > MAX_BOUNDED_RETRIES)) {
+            console.log(`[HuggingFaceImageProvider] HF router returned HTTP ${status} (${errMsg}). Failover to Pollinations FLUX.1 engine...`);
+            try {
+              const safePrompt = encodeURIComponent(fullPrompt.slice(0, 400));
+              const fallbackUrl = `https://image.pollinations.ai/prompt/${safePrompt}?width=${dim.width}&height=${dim.height}&nologo=true&model=flux`;
+              const fbRes = await this.fetchFn(fallbackUrl, { signal: AbortSignal.timeout(45000) });
+              if (fbRes.ok) {
+                const fbArrayBuf = await fbRes.arrayBuffer();
+                if (fbArrayBuf.byteLength > 1024) {
+                  mimeType = fbRes.headers.get("content-type") || "image/jpeg";
+                  rawBuffer = Buffer.from(fbArrayBuf);
+                  break;
+                }
+              }
+            } catch (fbErr: any) {
+              console.warn("[HuggingFaceImageProvider] Failover to Pollinations FLUX failed:", fbErr.message);
+            }
+          }
+
           if (this.isTransientError(status, errMsg) && attempt <= MAX_BOUNDED_RETRIES) {
             lastError = new Error(errMsg);
             await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
@@ -240,6 +260,24 @@ export class HuggingFaceImageProvider implements IllustrationGenerationProvider 
         const errMsg = isTimeout
           ? `Koneksi ke Hugging Face Inference API timeout (${DEFAULT_TIMEOUT_MS}ms).`
           : err.message || "Kegagalan jaringan ke Hugging Face.";
+
+        // Attempt failover before giving up
+        try {
+          console.log(`[HuggingFaceImageProvider] HF connection failed/timeout. Failover to Pollinations FLUX.1 engine...`);
+          const safePrompt = encodeURIComponent(fullPrompt.slice(0, 400));
+          const fallbackUrl = `https://image.pollinations.ai/prompt/${safePrompt}?width=${dim.width}&height=${dim.height}&nologo=true&model=flux`;
+          const fbRes = await this.fetchFn(fallbackUrl, { signal: AbortSignal.timeout(45000) });
+          if (fbRes.ok) {
+            const fbArrayBuf = await fbRes.arrayBuffer();
+            if (fbArrayBuf.byteLength > 1024) {
+              mimeType = fbRes.headers.get("content-type") || "image/jpeg";
+              rawBuffer = Buffer.from(fbArrayBuf);
+              break;
+            }
+          }
+        } catch (fbErr: any) {
+          console.warn("[HuggingFaceImageProvider] Failover to Pollinations FLUX failed:", fbErr.message);
+        }
 
         if (attempt <= MAX_BOUNDED_RETRIES) {
           lastError = new Error(errMsg);
