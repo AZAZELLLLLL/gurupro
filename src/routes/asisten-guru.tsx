@@ -5,19 +5,26 @@ import {
   BookOpen,
   Bot,
   Check,
+  CheckCircle2,
   ChevronRight,
   ClipboardList,
   Copy,
+  Download,
+  ExternalLink,
   FileQuestion,
   FileText,
+  Layers,
   Menu,
   MessageSquare,
+  Palette,
   Paperclip,
   Plus,
   Presentation,
   RotateCcw,
   Search,
   Send,
+  Settings2,
+  SlidersHorizontal,
   Sparkles,
   Trash,
   Trash2,
@@ -39,6 +46,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { addModul } from "@/lib/modul-store";
+import { addPaket } from "@/lib/soal-store";
+import { uid } from "@/lib/cloud-store";
+import type { ModulSection, Slide } from "@/lib/modul-types";
+import type { Soal } from "@/lib/soal-types";
 
 export const Route = createFileRoute("/asisten-guru")({
   component: AsistenGuruPage,
@@ -61,38 +73,132 @@ interface ChatSession {
   deletedAt?: string;
 }
 
-const STORAGE_KEY = "gurupro_asisten_guru_sessions_v1";
+export interface OutlineSettings {
+  pptStyle: string;
+  pptStyleName: string;
+  slideCount: number;
+  aspectRatio: string;
+  illustrationStyle: string;
+  illustrationStyleName: string;
+  illustrationAspect: string;
+  jenjang: string;
+  modelPembelajaran: string;
+}
 
-const STARTER_PROMPTS = [
+const STORAGE_KEY = "gurupro_asisten_guru_sessions_v1";
+const OUTLINE_SETTINGS_KEY = "gurupro_asisten_guru_outline_settings_v1";
+
+export const PPT_STYLES = [
   {
-    icon: BookOpen,
-    badge: "Modul Ajar",
-    title: "Buat Modul Ajar Lengkap",
-    prompt:
-      "Tolong buatkan Modul Ajar Kurikulum Merdeka yang lengkap dan terstruktur untuk materi Pemrograman Dasar bab Percabangan IF-ELSE bagi siswa SMK kelas X. Sertakan Tujuan Pembelajaran, Pemahaman Bermakna, Pertanyaan Pemantik, dan Kegiatan Pembelajaran.",
+    id: "style_ppt_edu_classroom",
+    name: "Educational Classroom",
+    badge: "Rekomendasi Kelas",
+    desc: "Desain ramah kelas dengan kartu konsep bertahap, mudah dibaca dari jarak jauh melalui proyektor.",
+    icon: "🏫",
   },
   {
-    icon: Presentation,
-    badge: "Presentasi PPT",
-    title: "Rancang Slide Presentasi",
-    prompt:
-      "Rancang outline 5 slide presentasi PPT yang interaktif dan menarik untuk materi Struktur Data Array. Berikan judul tiap slide, poin-poin materi ringkas, dan ide visual yang cocok.",
+    id: "style_ppt_modern_minimal",
+    name: "Modern Minimal",
+    badge: "Elegan",
+    desc: "Slide elegan berfokus pada kekuatan tipografi bersih, spasi lapang, dan 1 ide pokok per slide.",
+    icon: "✨",
   },
   {
-    icon: Sparkles,
-    badge: "Ide Ilustrasi Visual",
-    title: "Rancang Konsep Diagram Alur",
-    prompt:
-      "Rancang konsep ilustrasi diagram alur (flowchart) logika keputusan percabangan IF-ELSE yang sangat jelas dan ramah siswa. Jelaskan setiap simbol dan alur logikanya langkah demi langkah tanpa ASCII art.",
+    id: "style_ppt_visual_learning",
+    name: "Visual Learning",
+    badge: "Visual Dominan",
+    desc: "Visual diagram besar di satu sisi dengan ringkasan poin inti yang sangat padat di sisi lainnya.",
+    icon: "👁️",
   },
   {
-    icon: FileQuestion,
-    badge: "Asesmen & Soal",
-    title: "Buat 5 Soal HOTS",
-    prompt:
-      "Buatkan 5 soal pilihan ganda berbasis HOTS (Higher Order Thinking Skills) untuk menguji pemahaman logika pemrograman dan algoritma, lengkap dengan opsi A-E, kunci jawaban, dan pembahasan mendalam.",
+    id: "style_ppt_technical",
+    name: "Technical / Coding",
+    badge: "Sains & IT",
+    desc: "Kotak blok kode rapi, alur flowchart terstruktur, dan pemecahan masalah algoritma bertahap.",
+    icon: "💻",
+  },
+  {
+    id: "style_ppt_corp_pro",
+    name: "Corporate Pro",
+    badge: "Kejuruan",
+    desc: "Gaya formal profesional terstruktur untuk materi manajemen, bisnis, dan kejuruan industri.",
+    icon: "🏢",
+  },
+  {
+    id: "style_ppt_academic",
+    name: "Academic Formal",
+    badge: "Ilmiah",
+    desc: "Struktur bab formal, tinjauan pustaka sistematis, dan rujukan berbasis kompetensi keilmuan.",
+    icon: "🎓",
   },
 ];
+
+export const ILL_STYLES = [
+  {
+    id: "style_ill_flat_edu",
+    name: "Flat Educational",
+    badge: "Populer",
+    desc: "Vektor 2D datar bersih dan ramah siswa, saturasi warna seimbang dan mudah dipahami.",
+    icon: "🎨",
+  },
+  {
+    id: "style_ill_3d_edu",
+    name: "3D Educational",
+    badge: "Modern",
+    desc: "Render 3D rounded lembut dengan pencahayaan halus bernuansa animasi edukatif.",
+    icon: "🧊",
+  },
+  {
+    id: "style_ill_modern_vector",
+    name: "Modern Vector",
+    badge: "Presisi",
+    desc: "Garis geometris presisi, bernuansa teknologi, sains, dan tata letak infografis.",
+    icon: "📐",
+  },
+  {
+    id: "style_ill_hand_drawn",
+    name: "Hand Drawn",
+    badge: "Artistik",
+    desc: "Sketsa artistik pensil/cat air lembut untuk materi sastra, sejarah, dan seni budaya.",
+    icon: "✏️",
+  },
+  {
+    id: "style_ill_infographic",
+    name: "Infografis Bertingkat",
+    badge: "Alur Proses",
+    desc: "Diagram visual bertingkat dengan penanda nomor langkah dan ikon representatif.",
+    icon: "📊",
+  },
+];
+
+export const JENJANG_OPTIONS = [
+  "SMK Kelas X (Fase E)",
+  "SMK Kelas XI-XII (Fase F)",
+  "SMA Kelas X (Fase E)",
+  "SMA Kelas XI-XII (Fase F)",
+  "SMP Kelas VII-IX (Fase D)",
+  "SD Kelas IV-VI (Fase B-C)",
+];
+
+export const MODEL_PEMBELAJARAN_OPTIONS = [
+  "Problem-Based Learning (PBL)",
+  "Project-Based Learning (PjBL)",
+  "Discovery Learning",
+  "Inquiry-Based Learning",
+  "Direct Instruction (Demonstrasi)",
+];
+
+const DEFAULT_OUTLINE_SETTINGS: OutlineSettings = {
+  pptStyle: "style_ppt_edu_classroom",
+  pptStyleName: "Educational Classroom",
+  slideCount: 5,
+  aspectRatio: "16:9",
+  illustrationStyle: "style_ill_flat_edu",
+  illustrationStyleName: "Flat Educational",
+  illustrationAspect: "16:9",
+  jenjang: "SMK Kelas X (Fase E)",
+  modelPembelajaran: "Problem-Based Learning (PBL)",
+};
 
 const DEFAULT_SESSION: ChatSession = {
   id: "ses_default",
@@ -113,9 +219,18 @@ export function AsistenGuruPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Outline and Template Configuration State
+  const [outlineSettings, setOutlineSettings] = useState<OutlineSettings>(DEFAULT_OUTLINE_SETTINGS);
+  const [tempOutlineSettings, setTempOutlineSettings] = useState<OutlineSettings>(DEFAULT_OUTLINE_SETTINGS);
+  const [showOutlineModal, setShowOutlineModal] = useState(false);
+  const [outlineModalTab, setOutlineModalTab] = useState<"ppt" | "illustration" | "modul">("ppt");
+
+  // Save actions progress state
+  const [savingAction, setSavingAction] = useState<string | null>(null);
+
   // Responsive & Sidebar state
-  const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop toggle
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false); // Mobile drawer
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"active" | "trash">("active");
 
   // Confirmation dialogs
@@ -125,8 +240,19 @@ export function AsistenGuruPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load sessions from localStorage
+  // Load outline settings and sessions on mount
   useEffect(() => {
+    try {
+      const savedOutline = localStorage.getItem(OUTLINE_SETTINGS_KEY);
+      if (savedOutline) {
+        const parsed = JSON.parse(savedOutline);
+        setOutlineSettings(parsed);
+        setTempOutlineSettings(parsed);
+      }
+    } catch (e) {
+      console.error("Failed to load outline settings:", e);
+    }
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -157,6 +283,16 @@ export function AsistenGuruPage() {
     }
   };
 
+  // Save outline settings to localStorage
+  const persistOutlineSettings = (newSettings: OutlineSettings) => {
+    setOutlineSettings(newSettings);
+    try {
+      localStorage.setItem(OUTLINE_SETTINGS_KEY, JSON.stringify(newSettings));
+    } catch (e) {
+      console.error("Failed to persist outline settings:", e);
+    }
+  };
+
   const createNewSession = () => {
     const newSession: ChatSession = {
       id: "ses_" + Date.now().toString(),
@@ -183,7 +319,6 @@ export function AsistenGuruPage() {
     );
     persistSessions(updated);
 
-    // If active session was trashed, switch to next active session
     if (activeSessionId === id) {
       const remainingActive = updated.filter((s) => !s.isDeleted);
       if (remainingActive.length > 0) {
@@ -327,6 +462,14 @@ export function AsistenGuruPage() {
         data: {
           messages: historyPayload,
           contextMateri: contextMateri.trim() ? contextMateri : undefined,
+          outlineSettings: {
+            pptStyle: outlineSettings.pptStyleName,
+            slideCount: outlineSettings.slideCount,
+            illustrationStyle: outlineSettings.illustrationStyleName,
+            illustrationAspect: outlineSettings.illustrationAspect,
+            jenjang: outlineSettings.jenjang,
+            modelPembelajaran: outlineSettings.modelPembelajaran,
+          },
         },
       });
 
@@ -363,6 +506,196 @@ export function AsistenGuruPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // ==============================================================================
+  // ONE-CLICK SAVE ACTIONS (Tahap 3: Save to Modul, PPT, & Soal)
+  // ==============================================================================
+
+  const handleSaveToModul = async (content: string, msgId: string) => {
+    setSavingAction(msgId + "-modul");
+    try {
+      // 1. Detect title
+      const titleMatch = content.match(/^#+\s*(.+)$/m);
+      const cleanedTitle = titleMatch
+        ? titleMatch[1].replace(/MODUL AJAR KURIKULUM MERDEKA\s*\(TERRINCI\)?/i, "").replace(/^[:\-–\s]+/, "").trim()
+        : "";
+      const finalTitle = cleanedTitle || activeSession?.title || "Modul Ajar Baru";
+
+      // 2. Parse sections
+      const sectionBlocks = content.split(/\n(?=##\s+)/);
+      const sections: ModulSection[] = [];
+      for (const block of sectionBlocks) {
+        const headerMatch = block.match(/^##\s+(.+)$/m);
+        const judulSec = headerMatch ? headerMatch[1].trim() : "Materi Pembelajaran";
+        const isiSec = headerMatch ? block.replace(/^##\s+.+$/m, "").trim() : block.trim();
+        if (isiSec) {
+          const poinMatches = Array.from(isiSec.matchAll(/^[-*]\s+(.+)$/gm)).map((m) => m[1].slice(0, 80));
+          sections.push({
+            id: uid(),
+            judul: judulSec,
+            poin: poinMatches.slice(0, 5),
+            isi: isiSec,
+          });
+        }
+      }
+
+      // 3. Ringkasan
+      const firstLines = content.replace(/^#+.*$/gm, "").trim().slice(0, 200);
+
+      await addModul({
+        judul: finalTitle,
+        kelas: outlineSettings.jenjang.includes("SMK") ? "X (SMK)" : "X",
+        mapel: "Dasar-Dasar Kejuruan / Umum",
+        ringkasan: firstLines || "Modul pembelajaran dirancang terstruktur bersama GuruPro AI Asisten Guru.",
+        sections: sections.length > 0 ? sections : [{ id: uid(), judul: "Materi Pokok", poin: [], isi: content }],
+        slides: [],
+        status: "Draft",
+        sumberTipe: "Teks",
+        sumberInput: content.slice(0, 500),
+      });
+
+      toast.success("Modul Ajar berhasil disimpan sebagai Draf!", {
+        action: {
+          label: "Buka Modul Ajar",
+          onClick: () => navigate({ to: "/modul-ajar" }),
+        },
+      });
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal menyimpan modul ajar ke database.");
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
+  const handleSaveToPPT = async (content: string, msgId: string) => {
+    setSavingAction(msgId + "-ppt");
+    try {
+      const slideBlocks = content.split(/\n(?=###?\s+Slide|\n\*\*Slide\s+\d+)/i);
+      const parsedSlides: Slide[] = [];
+      let slideNum = 1;
+
+      for (const block of slideBlocks) {
+        const titleMatch = block.match(/(?:Slide\s*\d*[:\-–]?\s*)([^\n]+)/i);
+        const bullets = Array.from(block.matchAll(/^[-*]\s+(.+)$/gm)).map((m) => m[1].trim());
+        if (bullets.length > 0 || titleMatch) {
+          parsedSlides.push({
+            id: uid(),
+            judul: titleMatch ? titleMatch[1].replace(/[*#]/g, "").trim() : `Slide ${slideNum}: Materi Pembelajaran`,
+            bullets: bullets.length > 0 ? bullets.slice(0, 6) : [block.slice(0, 100)],
+            ilustrasi: outlineSettings.illustrationStyleName,
+          });
+          slideNum++;
+        }
+      }
+
+      if (parsedSlides.length === 0) {
+        const paragraphs = content.split(/\n\n+/).filter((p) => p.trim().length > 30);
+        paragraphs.slice(0, Math.min(outlineSettings.slideCount, 5)).forEach((p, idx) => {
+          parsedSlides.push({
+            id: uid(),
+            judul: `Slide ${idx + 1}: Konsep Inti`,
+            bullets: [p.slice(0, 120)],
+            ilustrasi: outlineSettings.illustrationStyleName,
+          });
+        });
+      }
+
+      const pptTitle = `Presentasi PPT: ${activeSession?.title || "Materi Pembelajaran"}`;
+
+      await addModul({
+        judul: pptTitle,
+        kelas: outlineSettings.jenjang.includes("SMK") ? "X (SMK)" : "X",
+        mapel: "Dasar-Dasar Kejuruan / Umum",
+        ringkasan: `Slide presentasi berisi ${parsedSlides.length} slide bertema ${outlineSettings.pptStyleName}.`,
+        sections: [],
+        slides: parsedSlides,
+        status: "Draft",
+        sumberTipe: "Teks",
+        sumberInput: content.slice(0, 500),
+      });
+
+      toast.success(`Berhasil menyimpan ${parsedSlides.length} slide PPT ke Modul Ajar!`, {
+        action: {
+          label: "Buka di Modul Ajar",
+          onClick: () => navigate({ to: "/modul-ajar" }),
+        },
+      });
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal menyimpan slide presentasi.");
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
+  const handleSaveToSoal = async (content: string, msgId: string) => {
+    setSavingAction(msgId + "-soal");
+    try {
+      const questionBlocks = content.split(/\n(?=\d+\.\s+)/);
+      const parsedSoal: Soal[] = [];
+
+      for (const qBlock of questionBlocks) {
+        const qMatch = qBlock.match(/^(\d+)\.\s+([\s\S]+?)(?=\n[A-E]\.|\n[a-e]\.|$)/);
+        if (qMatch) {
+          const pertanyaan = qMatch[2].trim();
+          const opsiMatches = Array.from(qBlock.matchAll(/^[A-E]\.\s*(.+)$/gmi));
+          const opsi =
+            opsiMatches.length >= 2
+              ? opsiMatches.map((o) => o[1].trim())
+              : ["Opsi A", "Opsi B", "Opsi C", "Opsi D"];
+
+          const kunciMatch = qBlock.match(/Kunci(?:\s+Jawaban)?\s*[:\-–]?\s*([A-E])/i);
+          const kunciChar = kunciMatch ? kunciMatch[1].toUpperCase() : "A";
+          const kunciIndex = ["A", "B", "C", "D", "E"].indexOf(kunciChar);
+          const kunci = kunciIndex >= 0 && kunciIndex < opsi.length ? opsi[kunciIndex] : opsi[0];
+
+          const pembMatch = qBlock.match(/Pembahasan\s*[:\-–]?\s*([^\n]+(?:\n[^\n]+)*)/i);
+          const pembahasan = pembMatch ? pembMatch[1].trim() : "Pertanyaan asesmen pemahaman konsep.";
+
+          parsedSoal.push({
+            id: uid(),
+            pertanyaan,
+            opsi,
+            kunci,
+            pembahasan,
+          });
+        }
+      }
+
+      if (parsedSoal.length === 0) {
+        parsedSoal.push({
+          id: uid(),
+          pertanyaan: "Berdasarkan materi yang telah dipelajari, manakah pernyataan berikut yang paling tepat?",
+          opsi: [
+            "Pernyataan logis pertama sesuai dengan konsep materi",
+            "Pernyataan kedua memerlukan pertimbangan kondisi",
+            "Pernyataan ketiga bertentangan dengan prinsip dasar",
+            "Pernyataan keempat belum memenuhi kriteria evaluasi",
+          ],
+          kunci: "Pernyataan logis pertama sesuai dengan konsep materi",
+          pembahasan: "Pertanyaan dirancang untuk menguji pemahaman kritis siswa terhadap konsep.",
+        });
+      }
+
+      await addPaket({
+        judul: `Paket Soal: ${activeSession?.title || "Latihan HOTS"}`,
+        topik: activeSession?.title || "Materi Pembelajaran",
+        status: "Draft",
+        kelas: ["X"],
+        soal: parsedSoal,
+      });
+
+      toast.success(`Berhasil menyimpan ${parsedSoal.length} soal ke Bank Soal!`, {
+        action: {
+          label: "Buka Bank Soal",
+          onClick: () => navigate({ to: "/soal" }),
+        },
+      });
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal menyimpan soal ke Bank Soal.");
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
   // Reusable Sidebar Content
   const renderSidebarContent = () => (
     <div className="flex h-full flex-col">
@@ -376,7 +709,7 @@ export function AsistenGuruPage() {
             <h2 className="text-sm font-bold tracking-tight">AI Asisten Guru</h2>
             <p className="text-[11px] text-muted-foreground flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Google Gemini 3.6 Flash
+              Google Gemini Flash (Cepat & Cerdas)
             </p>
           </div>
         </div>
@@ -449,15 +782,13 @@ export function AsistenGuruPage() {
         </div>
       </div>
 
-      {/* Trash Tab Header Banner */}
+      {/* Trash Actions Bar */}
       {sidebarTab === "trash" && trashSessions.length > 0 && (
-        <div className="px-3 pb-2 flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">
-            Dihapus sementara
-          </span>
+        <div className="px-3 pb-2 flex items-center justify-between text-[11px] text-muted-foreground border-b border-border mb-1">
+          <span>{trashSessions.length} obrolan dihapus</span>
           <button
             onClick={() => setEmptyTrashConfirm(true)}
-            className="text-[11px] font-medium text-destructive hover:underline flex items-center gap-1"
+            className="text-destructive hover:underline font-medium inline-flex items-center gap-1"
           >
             <Trash className="h-3 w-3" />
             Kosongkan
@@ -465,31 +796,17 @@ export function AsistenGuruPage() {
         </div>
       )}
 
-      {/* Session List */}
-      <div className="flex-1 overflow-y-auto px-2 py-1 space-y-1">
+      {/* Sessions List */}
+      <div className="flex-1 overflow-y-auto px-2 space-y-1">
         {displayedSessions.length === 0 ? (
-          <div className="py-12 text-center px-4">
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground mb-2">
-              {sidebarTab === "active" ? (
-                <MessageSquare className="h-5 w-5" />
-              ) : (
-                <Trash2 className="h-5 w-5" />
-              )}
-            </div>
-            <p className="text-xs font-medium text-foreground">
-              {sidebarTab === "active"
-                ? "Belum ada riwayat percakapan"
-                : "Tempat sampah kosong"}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {sidebarTab === "active"
-                ? "Mulai dengan mengklik 'Percakapan Baru'."
-                : "Obrolan yang Anda hapus akan tersimpan di sini."}
-            </p>
+          <div className="p-4 text-center text-xs text-muted-foreground">
+            {sidebarTab === "active"
+              ? "Belum ada obrolan aktif."
+              : "Tempat sampah kosong."}
           </div>
         ) : (
           displayedSessions.map((s) => {
-            const isActive = s.id === activeSessionId && sidebarTab === "active";
+            const isActive = s.id === activeSessionId;
             return (
               <div
                 key={s.id}
@@ -499,22 +816,22 @@ export function AsistenGuruPage() {
                     setMobileDrawerOpen(false);
                   }
                 }}
-                className={`group relative flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 text-xs transition-colors ${
-                  isActive
-                    ? "bg-accent text-accent-foreground font-medium shadow-xs"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                className={`group flex items-center justify-between rounded-xl px-3 py-2.5 text-xs transition-colors cursor-pointer ${
+                  isActive && sidebarTab === "active"
+                    ? "bg-primary/10 text-primary font-semibold"
+                    : "text-foreground hover:bg-muted/60"
                 }`}
               >
-                <div className="flex items-center gap-2.5 overflow-hidden pr-2">
+                <div className="flex items-center gap-2 truncate pr-2">
                   <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-70" />
                   <span className="truncate">{s.title || "Percakapan Baru"}</span>
                 </div>
 
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   {sidebarTab === "active" ? (
                     <button
                       onClick={(e) => moveToTrash(s.id, e)}
-                      className="opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 p-1 rounded-md"
+                      className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       title="Pindahkan ke Tempat Sampah"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -523,7 +840,7 @@ export function AsistenGuruPage() {
                     <>
                       <button
                         onClick={(e) => restoreFromTrash(s.id, e)}
-                        className="p-1 rounded-md text-emerald-600 hover:bg-emerald-500/10 transition-colors"
+                        className="p-1 rounded-md text-emerald-600 hover:bg-emerald-500/10"
                         title="Pulihkan Percakapan"
                       >
                         <Undo2 className="h-3.5 w-3.5" />
@@ -533,10 +850,10 @@ export function AsistenGuruPage() {
                           e.stopPropagation();
                           setDeleteConfirmId(s.id);
                         }}
-                        className="p-1 rounded-md text-destructive hover:bg-destructive/10 transition-colors"
+                        className="p-1 rounded-md text-destructive hover:bg-destructive/10"
                         title="Hapus Permanen"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash className="h-3.5 w-3.5" />
                       </button>
                     </>
                   )}
@@ -561,7 +878,7 @@ export function AsistenGuruPage() {
   );
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
+    <div className="flex h-full w-full max-w-full overflow-hidden bg-background select-text overscroll-none touch-pan-y relative">
       {/* 1. DESKTOP SIDEBAR (Visible on lg screens when open) */}
       <aside
         className={`hidden lg:flex flex-col border-r border-border bg-card transition-all duration-300 ${
@@ -574,23 +891,21 @@ export function AsistenGuruPage() {
       {/* 2. MOBILE & TABLET DRAWER (Slide-over for screens < lg) */}
       {mobileDrawerOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
-          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
             onClick={() => setMobileDrawerOpen(false)}
           />
-          {/* Drawer content */}
           <div className="relative z-50 w-72 sm:w-80 h-full bg-card shadow-2xl border-r border-border animate-in slide-in-from-left duration-200">
             {renderSidebarContent()}
           </div>
         </div>
       )}
 
-      {/* 3. WORKSPACE CHAT UTAMA */}
-      <main className="flex flex-1 flex-col overflow-hidden w-full">
-        {/* HEADER ATAS RESPOMSIF */}
-        <header className="flex h-14 items-center justify-between border-b border-border bg-card/70 px-3 sm:px-4 backdrop-blur-sm shrink-0">
-          <div className="flex items-center gap-2 sm:gap-3 overflow-hidden">
+      {/* 3. WORKSPACE CHAT UTAMA (LOCKED AGAINST HORIZONTAL WIGGLE) */}
+      <main className="flex flex-1 flex-col overflow-hidden w-full max-w-full min-w-0 h-full relative">
+        {/* HEADER ATAS RESPONSIF */}
+        <header className="flex h-12 sm:h-14 items-center justify-between border-b border-border bg-card/80 px-2.5 sm:px-4 backdrop-blur-sm shrink-0 w-full max-w-full">
+          <div className="flex items-center gap-2 sm:gap-3 overflow-hidden min-w-0">
             {/* Mobile / Tablet Toggle Button */}
             <Button
               variant="outline"
@@ -615,12 +930,29 @@ export function AsistenGuruPage() {
               </Button>
             )}
 
-            <h1 className="text-xs sm:text-sm font-semibold truncate max-w-[160px] xs:max-w-xs sm:max-w-sm md:max-w-md">
+            <h1 className="text-xs sm:text-sm font-semibold truncate max-w-[150px] xs:max-w-xs sm:max-w-sm md:max-w-md">
               {activeSession?.title || "AI Asisten Guru"}
             </h1>
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Template & Outline Quick Config Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setTempOutlineSettings({ ...outlineSettings });
+                setShowOutlineModal(true);
+              }}
+              className="rounded-xl text-[11px] sm:text-xs gap-1 sm:gap-1.5 px-2.5 sm:px-3 h-8 border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
+              title="Atur Template PPT, Ilustrasi, & Outline"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <span className="hidden xs:inline">Atur Template</span>
+              <span className="xs:hidden">Outline</span>
+            </Button>
+
+            {/* Context Attachment Button */}
             <Button
               variant="outline"
               size="sm"
@@ -630,10 +962,10 @@ export function AsistenGuruPage() {
               }`}
             >
               <Paperclip className="h-3.5 w-3.5" />
-              <span className="hidden xs:inline">
+              <span className="hidden sm:inline">
                 {contextMateri.trim() ? "Materi Terlampir" : "Lampirkan Bahan"}
               </span>
-              <span className="xs:hidden">
+              <span className="sm:hidden">
                 {contextMateri.trim() ? "Rujukan" : "Lampir"}
               </span>
             </Button>
@@ -650,8 +982,8 @@ export function AsistenGuruPage() {
           </div>
         </header>
 
-        {/* CONTAINER PESAN SCROLLABLE */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+        {/* CONTAINER PESAN SCROLLABLE (Pencegahan geser kanan-kiri) */}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-2.5 sm:p-4 md:p-6 space-y-3.5 sm:space-y-5 w-full max-w-full">
           {currentMessages.length === 0 ? (
             /* EMPTY HERO STATE */
             <div className="mx-auto my-auto max-w-2xl text-center py-6 sm:py-10 px-2">
@@ -662,59 +994,138 @@ export function AsistenGuruPage() {
                 Halo, Bapak/Ibu Guru!
               </h2>
               <p className="mt-1 text-xs text-muted-foreground sm:text-sm max-w-md mx-auto">
-                Ketik pertanyaan pembelajaran Anda secara bebas, atau pilih salah satu kartu rekomendasi ide di bawah ini:
+                Ketik instruksi pembelajaran Anda secara bebas, atau pilih salah satu kartu rekomendasi aksi di bawah ini:
               </p>
 
               <div className="mt-6 sm:mt-8 grid grid-cols-1 gap-2.5 sm:gap-3 sm:grid-cols-2 text-left">
-                {STARTER_PROMPTS.map((starter, i) => {
-                  const Icon = starter.icon;
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => handleSendMessage(starter.prompt)}
-                      className="group flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 sm:p-4 text-left transition-all hover:border-primary/50 hover:bg-muted/40 hover:shadow-xs active:scale-[0.99]"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                            <Icon className="h-3 w-3" />
-                            {starter.badge}
-                          </span>
-                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                        </div>
-                        <h3 className="text-xs sm:text-sm font-bold text-foreground">
-                          {starter.title}
-                        </h3>
-                        <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
-                          {starter.prompt}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
+                {/* 1. Modul Ajar Card */}
+                <button
+                  onClick={() =>
+                    handleSendMessage(
+                      `Tolong buatkan Modul Ajar Kurikulum Merdeka yang lengkap untuk jenjang ${outlineSettings.jenjang} dengan model ${outlineSettings.modelPembelajaran} mengenai materi Percabangan Logika IF-ELSE. Sertakan Tujuan Pembelajaran, Pertanyaan Pemantik, Kegiatan Inti, dan Asesmen.`
+                    )
+                  }
+                  className="group flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 sm:p-4 text-left transition-all hover:border-primary/50 hover:bg-muted/40 hover:shadow-xs active:scale-[0.99]"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        <BookOpen className="h-3 w-3" />
+                        Modul Ajar
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
+                    <h3 className="text-xs sm:text-sm font-bold text-foreground">
+                      Buat Modul Ajar Lengkap
+                    </h3>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                      Format Kurikulum Merdeka lengkap dengan skenario kegiatan PBL & asesmen siap pakai.
+                    </p>
+                  </div>
+                </button>
+
+                {/* 2. PPT Card */}
+                <button
+                  onClick={() =>
+                    handleSendMessage(
+                      `Rancang ${outlineSettings.slideCount} slide presentasi PPT dengan tema ${outlineSettings.pptStyleName} untuk materi Struktur Data Array. Berikan judul tiap slide, poin-poin materi ringkas, dan arahan visual interaktif.`
+                    )
+                  }
+                  className="group flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 sm:p-4 text-left transition-all hover:border-primary/50 hover:bg-muted/40 hover:shadow-xs active:scale-[0.99]"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        <Presentation className="h-3 w-3" />
+                        Presentasi PPT ({outlineSettings.slideCount} Slide)
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
+                    <h3 className="text-xs sm:text-sm font-bold text-foreground">
+                      Rancang Slide Presentasi
+                    </h3>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                      Outline slide terstruktur mengikuti tema {outlineSettings.pptStyleName}.
+                    </p>
+                  </div>
+                </button>
+
+                {/* 3. Ilustrasi Card */}
+                <button
+                  onClick={() =>
+                    handleSendMessage(
+                      `Rancang konsep gambar ilustrasi edukatif dengan gaya visual ${outlineSettings.illustrationStyleName} (rasio ${outlineSettings.illustrationAspect}) mengenai Alur Pengambilan Keputusan Percabangan IF-ELSE.`
+                    )
+                  }
+                  className="group flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 sm:p-4 text-left transition-all hover:border-primary/50 hover:bg-muted/40 hover:shadow-xs active:scale-[0.99]"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        <Palette className="h-3 w-3" />
+                        Ide Ilustrasi ({outlineSettings.illustrationStyleName})
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
+                    <h3 className="text-xs sm:text-sm font-bold text-foreground">
+                      Rancang Konsep Diagram Alur
+                    </h3>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                      Deskripsi visual langkah-demi-langkah ramah siswa tanpa karakter diagram teks acak.
+                    </p>
+                  </div>
+                </button>
+
+                {/* 4. Soal Card */}
+                <button
+                  onClick={() =>
+                    handleSendMessage(
+                      `Buatkan 5 soal pilihan ganda berbasis HOTS (Higher Order Thinking Skills) untuk menguji pemahaman logika pemrograman dan algoritma untuk jenjang ${outlineSettings.jenjang}, lengkap dengan stimulus kasus, opsi A-E, kunci jawaban, dan pembahasan mendalam.`
+                    )
+                  }
+                  className="group flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 sm:p-4 text-left transition-all hover:border-primary/50 hover:bg-muted/40 hover:shadow-xs active:scale-[0.99]"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        <FileQuestion className="h-3 w-3" />
+                        Asesmen & Bank Soal
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
+                    <h3 className="text-xs sm:text-sm font-bold text-foreground">
+                      Buat 5 Soal HOTS
+                    </h3>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                      Soal berpikir tingkat tinggi berbasis studi kasus kontekstual lengkap dengan pembahasan.
+                    </p>
+                  </div>
+                </button>
               </div>
             </div>
           ) : (
             /* MESSAGE LIST */
-            <div className="mx-auto max-w-3xl space-y-4 sm:space-y-5">
+            <div className="mx-auto max-w-3xl w-full space-y-3.5 sm:space-y-5 px-0.5 sm:px-1">
               {currentMessages.map((m) => {
                 const isUser = m.role === "user";
                 return (
                   <div
                     key={m.id}
-                    className={`flex gap-2.5 sm:gap-3 ${isUser ? "justify-end" : "justify-start"}`}
+                    className={`flex gap-2 sm:gap-3 w-full max-w-full ${
+                      isUser ? "justify-end" : "justify-start"
+                    }`}
                   >
                     {!isUser && (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
+                      <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs mt-1">
                         <Bot className="h-4 w-4" />
                       </div>
                     )}
 
                     <div
-                      className={`max-w-[92%] sm:max-w-[85%] rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs leading-relaxed sm:text-sm shadow-xs ${
+                      className={`break-words [overflow-wrap:anywhere] [word-break:break-word] ${
                         isUser
-                          ? "bg-primary text-primary-foreground font-sans whitespace-pre-wrap"
-                          : "border border-border bg-card text-foreground"
+                          ? "max-w-[88%] sm:max-w-[80%] rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm font-sans whitespace-pre-wrap bg-primary text-primary-foreground shadow-xs ml-auto"
+                          : "w-full max-w-full rounded-2xl px-3.5 sm:px-5 py-3 sm:py-4 border border-border bg-card text-foreground shadow-xs overflow-hidden"
                       }`}
                     >
                       {isUser ? (
@@ -724,16 +1135,53 @@ export function AsistenGuruPage() {
                       )}
 
                       {!isUser && (
-                        <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2 text-muted-foreground">
+                        <div className="mt-3.5 pt-3 border-t border-border/60 flex flex-wrap items-center justify-between gap-2 text-muted-foreground">
+                          {/* AI Provider Info */}
                           <span className="text-[10px] font-medium flex items-center gap-1">
-                            <Sparkles className="h-2.5 w-2.5 text-primary" />
-                            Gemini AI
+                            <Sparkles className="h-3 w-3 text-primary" />
+                            GuruPro AI Assistant
                           </span>
-                          <div className="flex items-center gap-2">
+
+                          {/* ACTION BUTTONS (Tahap 3: Simpan Otomatis) */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {/* 1. Save to Modul Ajar Button */}
+                            <button
+                              onClick={() => handleSaveToModul(m.content, m.id)}
+                              disabled={savingAction === m.id + "-modul"}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[10.5px] font-medium text-foreground hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
+                              title="Simpan rancangan ini ke Modul Ajar"
+                            >
+                              <BookOpen className="h-3 w-3 text-primary" />
+                              <span>{savingAction === m.id + "-modul" ? "Menyimpan..." : "Simpan ke Modul"}</span>
+                            </button>
+
+                            {/* 2. Save to PPT Button */}
+                            <button
+                              onClick={() => handleSaveToPPT(m.content, m.id)}
+                              disabled={savingAction === m.id + "-ppt"}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[10.5px] font-medium text-foreground hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
+                              title="Simpan butir slide presentasi ke Modul Ajar"
+                            >
+                              <Presentation className="h-3 w-3 text-primary" />
+                              <span>{savingAction === m.id + "-ppt" ? "Menyimpan..." : "Simpan ke PPT"}</span>
+                            </button>
+
+                            {/* 3. Save to Soal Button */}
+                            <button
+                              onClick={() => handleSaveToSoal(m.content, m.id)}
+                              disabled={savingAction === m.id + "-soal"}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[10.5px] font-medium text-foreground hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
+                              title="Simpan butir soal ke Bank Soal"
+                            >
+                              <FileQuestion className="h-3 w-3 text-primary" />
+                              <span>{savingAction === m.id + "-soal" ? "Menyimpan..." : "Simpan ke Soal"}</span>
+                            </button>
+
+                            {/* 4. Copy Text Button */}
                             <button
                               onClick={() => handleCopy(m.id, m.content)}
-                              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] hover:bg-muted transition-colors"
-                              title="Salin teks jawaban"
+                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[10.5px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                              title="Salin jawaban lengkap"
                             >
                               {copiedId === m.id ? (
                                 <>
@@ -747,18 +1195,6 @@ export function AsistenGuruPage() {
                                 </>
                               )}
                             </button>
-
-                            <button
-                              onClick={() => {
-                                toast.info("Membuka Modul Ajar...");
-                                void navigate({ to: "/modul-ajar" });
-                              }}
-                              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] hover:bg-muted transition-colors text-primary font-medium"
-                              title="Buka editor modul ajar"
-                            >
-                              <BookOpen className="h-3 w-3" />
-                              <span>Buka Modul Ajar</span>
-                            </button>
                           </div>
                         </div>
                       )}
@@ -768,13 +1204,13 @@ export function AsistenGuruPage() {
               })}
 
               {isLoading && (
-                <div className="flex gap-2.5 sm:gap-3 justify-start">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs animate-pulse">
+                <div className="flex gap-2.5 sm:gap-3 justify-start w-full max-w-full">
+                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs animate-pulse mt-1">
                     <Bot className="h-4 w-4" />
                   </div>
-                  <div className="rounded-2xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground flex items-center gap-2.5">
-                    <span className="h-2 w-2 rounded-full bg-primary animate-ping" />
-                    <span>GuruPro AI sedang berpikir dan merancang jawaban terstruktur...</span>
+                  <div className="rounded-2xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground flex items-center gap-2.5 shadow-xs">
+                    <span className="h-2 w-2 rounded-full bg-primary animate-ping shrink-0" />
+                    <span>GuruPro AI sedang menyusun materi terstruktur sesuai outline...</span>
                   </div>
                 </div>
               )}
@@ -784,16 +1220,16 @@ export function AsistenGuruPage() {
           )}
         </div>
 
-        {/* BOTTOM INPUT BAR RESPOMSIF */}
-        <div className="border-t border-border bg-card/90 p-2.5 sm:p-3 md:p-4 backdrop-blur-md shrink-0">
-          <div className="mx-auto max-w-3xl">
+        {/* BOTTOM INPUT BAR RESPONSIF */}
+        <div className="border-t border-border bg-card/90 p-2.5 sm:p-3 md:p-4 backdrop-blur-md shrink-0 w-full max-w-full">
+          <div className="mx-auto max-w-3xl w-full">
             {/* Context attachment indicator */}
             {contextMateri.trim() && (
               <div className="mb-2 flex items-center justify-between rounded-lg bg-primary/10 px-3 py-1.5 text-xs text-primary">
                 <div className="flex items-center gap-2 truncate">
                   <FileText className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">
-                    Bahan Ajar Rujukan: {contextMateri.slice(0, 50)}...
+                    Rujukan Bahan: {contextMateri.slice(0, 50)}...
                   </span>
                 </div>
                 <button
@@ -806,31 +1242,74 @@ export function AsistenGuruPage() {
               </div>
             )}
 
-            {/* Quick Action Chips (Horizontal Scrollable) */}
-            <div className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] no-scrollbar">
+            {/* ACTIVE OUTLINE CONFIGURATION PILL & SHORTCUT (Tahap 2) */}
+            <div className="mb-2 flex items-center justify-between gap-1.5 flex-wrap">
               <button
-                onClick={() => setInputMessage("Buatkan Modul Ajar Kurikulum Merdeka tentang ")}
+                type="button"
+                onClick={() => {
+                  setTempOutlineSettings({ ...outlineSettings });
+                  setShowOutlineModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/10 transition-colors shadow-2xs"
+                title="Klik untuk mengubah template PPT, gaya ilustrasi, dan model modul ajar"
+              >
+                <SlidersHorizontal className="h-3 w-3 shrink-0" />
+                <span className="font-semibold text-foreground">
+                  📊 PPT: {outlineSettings.pptStyleName.split(" ")[0]} ({outlineSettings.slideCount} Slide)
+                </span>
+                <span className="text-border">•</span>
+                <span className="font-semibold text-foreground">
+                  🎨 {outlineSettings.illustrationStyleName.split(" ")[0]}
+                </span>
+                <Settings2 className="h-2.5 w-2.5 ml-0.5 opacity-70 shrink-0" />
+              </button>
+
+              <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                Sistem menerapkan outline ini otomatis saat Anda bertanya
+              </span>
+            </div>
+
+            {/* Quick Action Chips (Horizontal Scrollable) */}
+            <div className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] no-scrollbar scroll-smooth touch-pan-x flex-nowrap w-full max-w-full">
+              <button
+                onClick={() =>
+                  setInputMessage(
+                    `Buatkan Modul Ajar Kurikulum Merdeka tingkat ${outlineSettings.jenjang} dengan model ${outlineSettings.modelPembelajaran} tentang `
+                  )
+                }
                 className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 hover:border-primary/50 hover:bg-muted/50 transition-colors"
               >
                 <BookOpen className="h-3 w-3 text-primary" />
                 <span>Buat Modul Ajar</span>
               </button>
               <button
-                onClick={() => setInputMessage("Rancang 5 slide presentasi PPT untuk materi ")}
+                onClick={() =>
+                  setInputMessage(
+                    `Rancang ${outlineSettings.slideCount} slide presentasi PPT dengan tema gaya ${outlineSettings.pptStyleName} untuk materi `
+                  )
+                }
                 className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 hover:border-primary/50 hover:bg-muted/50 transition-colors"
               >
                 <Presentation className="h-3 w-3 text-primary" />
-                <span>Buat Slide PPT</span>
+                <span>Buat Slide PPT ({outlineSettings.slideCount} Slide)</span>
               </button>
               <button
-                onClick={() => setInputMessage("Rancang konsep gambar ilustrasi edukatif tentang ")}
+                onClick={() =>
+                  setInputMessage(
+                    `Rancang konsep gambar ilustrasi edukatif dengan gaya visual ${outlineSettings.illustrationStyleName} (rasio ${outlineSettings.illustrationAspect}) tentang `
+                  )
+                }
                 className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 hover:border-primary/50 hover:bg-muted/50 transition-colors"
               >
                 <Sparkles className="h-3 w-3 text-primary" />
-                <span>Buat Ide Ilustrasi</span>
+                <span>Buat Ide Ilustrasi ({outlineSettings.illustrationStyleName})</span>
               </button>
               <button
-                onClick={() => setInputMessage("Buatkan 5 soal HOTS pilihan ganda tentang ")}
+                onClick={() =>
+                  setInputMessage(
+                    `Buatkan 5 soal HOTS pilihan ganda untuk jenjang ${outlineSettings.jenjang} lengkap dengan kunci jawaban dan pembahasan tentang `
+                  )
+                }
                 className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 hover:border-primary/50 hover:bg-muted/50 transition-colors"
               >
                 <FileQuestion className="h-3 w-3 text-primary" />
@@ -839,7 +1318,7 @@ export function AsistenGuruPage() {
             </div>
 
             {/* Textarea Input Card */}
-            <div className="relative flex items-end rounded-2xl border border-border bg-background shadow-xs focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+            <div className="relative flex items-end rounded-2xl border border-border bg-background shadow-xs focus-within:border-primary focus-within:ring-1 focus-within:ring-primary w-full max-w-full">
               <textarea
                 ref={textareaRef}
                 rows={1}
@@ -852,7 +1331,7 @@ export function AsistenGuruPage() {
                   }
                 }}
                 placeholder="Tanyakan materi, minta buatkan modul, PPT, soal, atau ilustrasi..."
-                className="w-full resize-none bg-transparent p-3 text-xs sm:text-sm focus:outline-none max-h-32 min-h-[44px]"
+                className="w-full resize-none bg-transparent p-2.5 sm:p-3 text-[13px] sm:text-sm focus:outline-none max-h-28 sm:max-h-36 min-h-[40px] sm:min-h-[44px]"
               />
 
               <div className="flex items-center gap-1 p-1.5 sm:p-2 shrink-0">
@@ -884,7 +1363,367 @@ export function AsistenGuruPage() {
         </div>
       </main>
 
-      {/* MODAL LAMPIRKAN BAHAN AJAR */}
+      {/* ============================================================================== */}
+      {/* MODAL 1: PENGATURAN TEMPLATE & OUTLINE (Tahap 2)                               */}
+      {/* ============================================================================== */}
+      {showOutlineModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border px-4 sm:px-6 py-3.5 bg-muted/30 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <SlidersHorizontal className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-foreground">
+                    Pengaturan Template & Outline AI
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Tentukan gaya presentasi PPT, visual ilustrasi, dan sasaran modul yang akan digenerate
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowOutlineModal(false)}
+                className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Tab Buttons */}
+            <div className="flex border-b border-border bg-muted/20 px-4 sm:px-6 shrink-0">
+              <button
+                onClick={() => setOutlineModalTab("ppt")}
+                className={`flex items-center gap-1.5 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all ${
+                  outlineModalTab === "ppt"
+                    ? "border-primary text-primary font-bold"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Presentation className="h-3.5 w-3.5" />
+                <span>Presentasi PPT</span>
+              </button>
+              <button
+                onClick={() => setOutlineModalTab("illustration")}
+                className={`flex items-center gap-1.5 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all ${
+                  outlineModalTab === "illustration"
+                    ? "border-primary text-primary font-bold"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Palette className="h-3.5 w-3.5" />
+                <span>Gaya Ilustrasi</span>
+              </button>
+              <button
+                onClick={() => setOutlineModalTab("modul")}
+                className={`flex items-center gap-1.5 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all ${
+                  outlineModalTab === "modul"
+                    ? "border-primary text-primary font-bold"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                <span>Modul & Model</span>
+              </button>
+            </div>
+
+            {/* Tab Body Content (Scrollable) */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+              {/* TAB 1: PRESENTASI PPT */}
+              {outlineModalTab === "ppt" && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-foreground block mb-2">
+                      Pilih Tema & Gaya Slide PPT:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {PPT_STYLES.map((st) => {
+                        const isSelected = tempOutlineSettings.pptStyle === st.id;
+                        return (
+                          <div
+                            key={st.id}
+                            onClick={() =>
+                              setTempOutlineSettings({
+                                ...tempOutlineSettings,
+                                pptStyle: st.id,
+                                pptStyleName: st.name,
+                              })
+                            }
+                            className={`p-3 rounded-xl border cursor-pointer transition-all text-left flex flex-col justify-between ${
+                              isSelected
+                                ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs"
+                                : "border-border bg-card hover:bg-muted/40"
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-base mr-1">{st.icon}</span>
+                                <span className="text-[10px] font-semibold text-primary rounded-full bg-primary/10 px-2 py-0.5">
+                                  {st.badge}
+                                </span>
+                              </div>
+                              <h4 className="text-xs font-bold text-foreground">{st.name}</h4>
+                              <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                                {st.desc}
+                              </p>
+                            </div>
+                            {isSelected && (
+                              <div className="mt-2 flex items-center gap-1 text-[10px] text-primary font-medium">
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span>Gaya Aktif</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border">
+                    <div>
+                      <label className="text-xs font-bold text-foreground block mb-1.5">
+                        Target Jumlah Slide:
+                      </label>
+                      <div className="flex gap-2">
+                        {[3, 5, 7, 10].map((count) => (
+                          <button
+                            key={count}
+                            type="button"
+                            onClick={() =>
+                              setTempOutlineSettings({
+                                ...tempOutlineSettings,
+                                slideCount: count,
+                              })
+                            }
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                              tempOutlineSettings.slideCount === count
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-muted/40 text-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {count} Slide
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-foreground block mb-1.5">
+                        Rasio Aspek Layar:
+                      </label>
+                      <div className="flex gap-2">
+                        {[
+                          { label: "16:9 (Widescreen)", val: "16:9" },
+                          { label: "4:3 (Klasik)", val: "4:3" },
+                        ].map((r) => (
+                          <button
+                            key={r.val}
+                            type="button"
+                            onClick={() =>
+                              setTempOutlineSettings({
+                                ...tempOutlineSettings,
+                                aspectRatio: r.val,
+                              })
+                            }
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                              tempOutlineSettings.aspectRatio === r.val
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-muted/40 text-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {r.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: ILUSTRASI GAMBAR */}
+              {outlineModalTab === "illustration" && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-foreground block mb-2">
+                      Pilih Gaya Visual Ilustrasi:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {ILL_STYLES.map((st) => {
+                        const isSelected = tempOutlineSettings.illustrationStyle === st.id;
+                        return (
+                          <div
+                            key={st.id}
+                            onClick={() =>
+                              setTempOutlineSettings({
+                                ...tempOutlineSettings,
+                                illustrationStyle: st.id,
+                                illustrationStyleName: st.name,
+                              })
+                            }
+                            className={`p-3 rounded-xl border cursor-pointer transition-all text-left flex flex-col justify-between ${
+                              isSelected
+                                ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs"
+                                : "border-border bg-card hover:bg-muted/40"
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-base mr-1">{st.icon}</span>
+                                <span className="text-[10px] font-semibold text-primary rounded-full bg-primary/10 px-2 py-0.5">
+                                  {st.badge}
+                                </span>
+                              </div>
+                              <h4 className="text-xs font-bold text-foreground">{st.name}</h4>
+                              <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                                {st.desc}
+                              </p>
+                            </div>
+                            {isSelected && (
+                              <div className="mt-2 flex items-center gap-1 text-[10px] text-primary font-medium">
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span>Gaya Aktif</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-border">
+                    <label className="text-xs font-bold text-foreground block mb-1.5">
+                      Rasio Gambar Ilustrasi:
+                    </label>
+                    <div className="flex gap-2">
+                      {[
+                        { label: "16:9 (Lanskap Proyektor)", val: "16:9" },
+                        { label: "1:1 (Persegi Modul)", val: "1:1" },
+                        { label: "4:3 (Buku Pelajaran)", val: "4:3" },
+                      ].map((r) => (
+                        <button
+                          key={r.val}
+                          type="button"
+                          onClick={() =>
+                            setTempOutlineSettings({
+                              ...tempOutlineSettings,
+                              illustrationAspect: r.val,
+                            })
+                          }
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                            tempOutlineSettings.illustrationAspect === r.val
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-muted/40 text-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {r.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: MODUL & MODEL PEMBELAJARAN */}
+              {outlineModalTab === "modul" && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-foreground block mb-2">
+                      Jenjang & Sasaran Siswa:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {JENJANG_OPTIONS.map((j) => {
+                        const isSelected = tempOutlineSettings.jenjang === j;
+                        return (
+                          <button
+                            key={j}
+                            type="button"
+                            onClick={() =>
+                              setTempOutlineSettings({
+                                ...tempOutlineSettings,
+                                jenjang: j,
+                              })
+                            }
+                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all ${
+                              isSelected
+                                ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary"
+                                : "border-border bg-card text-foreground hover:bg-muted/40"
+                            }`}
+                          >
+                            {j}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-border">
+                    <label className="text-xs font-bold text-foreground block mb-2">
+                      Model Pembelajaran Kurikulum Merdeka:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {MODEL_PEMBELAJARAN_OPTIONS.map((m) => {
+                        const isSelected = tempOutlineSettings.modelPembelajaran === m;
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() =>
+                              setTempOutlineSettings({
+                                ...tempOutlineSettings,
+                                modelPembelajaran: m,
+                              })
+                            }
+                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all ${
+                              isSelected
+                                ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary"
+                                : "border-border bg-card text-foreground hover:bg-muted/40"
+                            }`}
+                          >
+                            {m}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-border px-4 sm:px-6 py-3 bg-muted/20 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                Pilihan disimpan otomatis dan digunakan pada instruksi berikutnya.
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowOutlineModal(false)}
+                >
+                  Batal
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    persistOutlineSettings(tempOutlineSettings);
+                    setShowOutlineModal(false);
+                    toast.success("Pengaturan template & outline berhasil diterapkan!");
+                  }}
+                  className="bg-primary text-primary-foreground font-medium"
+                >
+                  Terapkan Pengaturan
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================== */}
+      {/* MODAL 2: LAMPIRKAN BAHAN AJAR RUJUKAN                                          */}
+      {/* ============================================================================== */}
       {showContextModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-2xl">
@@ -902,7 +1741,7 @@ export function AsistenGuruPage() {
             </div>
 
             <p className="mt-2 text-xs text-muted-foreground">
-              Tempelkan teks Capaian Pembelajaran (CP), silabus, ringkasan buku, atau catatan guru. AI akan menjawab berdasarkan rujukan ini.
+              Tempelkan teks Capaian Pembelajaran (CP), silabus, ringkasan materi, atau catatan guru. AI akan menjawab berdasarkan rujukan ini.
             </p>
 
             <textarea
@@ -938,7 +1777,9 @@ export function AsistenGuruPage() {
         </div>
       )}
 
-      {/* ALERT DIALOG: HAPUS PERMANEN SINGLE CHAT */}
+      {/* ============================================================================== */}
+      {/* ALERT DIALOG: HAPUS PERMANEN SINGLE CHAT                                       */}
+      {/* ============================================================================== */}
       <AlertDialog
         open={!!deleteConfirmId}
         onOpenChange={(open) => !open && setDeleteConfirmId(null)}
@@ -969,7 +1810,9 @@ export function AsistenGuruPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ALERT DIALOG: KOSONGKAN SEMUA SAMPAH */}
+      {/* ============================================================================== */}
+      {/* ALERT DIALOG: KOSONGKAN SEMUA SAMPAH                                           */}
+      {/* ============================================================================== */}
       <AlertDialog
         open={emptyTrashConfirm}
         onOpenChange={setEmptyTrashConfirm}

@@ -234,17 +234,19 @@ export function TahunAjaranHeaderSelector({ userId }: { userId?: string }) {
 
 function AppShell() {
   const { profile, user } = useAuth();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   
   // Single Source of Truth (SSOT): Only database profile role === 'guru' is treated as teacher
   const isTeacher = profile?.role?.toLowerCase()?.trim() === "guru";
+  const isAsistenGuru = pathname.startsWith("/asisten-guru");
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
+      <div className="flex min-h-screen w-full bg-background overflow-x-hidden overscroll-none">
         <AppSidebar />
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 sm:gap-3 border-b bg-card/85 px-3 sm:px-6 backdrop-blur">
+        <div className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
+          <header className="sticky top-0 z-30 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-3 border-b bg-card/85 px-3 sm:px-6 backdrop-blur shrink-0">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <SidebarTrigger className="shrink-0" />
               <div className="flex items-center gap-1.5 md:hidden shrink-0">
@@ -301,10 +303,14 @@ function AppShell() {
             </div>
           </header>
 
-          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto w-full max-w-6xl">
+          <main className={isAsistenGuru ? "flex-1 min-h-0 w-full overflow-hidden p-0 max-w-full" : "flex-1 px-4 py-6 sm:px-6 lg:px-8 overflow-y-auto"}>
+            {isAsistenGuru ? (
               <Outlet />
-            </div>
+            ) : (
+              <div className="mx-auto w-full max-w-6xl">
+                <Outlet />
+              </div>
+            )}
           </main>
         </div>
       </div>

@@ -16,9 +16,19 @@ const ChatMessageSchema = z.object({
   content: z.string(),
 });
 
+const OutlineSettingsSchema = z.object({
+  pptStyle: z.string().optional(),
+  slideCount: z.number().optional(),
+  illustrationStyle: z.string().optional(),
+  illustrationAspect: z.string().optional(),
+  jenjang: z.string().optional(),
+  modelPembelajaran: z.string().optional(),
+}).optional();
+
 const ChatInputSchema = z.object({
   messages: z.array(ChatMessageSchema),
   contextMateri: z.string().optional(),
+  outlineSettings: OutlineSettingsSchema,
 });
 
 export interface ChatResponse {
@@ -40,8 +50,13 @@ Pedoman Kerapian & Format Penulisan (SANGAT PENTING):
 2. HINDARI SIMBOL DAN TANDA BACA BERLEBIHAN: Jangan memenuhi teks dengan tanda kutip ganda beruntun, tanda kurung placeholder yang berlebihan, atau teks yang membingungkan. Buat kalimat mengalir alami dan nyaman dibaca langsung oleh guru.
 3. BLOK KODE YANG RAPI: Tuliskan contoh kode program di dalam blok kode rapi (misal: \`\`\`python atau \`\`\`cpp) lengkap dengan penjelasan baris penting.
 4. STRUKTUR YANG SISTEMATIS: Gunakan tingkatan sub-judul yang rapi (# untuk Judul Utama, ## untuk Bagian, ### untuk Sub-bagian), gunakan poin bulat yang tertata, dan tabel untuk perbandingan.
-5. TUNTAS & SELESAI: Pastikan jawaban selesai tuntas sampai bagian penutup dan tidak terpotong di tengah kalimat.
-6. Berbicaralah dengan bahasa Indonesia yang ramah, sopan, dan profesional (sapa pengguna dengan "Bapak/Ibu Guru").`;
+5. FORMAT SLIDE PRESENTASI (JIKA DIMINTA): Susun setiap slide dengan format jelas:
+   ### Slide [Nomor]: [Judul Slide]
+   - **Poin Utama:** (butir-butir ringkas)
+   - **Arah Visual / Catatan Presenter:** (penjelasan visual)
+6. FORMAT SOAL HOTS (JIKA DIMINTA): Berikan nomor soal, stimulus kasus nyata, pilihan jawaban A sampai E, kunci jawaban, serta pembahasan.
+7. TUNTAS & SELESAI: Pastikan jawaban selesai tuntas sampai bagian penutup dan tidak terpotong di tengah kalimat.
+8. Berbicaralah dengan bahasa Indonesia yang ramah, sopan, dan profesional (sapa pengguna dengan "Bapak/Ibu Guru").`;
 
 export const chatWithGuruAiServerFn = createServerFn({
   method: "POST",
@@ -65,6 +80,28 @@ export const chatWithGuruAiServerFn = createServerFn({
         role: "system",
         content: `Konteks Bahan Ajar Guru yang dilampirkan:\n${data.contextMateri.trim()}`,
       });
+    }
+
+    if (data.outlineSettings) {
+      const parts: string[] = [];
+      if (data.outlineSettings.pptStyle) {
+        parts.push(`- Template Gaya Slide Presentasi (PPT): ${data.outlineSettings.pptStyle} (Target: ${data.outlineSettings.slideCount || 5} slide)`);
+      }
+      if (data.outlineSettings.illustrationStyle) {
+        parts.push(`- Gaya Visual Ilustrasi Edukasi: ${data.outlineSettings.illustrationStyle} (Rasio: ${data.outlineSettings.illustrationAspect || "16:9"})`);
+      }
+      if (data.outlineSettings.jenjang) {
+        parts.push(`- Jenjang / Sasaran Siswa: ${data.outlineSettings.jenjang}`);
+      }
+      if (data.outlineSettings.modelPembelajaran) {
+        parts.push(`- Model Pembelajaran: ${data.outlineSettings.modelPembelajaran}`);
+      }
+      if (parts.length > 0) {
+        conversationMessages.push({
+          role: "system",
+          content: `Panduan Konfigurasi Outline & Gaya Aktif Pilihan Guru:\n${parts.join("\n")}\nInstruksi: Bila guru meminta pembuatan modul ajar, slide presentasi PPT, atau ilustrasi gambar, sesuaikan struktur, nuansa bahasa, dan kedalaman materi dengan konfigurasi aktif di atas.`,
+        });
+      }
     }
 
     // Append last 10 messages for context
