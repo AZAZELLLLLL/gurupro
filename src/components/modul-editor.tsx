@@ -9,6 +9,7 @@ import {
   FileText,
   Image as ImageIcon,
   Loader2,
+  Palette,
   Pencil,
   Plus,
   Presentation,
@@ -47,8 +48,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { exportModulAjarPdf, unduhPdf, unduhWord } from "@/lib/exporters";
-import { formatTanggal, type Modul } from "@/lib/modul-types";
+import { exportModulAjarPdf, unduhPdf, unduhWord, slug } from "@/lib/exporters";
+import { formatTanggal, type Modul, type Slide } from "@/lib/modul-types";
 import { useServerFn } from "@tanstack/react-start";
 import { editModulAi, generateModulAi, saveModulDraftServerFn, publishModulServerFn } from "@/lib/ai.functions";
 import { generateModuleIllustrationsServerFn } from "@/lib/illustration-generation.functions";
@@ -56,7 +57,6 @@ import { validateTeacherDraftEdit } from "@/lib/ai/modul-contract";
 import { supabase } from "@/integrations/supabase/client";
 import { isRecoverableAuthError, withAuthRetry } from "@/integrations/supabase/auth-token";
 import { uid } from "@/lib/cloud-store";
-import { IllustrationPlanningPanel, PresentationPlanningPanel } from "@/components/generation-planning-panel";
 
 const INSTRUKSI_MODUL = [
   "Buat bahasa lebih sederhana",
@@ -94,6 +94,7 @@ export function ModulEditor({
   // Publish Confirmation & Execution State
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [downloadingPptx, setDownloadingPptx] = useState(false);
 
   const editAi = useServerFn(editModulAi);
   const generateAi = useServerFn(generateModulAi);
@@ -389,6 +390,126 @@ export function ModulEditor({
       setUnsavedLeaveOpen(true);
     } else {
       onBack();
+    }
+  };
+
+  const addSlide = () => {
+    const newSlide: Slide = {
+      id: uid(),
+      judul: `Slide ${modul.slides.length + 1}: Pokok Bahasan`,
+      bullets: ["Poin pembelajaran kunci", "Penjelasan konsep"],
+      ilustrasi: "",
+    };
+    onChange({
+      ...modul,
+      slides: [...modul.slides, newSlide],
+    });
+    toast.success("Slide baru berhasil ditambahkan.");
+  };
+
+  const patchSlide = (idx: number, patch: Partial<Slide>) => {
+    const updated = modul.slides.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+    onChange({ ...modul, slides: updated });
+  };
+
+  const removeSlide = (idx: number) => {
+    const updated = modul.slides.filter((_, i) => i !== idx);
+    onChange({ ...modul, slides: updated });
+    toast.success("Slide berhasil dihapus.");
+  };
+
+  const handleDownloadPptx = async () => {
+    if (modul.slides.length === 0) {
+      toast.error("Belum ada slide presentasi pada modul ini.");
+      return;
+    }
+    setDownloadingPptx(true);
+    try {
+      toast.info("Menyiapkan dokumen PowerPoint (.pptx)...");
+      const PptxGenJS = (await import("pptxgenjs")).default;
+      const pptx = new PptxGenJS();
+      pptx.layout = "LAYOUT_16x9";
+      pptx.title = modul.judul;
+
+      // Slide 1: Cover
+      const cover = pptx.addSlide();
+      cover.background = { color: "0D1B3D" };
+      cover.addText(modul.judul, {
+        x: 0.8,
+        y: 2.0,
+        w: 8.4,
+        h: 1.6,
+        fontSize: 26,
+        bold: true,
+        color: "FFFFFF",
+        fontFace: "Arial",
+      });
+      cover.addText(`${modul.mapel} · Kelas ${modul.kelas}`, {
+        x: 0.8,
+        y: 3.8,
+        w: 8.4,
+        h: 0.8,
+        fontSize: 16,
+        color: "60A5FA",
+        fontFace: "Arial",
+      });
+
+      // Content Slides
+      modul.slides.forEach((s, idx) => {
+        const slide = pptx.addSlide();
+        slide.background = { color: "F8FAFC" };
+
+        slide.addShape(pptx.ShapeType.rect, {
+          x: 0.8,
+          y: 0.5,
+          w: 8.4,
+          h: 0.9,
+          fill: { color: "2563EB" },
+        });
+        slide.addText(`Slide ${idx + 1}: ${s.judul}`, {
+          x: 1.0,
+          y: 0.6,
+          w: 8.0,
+          h: 0.7,
+          fontSize: 17,
+          bold: true,
+          color: "FFFFFF",
+          fontFace: "Arial",
+        });
+
+        if (s.bullets && s.bullets.length > 0) {
+          const bulletItems = s.bullets.map((b) => ({
+            text: b,
+            options: { fontSize: 13, color: "1E293B", bullet: true, breakLine: true },
+          }));
+          slide.addText(bulletItems, {
+            x: 1.0,
+            y: 1.7,
+            w: 8.0,
+            h: 3.3,
+            fontFace: "Arial",
+            lineSpacing: 24,
+          });
+        }
+
+        slide.addText(`GuruPro AI · ${modul.judul}`, {
+          x: 0.8,
+          y: 5.0,
+          w: 8.4,
+          h: 0.3,
+          fontSize: 9,
+          color: "94A3B8",
+          fontFace: "Arial",
+        });
+      });
+
+      await pptx.writeFile({ fileName: `${slug(modul.judul)}.pptx` });
+      toast.success("File presentasi PowerPoint (.pptx) berhasil diunduh!");
+    } catch (err: any) {
+      console.error("[handleDownloadPptx] Error:", err);
+      toast.error("Gagal membuat file presentasi PPTX.");
+    } finally {
+      setDownloadingPptx(false);
     }
   };
 
@@ -742,13 +863,11 @@ export function ModulEditor({
                 {manual ? <X className="h-4 w-4 mr-1.5" /> : <Pencil className="h-4 w-4 mr-1.5" />}
                 {manual ? "Selesai Edit" : "Edit Terstruktur"}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setAiOpen(true)} className="text-xs">
-                <Sparkles className="h-4 w-4 mr-1.5" />
-                Edit dengan AI
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setRegenerateOpen(true)} className="text-xs">
-                <RefreshCw className="h-4 w-4 mr-1.5" />
-                Regenerasi
+              <Button asChild variant="outline" size="sm" className="text-xs border-primary/30 text-primary hover:bg-primary/5 gap-1.5">
+                <Link to="/asisten-guru">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  Konsultasikan di AI Asisten
+                </Link>
               </Button>
               <Button
                 size="sm"
@@ -1327,45 +1446,46 @@ export function ModulEditor({
           </Card>
         </TabsContent>
 
-        {/* TAB 4: ILUSTRASI AI */}
-        <TabsContent value="ilustrasi" className="mt-4 grid gap-6">
-          <IllustrationPlanningPanel
-            moduleId={modul.id}
-            moduleTitle={modul.judul}
-            sections={modul.sections}
-            onSectionUpdated={(secId, url) => {
-              onChange({
-                ...modul,
-                sections: modul.sections.map((s) =>
-                  s.id === secId ? { ...s, ilustrasi: url } : s
-                ),
-                updatedAt: new Date().toISOString(),
-              });
-            }}
-          />
+        {/* TAB 4: ILUSTRASI MODUL */}
+        <TabsContent value="ilustrasi" className="mt-4 grid gap-5">
+          {/* Guidance Banner to AI Assistant */}
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Palette className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-sm text-navy">Pusat Ilustrasi Edukatif</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Rancang konsep visual atau buat ilustrasi baru langsung melalui percakapan AI Asisten Guru.
+                  </p>
+                </div>
+              </div>
+              <Button asChild size="sm" className="bg-primary text-primary-foreground gap-1.5 shrink-0 text-xs">
+                <Link to="/asisten-guru">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Rancang di AI Asisten
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
 
-          {/* Quick Mockup & Export Tools (Existing Feature Preserved) */}
+          {/* Ilustrasi Gallery & Documents */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="font-display text-base text-navy">
-                Generator Cepat & Pratinjau Ilustrasi Sederhana
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 pt-0">
-              <p className="text-sm text-muted-foreground">
-                AI membaca setiap sub-judul modul lalu membuat ilustrasi yang sesuai konteksnya.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={generateIlustrasi} disabled={ilustrasiLoading}>
-                  {ilustrasiLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ImageIcon className="h-4 w-4" />
-                  )}
-                  {ilustrasiLoading ? "AI sedang menggambar…" : "Generate Ilustrasi dengan AI"}
-                </Button>
+            <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <CardTitle className="font-display text-base text-navy">
+                  Galeri Ilustrasi Bab Modul
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Daftar ilustrasi visual yang telah terpasang pada bab materi modul ini.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
                 <Button
                   variant="outline"
+                  size="sm"
                   disabled={!punyaIlustrasi}
                   onClick={async () => {
                     try {
@@ -1376,66 +1496,46 @@ export function ModulEditor({
                       toast.error("Gagal membuat file PDF.");
                     }
                   }}
+                  className="text-xs gap-1.5"
                 >
-                  <FileText className="h-4 w-4" />
-                  Unduh PDF dengan Ilustrasi
+                  <FileText className="h-3.5 w-3.5" />
+                  Unduh PDF
                 </Button>
                 <Button
                   variant="outline"
+                  size="sm"
                   disabled={!punyaIlustrasi}
                   onClick={() => unduhWord(modul, true)}
+                  className="text-xs gap-1.5"
                 >
-                  <Download className="h-4 w-4" />
-                  Unduh Word dengan Ilustrasi
+                  <Download className="h-3.5 w-3.5" />
+                  Unduh Word
                 </Button>
               </div>
-
+            </CardHeader>
+            <CardContent className="pt-0">
               {punyaIlustrasi ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {modul.sections.map((s) =>
                     s.ilustrasi ? (
-                      <div key={s.id} className="grid gap-2 rounded-xl border p-3">
+                      <div key={s.id} className="grid gap-2.5 rounded-xl border p-3 bg-card shadow-xs">
                         <img
                           src={s.ilustrasi}
                           alt={`Ilustrasi ${s.judul}`}
-                          className="w-full rounded-lg border max-h-48 object-cover"
+                          className="w-full rounded-lg border max-h-56 object-cover bg-muted/20"
                         />
-                        <div className="flex items-center justify-between">
-                          <p className="truncate text-sm font-medium">{s.judul}</p>
-                          {s.ilustrasi.startsWith("data:image/svg+xml") ? (
-                            <Badge variant="outline" className="text-amber-600 border-amber-300 text-[10px] shrink-0">
-                              Mockup Geometris
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-emerald-600 text-white text-[10px] shrink-0">
-                              AI Nyata
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={replacingSectionId === s.id}
-                            onClick={() => regenerateSectionIllustration(s.id)}
-                          >
-                            {replacingSectionId === s.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <RefreshCw className="h-4 w-4" />
-                            )}
-                            {replacingSectionId === s.id ? "Menggambar..." : "Ganti"}
-                          </Button>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-xs font-semibold text-foreground">{s.judul}</p>
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            className="text-destructive hover:bg-destructive/10 h-7 px-2 text-xs"
                             onClick={() => {
                               patchSection(s.id, { ilustrasi: undefined });
-                              toast.success("Ilustrasi dihapus.");
+                              toast.success("Ilustrasi bab telah dihapus.");
                             }}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
                             Hapus
                           </Button>
                         </div>
@@ -1444,21 +1544,172 @@ export function ModulEditor({
                   )}
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                  Belum ada ilustrasi. Jalankan generator untuk membuat ilustrasi tiap sub-judul.
+                <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-3">
+                  <div className="h-12 w-12 rounded-2xl bg-muted/60 text-muted-foreground flex items-center justify-center">
+                    <ImageIcon className="h-6 w-6" />
+                  </div>
+                  <p className="max-w-md text-xs leading-relaxed">
+                    Belum ada gambar ilustrasi pada bab modul ini. Anda dapat membuka <strong>AI Asisten Guru</strong>, memilih gaya visual (seperti <em>Flat Educational</em>), dan menyimpannya ke modul ini.
+                  </p>
+                  <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs">
+                    <Link to="/asisten-guru">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      Buka AI Asisten Guru
+                    </Link>
+                  </Button>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* TAB 5: PPT OTOMATIS */}
-        <TabsContent value="ppt" className="mt-4 grid gap-6">
-          {/* Real OOXML PPTX Planning, Generation & Export Pipeline */}
-          <PresentationPlanningPanel
-            moduleId={modul.id}
-            moduleTitle={modul.judul}
-          />
+        {/* TAB 5: PPT / PRESENTASI */}
+        <TabsContent value="ppt" className="mt-4 grid gap-5">
+          {/* Guidance Banner */}
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Presentation className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-sm text-navy">Manajemen Slide Presentasi</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Slide presentasi dirancang terstruktur melalui AI Asisten Guru, lalu ditinjau dan diunduh (.pptx) di sini.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button asChild size="sm" className="bg-primary text-primary-foreground gap-1.5 text-xs">
+                  <Link to="/asisten-guru">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Rancang di AI Asisten
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Slides List & Export */}
+          <Card>
+            <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <CardTitle className="font-display text-base text-navy">
+                  Daftar Slide Modul ({modul.slides.length} Slide)
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Tinjau isi slide, edit butir materi, atau unduh sebagai file PowerPoint asli (.pptx).
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {manual && (
+                  <Button size="sm" variant="outline" onClick={addSlide} className="gap-1 text-xs">
+                    <Plus className="h-3.5 w-3.5" /> Tambah Slide
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="default"
+                  disabled={modul.slides.length === 0 || downloadingPptx}
+                  onClick={handleDownloadPptx}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5"
+                >
+                  {downloadingPptx ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5" />
+                  )}
+                  {downloadingPptx ? "Membuat PPTX..." : "Unduh File PPTX"}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {modul.slides.length > 0 ? (
+                <div className="grid gap-3">
+                  {modul.slides.map((slide, sIdx) => (
+                    <div
+                      key={slide.id || sIdx}
+                      className="rounded-xl border border-border bg-card p-4 shadow-2xs space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary shrink-0">
+                            Slide {sIdx + 1}
+                          </span>
+                          {manual ? (
+                            <Input
+                              value={slide.judul}
+                              onChange={(e) => patchSlide(sIdx, { judul: e.target.value })}
+                              className="text-xs sm:text-sm font-semibold h-8"
+                              placeholder="Judul Slide"
+                            />
+                          ) : (
+                            <h4 className="text-xs sm:text-sm font-bold text-foreground truncate">
+                              {slide.judul}
+                            </h4>
+                          )}
+                        </div>
+                        {manual && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => removeSlide(sIdx)}
+                            className="text-destructive hover:bg-destructive/10 h-7 px-2 text-xs shrink-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            Hapus
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Bullets Content */}
+                      <div>
+                        {manual ? (
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">Butir-Butir Materi (Pisahkan dengan baris baru):</Label>
+                            <Textarea
+                              rows={3}
+                              value={(slide.bullets || []).join("\n")}
+                              onChange={(e) =>
+                                patchSlide(sIdx, {
+                                  bullets: e.target.value.split("\n").filter((b) => b.trim()),
+                                })
+                              }
+                              className="text-xs font-mono"
+                              placeholder="Ketik butir slide..."
+                            />
+                          </div>
+                        ) : (
+                          <ul className="list-disc pl-5 space-y-1 text-xs text-foreground/90">
+                            {(slide.bullets || []).map((b, bIdx) => (
+                              <li key={bIdx} className="leading-relaxed">
+                                {b}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-3">
+                  <div className="h-12 w-12 rounded-2xl bg-muted/60 text-muted-foreground flex items-center justify-center">
+                    <Presentation className="h-6 w-6" />
+                  </div>
+                  <p className="max-w-md text-xs leading-relaxed">
+                    Belum ada slide presentasi pada modul ini. Buka <strong>AI Asisten Guru</strong>, rancang outline slide (misal dengan tema <em>Educational Classroom</em>), dan simpan langsung ke modul ini.
+                  </p>
+                  <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs">
+                    <Link to="/asisten-guru">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      Rancang Slide di AI Asisten Guru
+                    </Link>
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

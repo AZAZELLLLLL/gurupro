@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { archiveAcademicItem } from "@/lib/archive-store";
 
 import { ModulEditor } from "@/components/modul-editor";
-import { ModulGeneratorDialog } from "@/components/modul-generator-dialog";
+import { uid } from "@/lib/cloud-store";
 import { PageHeader } from "@/components/page-header";
 import {
   AlertDialog,
@@ -91,7 +91,6 @@ function ModulAjarPage() {
   const { selectedYear } = useTahunAjaran(currentGuruId);
   const [tab, setTab] = useState<TabValue>("semua");
   const [query, setQuery] = useState("");
-  const [openGenerator, setOpenGenerator] = useState(false);
   const [editing, setEditing] = useState<Modul | null>(null);
   const [hapus, setHapus] = useState<Modul | null>(null);
   const [targetArsip, setTargetArsip] = useState<Modul | null>(null);
@@ -143,6 +142,34 @@ function ModulAjarPage() {
       toast.error(message);
     } finally {
       setPublishLoading(false);
+    }
+  };
+
+  const handleCreateManualModul = async () => {
+    try {
+      const newModul = await addModul({
+        judul: "Modul Ajar Baru (Draf Manual)",
+        kelas: "X",
+        mapel: "Umum",
+        ringkasan: "Draf modul pembelajaran baru disusun secara mandiri.",
+        sections: [
+          {
+            id: uid(),
+            judul: "Bab 1: Pendahuluan & Materi",
+            poin: ["Tujuan Pembelajaran", "Uraian Pokok"],
+            isi: "Tuliskan materi pembelajaran modul di sini...",
+          },
+        ],
+        slides: [],
+        status: "Draft",
+        sumberTipe: "Teks",
+        sumberInput: "Disusun manual oleh guru.",
+      });
+      await reloadModuls();
+      setEditing(newModul);
+      toast.success("Draf modul ajar baru berhasil dibuat.");
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal membuat draf modul baru.");
     }
   };
 
@@ -242,10 +269,18 @@ function ModulAjarPage() {
             : "Susun modul dibantu AI dari berbagai sumber, edit, lalu publikasikan."
         }
         actions={
-          <Button onClick={() => setOpenGenerator(true)}>
-            <Plus className="h-4 w-4" />
-            Susun Modul Baru
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild className="gap-2 shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Link to="/asisten-guru">
+                <Sparkles className="h-4 w-4" />
+                <span>Rancang di AI Asisten</span>
+              </Link>
+            </Button>
+            <Button variant="outline" onClick={handleCreateManualModul} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              <span>Draf Manual</span>
+            </Button>
+          </div>
         }
       />
 
@@ -290,10 +325,18 @@ function ModulAjarPage() {
                   ? `Tidak ada modul pembelajaran yang terhubung dengan kelas pada tahun ajaran ${selectedYear}. Anda dapat menyusun modul baru atau memilih tahun ajaran lain di header.`
                   : "Susun modul pertama Anda dari CP/ATP, eBook, teks, atau link luar — dibantu GuruPro AI."}
               </p>
-              <Button onClick={() => setOpenGenerator(true)}>
-                <Sparkles className="h-4 w-4" />
-                Susun Modul Baru
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2.5">
+                <Button asChild className="gap-2 shadow-sm bg-primary text-primary-foreground">
+                  <Link to="/asisten-guru">
+                    <Sparkles className="h-4 w-4" />
+                    Rancang di AI Asisten
+                  </Link>
+                </Button>
+                <Button variant="outline" onClick={handleCreateManualModul} className="gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  Tulis Draf Manual
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -437,15 +480,6 @@ function ModulAjarPage() {
           ))
         )}
       </section>
-
-      <ModulGeneratorDialog
-        open={openGenerator}
-        onOpenChange={setOpenGenerator}
-        onGenerated={async (persistedModul) => {
-          await reloadModuls();
-          setEditing(persistedModul);
-        }}
-      />
 
       {/* Dialog Arsipkan Modul */}
       <AlertDialog
