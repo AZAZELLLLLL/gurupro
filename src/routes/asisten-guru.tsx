@@ -491,6 +491,9 @@ export function AsistenGuruPage() {
         role: "assistant",
         content: res.reply,
         createdAt: new Date().toISOString(),
+        imageUrl: res.imageUrl,
+        imagePrompt: res.imagePrompt,
+        imageProvider: res.imageUrl ? "FLUX.1" : undefined,
       };
 
       const finalSessions = updatedSessions.map((s) =>
@@ -636,6 +639,92 @@ export function AsistenGuruPage() {
       toast.error(err?.message || "Gagal menyimpan slide presentasi.");
     } finally {
       setSavingAction(null);
+    }
+  };
+
+  const handleDownloadPPTFromChat = async (content: string, msgTitle?: string) => {
+    try {
+      toast.info("Menyiapkan berkas PowerPoint (.pptx)...");
+      const PptxGenJS = (await import("pptxgenjs")).default;
+      const pptx = new PptxGenJS();
+      pptx.layout = "LAYOUT_16x9";
+      const presentationTitle = msgTitle || activeSession?.title || "Presentasi Pembelajaran";
+      pptx.title = presentationTitle;
+
+      // Cover slide
+      const cover = pptx.addSlide();
+      cover.background = { color: "0F172A" };
+      cover.addText(presentationTitle, {
+        x: 0.8,
+        y: 2.2,
+        w: 8.4,
+        h: 1.5,
+        fontSize: 32,
+        bold: true,
+        color: "FFFFFF",
+      });
+      cover.addText(`Disusun dengan GuruPro AI Asisten Guru • Tema: ${outlineSettings.pptStyleName}`, {
+        x: 0.8,
+        y: 3.8,
+        w: 8.4,
+        h: 0.6,
+        fontSize: 14,
+        color: "94A3B8",
+      });
+
+      // Parse slide blocks
+      const slideBlocks = content.split(/\n(?=###?\s+Slide|\n\*\*Slide\s+\d+)/i);
+      let slideNum = 1;
+
+      for (const block of slideBlocks) {
+        const titleMatch = block.match(/(?:Slide\s*\d*[:\-–]?\s*)([^\n]+)/i);
+        const bullets = Array.from(block.matchAll(/^[-*]\s+(.+)$/gm)).map((m) => m[1].trim());
+
+        if (bullets.length > 0 || titleMatch) {
+          const slide = pptx.addSlide();
+          slide.background = { color: "F8FAFC" };
+
+          // Top Header shape
+          slide.addShape(pptx.ShapeType.rect, {
+            x: 0.6,
+            y: 0.5,
+            w: 8.8,
+            h: 0.9,
+            fill: { color: "1E293B" },
+          });
+
+          slide.addText(titleMatch ? titleMatch[1].replace(/[*#]/g, "").trim() : `Slide ${slideNum}: Pembelajaran`, {
+            x: 0.8,
+            y: 0.6,
+            w: 8.4,
+            h: 0.7,
+            fontSize: 20,
+            bold: true,
+            color: "FFFFFF",
+          });
+
+          // Bullets
+          const bulletTexts = bullets.length > 0 ? bullets.slice(0, 6) : [block.slice(0, 150)];
+          bulletTexts.forEach((b, idx) => {
+            slide.addText(`•  ${b}`, {
+              x: 0.8,
+              y: 1.8 + idx * 0.7,
+              w: 8.4,
+              h: 0.6,
+              fontSize: 14,
+              color: "334155",
+            });
+          });
+
+          slideNum++;
+        }
+      }
+
+      const cleanFilename = (presentationTitle || "presentasi").replace(/[^a-zA-Z0-9]/g, "-").slice(0, 30);
+      await pptx.writeFile({ fileName: `${cleanFilename}.pptx` });
+      toast.success("Dokumen PowerPoint (.pptx) berhasil diunduh!");
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal mengunduh berkas PowerPoint.");
     }
   };
 
@@ -1364,6 +1453,18 @@ export function AsistenGuruPage() {
                               <span>{savingAction === m.id + "-soal" ? "Menyimpan..." : "Simpan ke Soal"}</span>
                             </button>
 
+                            {/* 3b. Download PPTX Direct Button */}
+                            {/(?:###?\s*Slide|\*\*Slide\s*\d+)/i.test(m.content) && (
+                              <button
+                                onClick={() => handleDownloadPPTFromChat(m.content, activeSession?.title)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-blue-500/40 bg-blue-500/10 px-2 py-1 text-[10.5px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors"
+                                title="Unduh presentasi PowerPoint (.pptx) asli"
+                              >
+                                <Download className="h-3 w-3" />
+                                <span>Unduh PPTX</span>
+                              </button>
+                            )}
+
                             {/* 4. Generate FLUX.1 Image Button */}
                             <button
                               onClick={() => {
@@ -1413,7 +1514,13 @@ export function AsistenGuruPage() {
                   </div>
                   <div className="rounded-2xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground flex items-center gap-2.5 shadow-xs">
                     <span className="h-2 w-2 rounded-full bg-primary animate-ping shrink-0" />
-                    <span>GuruPro AI sedang menyusun materi terstruktur sesuai outline...</span>
+                    <span>
+                      {currentMessages[currentMessages.length - 1]?.content?.includes("@generate_ilustrasi")
+                        ? `GuruPro AI sedang menganalisis materi & me-render ilustrasi FLUX.1 (${outlineSettings.illustrationStyleName})...`
+                        : currentMessages[currentMessages.length - 1]?.content?.includes("@generate_ppt")
+                        ? `GuruPro AI sedang menyusun slide presentasi PPT (${outlineSettings.pptStyleName})...`
+                        : "GuruPro AI sedang menyusun materi terstruktur sesuai outline..."}
+                    </span>
                   </div>
                 </div>
               )}
@@ -1475,112 +1582,140 @@ export function AsistenGuruPage() {
             {/* Quick Action Chips (Horizontal Scrollable) */}
             <div className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] no-scrollbar scroll-smooth touch-pan-x flex-nowrap w-full max-w-full">
               <button
-                onClick={() =>
+                onClick={() => {
                   setInputMessage(
-                    `Buatkan Modul Ajar Kurikulum Merdeka tingkat ${outlineSettings.jenjang} dengan model ${outlineSettings.modelPembelajaran} tentang `
-                  )
-                }
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                    `@generate_ilustrasi buatkan ilustrasi edukatif gaya ${outlineSettings.illustrationStyleName} (rasio ${outlineSettings.illustrationAspect}) tentang `
+                  );
+                  setTimeout(() => textareaRef.current?.focus(), 80);
+                }}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-500/10 px-3 py-1 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 transition-colors font-semibold shadow-2xs"
+                title="Ketik perintah generate gambar ilustrasi edukatif dengan FLUX.1"
               >
-                <BookOpen className="h-3 w-3 text-primary" />
-                <span>Buat Modul Ajar</span>
+                <Palette className="h-3.5 w-3.5" />
+                <span>@generate_ilustrasi</span>
               </button>
-              <button
-                onClick={() =>
-                  setInputMessage(
-                    `Rancang ${outlineSettings.slideCount} slide presentasi PPT dengan tema gaya ${outlineSettings.pptStyleName} untuk materi `
-                  )
-                }
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 hover:border-primary/50 hover:bg-muted/50 transition-colors"
-              >
-                <Presentation className="h-3 w-3 text-primary" />
-                <span>Buat Slide PPT ({outlineSettings.slideCount} Slide)</span>
-              </button>
-              <button
-                onClick={() =>
-                  setInputMessage(
-                    `Rancang konsep gambar ilustrasi edukatif dengan gaya visual ${outlineSettings.illustrationStyleName} (rasio ${outlineSettings.illustrationAspect}) tentang `
-                  )
-                }
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 hover:border-primary/50 hover:bg-muted/50 transition-colors"
-              >
-                <Sparkles className="h-3 w-3 text-primary" />
-                <span>Buat Ide Ilustrasi ({outlineSettings.illustrationStyleName})</span>
-              </button>
+
               <button
                 onClick={() => {
-                  setImagePromptInput(activeSession?.title || "Diagram alur konsep pembelajaran");
-                  setTargetMessageForImage(null);
-                  setShowImageModal(true);
+                  setInputMessage(
+                    `@generate_ppt rancang ${outlineSettings.slideCount} slide presentasi tema ${outlineSettings.pptStyleName} tentang `
+                  );
+                  setTimeout(() => textareaRef.current?.focus(), 80);
                 }}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-primary/5 px-2.5 py-1 text-primary hover:bg-primary/10 transition-colors font-medium"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors font-semibold shadow-2xs"
+                title="Ketik perintah generate materi slide presentasi PPT"
               >
-                <Palette className="h-3 w-3" />
-                <span>Render Gambar (FLUX.1)</span>
+                <Presentation className="h-3.5 w-3.5" />
+                <span>@generate_ppt</span>
               </button>
+
               <button
-                onClick={() =>
+                onClick={() => {
+                  setInputMessage(
+                    `@generate_modul buatkan modul ajar Kurikulum Merdeka ${outlineSettings.jenjang} model ${outlineSettings.modelPembelajaran} tentang `
+                  );
+                  setTimeout(() => textareaRef.current?.focus(), 80);
+                }}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors font-semibold shadow-2xs"
+                title="Ketik perintah rancang Modul Ajar Kurikulum Merdeka"
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                <span>@generate_modul</span>
+              </button>
+
+              <button
+                onClick={() => {
                   setInputMessage(
                     `Buatkan 5 soal HOTS pilihan ganda untuk jenjang ${outlineSettings.jenjang} lengkap dengan kunci jawaban dan pembahasan tentang `
-                  )
-                }
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                  );
+                  setTimeout(() => textareaRef.current?.focus(), 80);
+                }}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 hover:border-primary/50 hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground text-[11px]"
               >
                 <FileQuestion className="h-3 w-3 text-primary" />
-                <span>Buat Soal Kuis</span>
+                <span>Buat Soal HOTS</span>
               </button>
             </div>
 
             {/* Textarea Input Card */}
-            <div className="relative flex items-end rounded-2xl border border-border bg-background shadow-xs focus-within:border-primary focus-within:ring-1 focus-within:ring-primary w-full max-w-full">
-              <textarea
-                ref={textareaRef}
-                rows={1}
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void handleSendMessage();
-                  }
-                }}
-                placeholder="Tanyakan materi, minta buatkan modul, PPT, soal, atau ilustrasi..."
-                className="w-full resize-none bg-transparent p-2.5 sm:p-3 text-[13px] sm:text-sm focus:outline-none max-h-28 sm:max-h-36 min-h-[40px] sm:min-h-[44px]"
-              />
+            <div className="relative flex flex-col rounded-2xl border border-border bg-background shadow-xs focus-within:border-primary focus-within:ring-1 focus-within:ring-primary w-full max-w-full overflow-hidden">
+              {/* Active Mode Indicator Banners */}
+              {inputMessage.includes("@generate_ilustrasi") && (
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-purple-500/10 border-b border-purple-500/20 text-purple-600 dark:text-purple-400 text-[11px] font-medium">
+                  <Sparkles className="h-3.5 w-3.5 animate-pulse shrink-0" />
+                  <span className="truncate">
+                    Mode Ilustrasi Aktif: <strong>{outlineSettings.illustrationStyleName}</strong> ({outlineSettings.illustrationAspect}) via FLUX.1
+                  </span>
+                </div>
+              )}
+              {inputMessage.includes("@generate_ppt") && (
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border-b border-blue-500/20 text-blue-600 dark:text-blue-400 text-[11px] font-medium">
+                  <Presentation className="h-3.5 w-3.5 animate-pulse shrink-0" />
+                  <span className="truncate">
+                    Mode Presentasi Aktif: <strong>{outlineSettings.pptStyleName}</strong> ({outlineSettings.slideCount} Slide)
+                  </span>
+                </div>
+              )}
+              {inputMessage.includes("@generate_modul") && (
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border-b border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium">
+                  <BookOpen className="h-3.5 w-3.5 animate-pulse shrink-0" />
+                  <span className="truncate">
+                    Mode Modul Aktif: <strong>{outlineSettings.jenjang}</strong> ({outlineSettings.modelPembelajaran})
+                  </span>
+                </div>
+              )}
 
-              <div className="flex items-center gap-1 p-1.5 sm:p-2 shrink-0">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowContextModal(true)}
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-                  title="Lampirkan Bahan Ajar / Catatan Guru"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    setImagePromptInput(inputMessage.trim() || activeSession?.title || "");
-                    setTargetMessageForImage(null);
-                    setShowImageModal(true);
+              <div className="flex items-end w-full">
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleSendMessage();
+                    }
                   }}
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                  title="Render Gambar Ilustrasi Edukatif (FLUX.1)"
-                >
-                  <Palette className="h-4 w-4" />
-                </Button>
+                  placeholder="Tanyakan materi, atau gunakan @generate_ilustrasi, @generate_ppt..."
+                  className="w-full resize-none bg-transparent p-2.5 sm:p-3 text-[13px] sm:text-sm focus:outline-none max-h-28 sm:max-h-36 min-h-[40px] sm:min-h-[44px]"
+                />
 
-                <Button
-                  onClick={() => handleSendMessage()}
-                  disabled={!inputMessage.trim() || isLoading}
-                  size="icon"
-                  className="h-8 w-8 rounded-lg bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-40"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1 p-1.5 sm:p-2 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowContextModal(true)}
+                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+                    title="Lampirkan Bahan Ajar / Catatan Guru"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setInputMessage(
+                        `@generate_ilustrasi buatkan ilustrasi edukatif gaya ${outlineSettings.illustrationStyleName} (rasio ${outlineSettings.illustrationAspect}) tentang `
+                      );
+                      setTimeout(() => textareaRef.current?.focus(), 80);
+                    }}
+                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-purple-600 hover:bg-purple-500/10 transition-colors"
+                    title="Sisipkan perintah @generate_ilustrasi (FLUX.1)"
+                  >
+                    <Palette className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    onClick={() => handleSendMessage()}
+                    disabled={!inputMessage.trim() || isLoading}
+                    size="icon"
+                    className="h-8 w-8 rounded-lg bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-40"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -1937,9 +2072,34 @@ export function AsistenGuruPage() {
                   onClick={() => {
                     persistOutlineSettings(tempOutlineSettings);
                     setShowOutlineModal(false);
-                    toast.success("Pengaturan template & outline berhasil diterapkan!");
+
+                    const cleanPrev = inputMessage.replace(/^@generate_[a-z_]+\s*/i, "").trim();
+
+                    if (outlineModalTab === "illustration") {
+                      setInputMessage(
+                        `@generate_ilustrasi ${cleanPrev ? cleanPrev : `buatkan ilustrasi edukatif gaya ${tempOutlineSettings.illustrationStyleName} (rasio ${tempOutlineSettings.illustrationAspect}) tentang `}`
+                      );
+                      toast.success(`Gaya ${tempOutlineSettings.illustrationStyleName} diterapkan! Tambahkan instruksi materi di chat.`);
+                    } else if (outlineModalTab === "ppt") {
+                      setInputMessage(
+                        `@generate_ppt ${cleanPrev ? cleanPrev : `rancang ${tempOutlineSettings.slideCount} slide presentasi tema ${tempOutlineSettings.pptStyleName} tentang `}`
+                      );
+                      toast.success(`Tema PPT ${tempOutlineSettings.pptStyleName} diterapkan! Tambahkan topik di chat.`);
+                    } else {
+                      setInputMessage(
+                        `@generate_modul ${cleanPrev ? cleanPrev : `buatkan modul ajar Kurikulum Merdeka ${tempOutlineSettings.jenjang} model ${tempOutlineSettings.modelPembelajaran} tentang `}`
+                      );
+                      toast.success("Outline modul ajar diterapkan! Tambahkan materi di chat.");
+                    }
+
+                    setTimeout(() => {
+                      if (textareaRef.current) {
+                        textareaRef.current.focus();
+                        textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length);
+                      }
+                    }, 120);
                   }}
-                  className="bg-primary text-primary-foreground font-medium"
+                  className="bg-primary text-primary-foreground font-semibold shadow-xs"
                 >
                   Terapkan Pengaturan
                 </Button>
