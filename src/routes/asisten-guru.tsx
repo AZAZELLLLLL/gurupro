@@ -735,6 +735,7 @@ export function AsistenGuruPage() {
       .replace(/`([^`]+)`/g, "$1")
       .replace(/^#+\s*/g, "")
       .replace(/^[\s\t]*[•\-\*✓✔]\s*/g, "")
+      .replace(/^(?:Sub-?TeKS|Sub-?Teks|Sub-?Judul|Tagline)\s*[:\-–]?\s*/i, "")
       .replace(/[""]/g, '"')
       .replace(/^[-–—]\s*/, "")
       .trim();
@@ -758,73 +759,107 @@ export function AsistenGuruPage() {
       lower.startsWith("visual:") ||
       lower.startsWith("visual :") ||
       lower.startsWith("judul slide:") ||
+      lower.startsWith("footer:") ||
+      lower.startsWith("footer :") ||
+      lower.startsWith("poin rangkuman:") ||
+      lower.startsWith("poin inti:") ||
       lower.startsWith("```ai_image_prompt")
     );
   };
 
   const parseSlidesFromContent = (content: string, defaultTitle?: string): ParsedSlideDeck | null => {
-    if (!/(?:###?\s*Slide|\*\*Slide\s*\d+|Slide\s*\d+[:\-–])/i.test(content)) {
-      return null;
+    if (!content) return null;
+    const text = content.replace(/\r\n/g, "\n");
+
+    // Matches slide headings across all markdown styles:
+    // 1. ### Slide 1: / ## Slide 1 / # Slide 1
+    // 2. **Slide 1:** / **Slide 1** / **SLIDE 1: ...**
+    // 3. * Slide 1: / - Slide 1: / • Slide 1:
+    // 4. * **Slide 1:** / - **Slide 1:** / • **Slide 1:**
+    // 5. Slide 1: / SLIDE 1: / Slide 1. / Slide 1 -
+    const slideHeaderPattern = /(?:^|\n)(?:[\s\t]*[-*•]\s+)?(?:#{1,6}\s+)?(?:\*\*)?(?:Slide|SLIDE)\s*(\d+)[\s*:\-–.]*(?:\*\*)?[\s:\-–]*([^\n]*)/gi;
+
+    const matches: Array<{
+      startIndex: number;
+      slideNum: number;
+      rawTitle: string;
+      bodyStart: number;
+    }> = [];
+
+    let match: RegExpExecArray | null;
+    while ((match = slideHeaderPattern.exec(text)) !== null) {
+      matches.push({
+        startIndex: match.index,
+        slideNum: parseInt(match[1], 10),
+        rawTitle: match[2]?.trim() || "",
+        bodyStart: match.index + match[0].length,
+      });
     }
 
-    const slideBlocks = content.split(/\n(?=###?\s+Slide|\n\*\*Slide\s+\d+|Slide\s*\d+[:\-–])/i);
-    if (slideBlocks.length === 0) return null;
+    // A valid presentation deck MUST contain at least 2 distinct slides!
+    // This prevents a normal Modul Ajar (which might mention 'slide' once) from being mistakenly parsed as a 1-slide PPT.
+    if (matches.length < 2) return null;
 
     const slides: ParsedSlideItem[] = [];
     let mainTitle = defaultTitle || "Materi Pembelajaran";
     let mainSubtitle = "";
 
-    slideBlocks.forEach((block, idx) => {
-      const titleMatch = block.match(/(?:Slide\s*\d*[:\-–]?\s*)([^\n]+)/i);
-      const subMatch = block.match(/(?:Sub-?Judul|Tagline|Sasaran)\s*[:\-–]?\s*([^\n]+)/i);
+    for (let i = 0; i < matches.length; i++) {
+      const cur = matches[i];
+      const next = matches[i + 1];
+      const bodyText = text.slice(cur.bodyStart, next ? next.startIndex : text.length).trim();
+
+      // Clean title
+      let cleanTitle = cleanSlideText(cur.rawTitle);
+      cleanTitle = cleanTitle.replace(/^[*\-–—:]+\s*/, "").replace(/[*\-–—:]+$/, "").trim();
+
+      // If title is empty or generic, look for inner Judul Slide
+      if (!cleanTitle || cleanTitle.toLowerCase() === "cover" || cleanTitle.toLowerCase().startsWith("slide")) {
+        const innerJudul = bodyText.match(/(?:Judul Slide|Judul Utama|Materi Utama|Topik Slide|Judul)\s*[:\-–]?\s*([^\n]+)/i);
+        if (innerJudul) {
+          cleanTitle = cleanSlideText(innerJudul[1]);
+        }
+      }
+      if (!cleanTitle) {
+        cleanTitle = `Slide ${cur.slideNum}: Materi Pembelajaran`;
+      }
+
+      // Subtitle / tagline
+      const subMatch = bodyText.match(/(?:Sub-?Judul|Tagline|Sasaran|Sub-TeKS|Sub-Teks)\s*[:\-–]?\s*([^\n]+)/i);
       const subtitle = subMatch ? cleanSlideText(subMatch[1]) : undefined;
 
-      const rawBullets = Array.from(block.matchAll(/^[\s\t]*[-*•✓✔]\s+(.+)$/gm)).map((m) => m[1].trim());
+      // Extract bullets
+      const rawBullets = Array.from(bodyText.matchAll(/^[\s\t]*[-*•✓✔]\s+(.+)$/gm)).map((m) => m[1].trim());
       const cleanBullets = rawBullets
         .filter((b) => !isMetaPromptLine(b))
         .map((b) => cleanSlideText(b))
         .filter((b) => b.length > 3);
 
-      let cleanTitle = titleMatch ? cleanSlideText(titleMatch[1]) : "";
-      
-      // If there is an inner "Judul Slide: ..." line, use that as cleanTitle
-      const innerJudulMatch = block.match(/(?:Judul Slide|Topik Slide)\s*[:\-–]?\s*([^\n]+)/i);
-      if (innerJudulMatch) {
-        cleanTitle = cleanSlideText(innerJudulMatch[1]);
-      }
-
-      const isCover =
-        idx === 0 &&
-        (cleanTitle.toLowerCase().includes("cover") ||
-          cleanTitle.toLowerCase().includes("judul utama") ||
-          slideBlocks.length > 1);
+      const isCover = cur.slideNum === 1 || cleanTitle.toLowerCase().includes("cover");
 
       if (isCover) {
-        const mainTitleMatch = block.match(/(?:Judul Utama|Materi Utama)\s*[:\-–]?\s*([^\n]+)/i);
-        if (mainTitleMatch) {
-          mainTitle = cleanSlideText(mainTitleMatch[1]);
-        } else if (cleanTitle && !cleanTitle.toLowerCase().includes("cover")) {
-          mainTitle = cleanTitle.replace(/^Cover\s*[:\-–]?\s*/i, "").trim();
+        if (cleanTitle && !cleanTitle.toLowerCase().includes("cover")) {
+          mainTitle = cleanTitle;
         }
-        if (subtitle) mainSubtitle = subtitle;
+        if (subtitle) {
+          mainSubtitle = subtitle;
+        }
       }
 
-      if (cleanTitle || cleanBullets.length > 0) {
-        slides.push({
-          id: `slide_${idx + 1}`,
-          num: idx + 1,
-          title: cleanTitle ? cleanTitle.replace(/^Slide\s*\d*[:\-–]?\s*/i, "").trim() : `Slide ${idx + 1}`,
-          subtitle,
-          bullets:
-            cleanBullets.length > 0
-              ? cleanBullets
-              : [cleanSlideText(block.slice(0, 150))].filter(Boolean),
-          isCover,
-        });
-      }
-    });
+      slides.push({
+        id: `slide_${cur.slideNum}_${i}`,
+        num: cur.slideNum || i + 1,
+        title: cleanTitle,
+        subtitle,
+        bullets:
+          cleanBullets.length > 0
+            ? cleanBullets
+            : [cleanSlideText(bodyText.slice(0, 150))].filter(Boolean),
+        isCover,
+      });
+    }
 
-    if (slides.length === 0) return null;
+    if (slides.length < 2) return null;
 
     return {
       title: mainTitle,
@@ -845,44 +880,21 @@ export function AsistenGuruPage() {
   const handleSaveToPPT = async (content: string, msgId: string) => {
     setSavingAction(msgId + "-ppt");
     try {
-      const slideBlocks = content.split(/\n(?=###?\s+Slide|\n\*\*Slide\s+\d+)/i);
+      const deck = parseSlidesFromContent(content, activeSession?.title);
       const parsedSlides: Slide[] = [];
-      let slideNum = 1;
 
-      for (const block of slideBlocks) {
-        const titleMatch = block.match(/(?:Slide\s*\d*[:\-–]?\s*)([^\n]+)/i);
-        const rawBullets = Array.from(block.matchAll(/^[-*•]\s+(.+)$/gm)).map((m) => m[1].trim());
-
-        // Filter meta-prompts and clean text
-        const cleanBullets = rawBullets
-          .filter((b) => !isMetaPromptLine(b))
-          .map((b) => cleanSlideText(b))
-          .filter((b) => b.length > 5);
-
-        let cleanTitle = titleMatch ? cleanSlideText(titleMatch[1]) : `Slide ${slideNum}: Pembelajaran`;
-        if (cleanTitle.toLowerCase().includes("cover") || cleanTitle.toLowerCase().includes("judul utama")) {
-          const mainTitleMatch = block.match(/(?:Judul Utama|Materi Utama)\s*[:\-–]?\s*([^\n]+)/i);
-          if (mainTitleMatch) {
-            cleanTitle = cleanSlideText(mainTitleMatch[1]);
-          } else {
-            cleanTitle = activeSession?.title || "Materi Pembelajaran";
-          }
-        }
-
-        if (cleanBullets.length > 0 || titleMatch) {
+      if (deck && deck.slides.length > 0) {
+        deck.slides.forEach((s) => {
           parsedSlides.push({
             id: uid(),
-            judul: cleanTitle,
-            bullets: cleanBullets.length > 0 ? cleanBullets.slice(0, 6) : [cleanSlideText(block.slice(0, 200))],
+            judul: s.title,
+            bullets: s.bullets.slice(0, 6),
             ilustrasi: outlineSettings.illustrationStyleName,
           });
-          slideNum++;
-        }
-      }
-
-      if (parsedSlides.length === 0) {
+        });
+      } else {
         const paragraphs = content.split(/\n\n+/).filter((p) => p.trim().length > 30);
-        paragraphs.slice(0, Math.min(outlineSettings.slideCount, 6)).forEach((p, idx) => {
+        paragraphs.slice(0, 6).forEach((p, idx) => {
           parsedSlides.push({
             id: uid(),
             judul: `Slide ${idx + 1}: Konsep & Pembahasan Inti`,
@@ -892,7 +904,7 @@ export function AsistenGuruPage() {
         });
       }
 
-      const pptTitle = `Presentasi PPT: ${activeSession?.title || "Materi Pembelajaran"}`;
+      const pptTitle = `Presentasi PPT: ${deck?.title || activeSession?.title || "Materi Pembelajaran"}`;
 
       await addModul({
         judul: pptTitle,
@@ -929,66 +941,25 @@ export function AsistenGuruPage() {
       const pptx = new PptxGenJS();
       pptx.layout = "LAYOUT_16x9";
 
-      const sessionTitle = msgTitle || activeSession?.title || "Materi Pembelajaran";
+      const deck = parseSlidesFromContent(content, msgTitle || activeSession?.title);
+      const sessionTitle = deck?.title || msgTitle || activeSession?.title || "Materi Pembelajaran";
       pptx.title = sessionTitle;
 
-      // Parse slide blocks
-      const slideBlocks = content.split(/\n(?=###?\s+Slide|\n\*\*Slide\s+\d+)/i);
-      const parsedList: { title: string; bullets: string[]; subtitle?: string }[] = [];
-
-      for (const block of slideBlocks) {
-        const titleMatch = block.match(/(?:Slide\s*\d*[:\-–]?\s*)([^\n]+)/i);
-        const rawBullets = Array.from(block.matchAll(/^[-*•]\s+(.+)$/gm)).map((m) => m[1].trim());
-
-        // Extract subjudul or tagline if present
-        const subMatch = block.match(/(?:Sub-?Judul|Tagline|Sasaran)\s*[:\-–]?\s*([^\n]+)/i);
-        const subtitle = subMatch ? cleanSlideText(subMatch[1]) : undefined;
-
-        // Clean bullets and remove meta-prompts
-        const cleanBullets = rawBullets
-          .filter((b) => !isMetaPromptLine(b))
-          .map((b) => cleanSlideText(b))
-          .filter((b) => b.length > 5);
-
-        let cleanTitle = titleMatch ? cleanSlideText(titleMatch[1]) : "";
-        if (cleanTitle.toLowerCase().includes("cover") || cleanTitle.toLowerCase().includes("judul utama")) {
-          const mainTitleMatch = block.match(/(?:Judul Utama|Materi Utama)\s*[:\-–]?\s*([^\n]+)/i);
-          if (mainTitleMatch) {
-            cleanTitle = cleanSlideText(mainTitleMatch[1]);
-          } else {
-            cleanTitle = sessionTitle;
-          }
-        }
-
-        if (cleanTitle || cleanBullets.length > 0) {
-          parsedList.push({
-            title: cleanTitle || `Materi Pembelajaran`,
-            bullets: cleanBullets,
-            subtitle,
-          });
-        }
-      }
-
-      // If content was not in ### Slide format, convert paragraphs to rich pedagogical slides
-      if (parsedList.length === 0) {
-        const paragraphs = content.split(/\n\n+/).filter((p) => p.trim().length > 30);
-        paragraphs.slice(0, 6).forEach((p, idx) => {
-          parsedList.push({
-            title: `Bagian ${idx + 1}: ${sessionTitle}`,
-            bullets: [cleanSlideText(p)],
-          });
-        });
-      }
-
-      // Ensure first slide is Cover
-      const firstSlide = parsedList[0];
-      const isFirstCover =
-        firstSlide &&
-        (firstSlide.title.toLowerCase().includes("cover") ||
-          firstSlide.title.toLowerCase() === sessionTitle.toLowerCase() ||
-          parsedList.length > 1);
+      const slidesToRender = deck && deck.slides.length > 0
+        ? deck.slides
+        : (() => {
+            const paragraphs = content.split(/\n\n+/).filter((p) => p.trim().length > 30);
+            return paragraphs.slice(0, 6).map((p, idx) => ({
+              id: `slide_${idx + 1}`,
+              num: idx + 1,
+              title: `Bagian ${idx + 1}: ${sessionTitle}`,
+              bullets: [cleanSlideText(p)],
+              isCover: idx === 0,
+            }));
+          })();
 
       // Slide 1: Premium Professional Cover Slide
+      const firstSlide = slidesToRender[0];
       const cover = pptx.addSlide();
       cover.background = { color: "0B132B" }; // Deep Midnight Navy
 
@@ -1012,8 +983,7 @@ export function AsistenGuruPage() {
         fontFace: "Arial",
       });
 
-      const rawCoverTitle =
-        isFirstCover && firstSlide?.title ? firstSlide.title : sessionTitle;
+      const rawCoverTitle = firstSlide?.title || sessionTitle;
       const coverTitle = rawCoverTitle.replace(/^Cover\s*[:\-–]?\s*/i, "").trim() || sessionTitle;
 
       cover.addText(coverTitle, {
@@ -1029,9 +999,7 @@ export function AsistenGuruPage() {
 
       const coverSubtitle =
         firstSlide?.subtitle ||
-        (firstSlide?.bullets?.[0] && firstSlide.bullets[0].length < 120
-          ? firstSlide.bullets[0]
-          : null) ||
+        deck?.subtitle ||
         `Media Pembelajaran Interaktif & Pembahasan Komprehensif Jenjang ${outlineSettings.jenjang}`;
 
       cover.addText(coverSubtitle, {
@@ -1057,12 +1025,12 @@ export function AsistenGuruPage() {
         },
       );
 
-      // Render Content Slides (starting from index 1 if index 0 was cover, or all if not)
-      const contentSlides = isFirstCover ? parsedList.slice(1) : parsedList;
+      // Render Content Slides (starting from index 1 if multiple, or index 0 if not cover)
+      const contentSlides = slidesToRender.length > 1 ? slidesToRender.slice(1) : slidesToRender;
 
       contentSlides.forEach((s, idx) => {
         const slide = pptx.addSlide();
-        slide.background = { color: "F8FAFC" }; // Soft clean off-white
+        slide.background = { color: "F8FAFC" };
 
         // Header Shape Container
         slide.addShape(pptx.ShapeType.roundRect, {
@@ -1074,8 +1042,8 @@ export function AsistenGuruPage() {
           line: { color: "1E293B", width: 1 },
         });
 
-        // Slide Badge (SLIDE 01, SLIDE 02, etc.)
-        const badgeText = `SLIDE ${(idx + 1).toString().padStart(2, "0")}`;
+        // Slide Badge
+        const badgeText = `SLIDE ${(s.num || idx + 2).toString().padStart(2, "0")}`;
         slide.addShape(pptx.ShapeType.roundRect, {
           x: 0.8,
           y: 0.65,
@@ -1124,7 +1092,7 @@ export function AsistenGuruPage() {
           contentStartY = 1.85;
         }
 
-        // Body Content Bullets (Real, deep, accurate explanation)
+        // Body Content Bullets
         const bulletsToRender =
           s.bullets.length > 0
             ? s.bullets
@@ -1132,7 +1100,6 @@ export function AsistenGuruPage() {
                 `Pembahasan mendalam dan terstruktur mengenai ${cleanTitle} untuk memfasilitasi ketercapaian tujuan pembelajaran peserta didik secara komprehensif.`,
               ];
 
-        // Format bullet items for pptxgenjs
         const textItems = bulletsToRender.map((b) => ({
           text: `${b}\n`,
           options: {
@@ -1829,7 +1796,7 @@ export function AsistenGuruPage() {
             <div className="mx-auto max-w-3xl w-full space-y-3.5 sm:space-y-5 px-0.5 sm:px-1">
               {currentMessages.map((m) => {
                 const isUser = m.role === "user";
-                const chatSlideDeck = !isUser ? parseSlidesFromContent(m.content, activeSession?.title) : null;
+                const chatSlideDeck = !isUser && !isLoading ? parseSlidesFromContent(m.content, activeSession?.title) : null;
                 return (
                   <div
                     key={m.id}
@@ -1907,7 +1874,7 @@ export function AsistenGuruPage() {
                       )}
 
                       {/* PRESENTATION SLIDE DECK CARD (BACKGROUND LAZYLOADING PREVIEW) */}
-                      {!isUser && chatSlideDeck && (
+                      {!isUser && chatSlideDeck && chatSlideDeck.slideCount >= 2 && (
                         <div className="mt-3.5 overflow-hidden rounded-xl border border-blue-500/30 bg-gradient-to-br from-blue-500/5 via-primary/5 to-card p-3 sm:p-4 shadow-sm transition-all hover:border-blue-500/50">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
                             <div className="flex items-start gap-2.5">
@@ -2029,7 +1996,7 @@ export function AsistenGuruPage() {
                             </button>
 
                             {/* 3b. Tinjau PPT Button */}
-                            {chatSlideDeck && (
+                            {chatSlideDeck && chatSlideDeck.slideCount >= 2 && (
                               <button
                                 onClick={() => openSlideViewer(chatSlideDeck, m.content, m.id)}
                                 className="inline-flex items-center gap-1 rounded-lg border border-blue-500/40 bg-blue-500/10 px-2 py-1 text-[10.5px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors"
@@ -2082,23 +2049,57 @@ export function AsistenGuruPage() {
                 );
               })}
 
-              {isLoading && (
-                <div className="flex gap-2.5 sm:gap-3 justify-start w-full max-w-full">
-                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs animate-pulse mt-1">
-                    <Bot className="h-4 w-4" />
+              {isLoading && (() => {
+                const lastUserMsg = [...currentMessages].reverse().find((msg) => msg.role === "user");
+                const isPptRequest =
+                  lastUserMsg &&
+                  (/@generate_ppt/i.test(lastUserMsg.content) ||
+                    /(?:rancang|buatkan|susun|bikin).*(?:slide|ppt|presentasi)/i.test(lastUserMsg.content) ||
+                    /presentasi\s*ppt/i.test(lastUserMsg.content));
+                const isIlustrasiRequest =
+                  lastUserMsg &&
+                  (/@generate_ilustrasi/i.test(lastUserMsg.content) ||
+                    /buatkan (?:sebuah )?(?:gambar|ilustrasi)|generate (?:sebuah )?(?:gambar|ilustrasi)/i.test(lastUserMsg.content));
+
+                return (
+                  <div className="flex gap-2.5 sm:gap-3 justify-start w-full max-w-full">
+                    <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs animate-pulse mt-1">
+                      <Bot className="h-4 w-4" />
+                    </div>
+
+                    {isPptRequest ? (
+                      <div className="w-full max-w-xl rounded-2xl border border-blue-500/40 bg-gradient-to-br from-blue-500/10 via-background to-card p-4 text-xs text-card-foreground shadow-sm space-y-2.5 animate-in fade-in">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-xs sm:text-sm">
+                            <Presentation className="h-4 w-4 animate-bounce shrink-0" />
+                            <span>Merancang Seluruh Slide Presentasi PPT...</span>
+                          </div>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping" />
+                            Sedang Menyusun
+                          </span>
+                        </div>
+                        <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+                          GuruPro AI sedang menyusun materi setiap slide secara mendalam, rinci, dan lengkap dari konsep dasar hingga penutup. File PPT akan langsung muncul otomatis di layar obrolan setelah seluruh halaman slide selesai dirangkai.
+                        </p>
+                        <div className="flex items-center gap-2 pt-1 border-t border-blue-500/20 text-[10.5px] text-blue-600 dark:text-blue-400 font-medium">
+                          <Sparkles className="h-3 w-3 shrink-0" />
+                          <span>Menulis rincian konten per slide sesuai outline materi...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground flex items-center gap-2.5 shadow-xs">
+                        <span className="h-2 w-2 rounded-full bg-primary animate-ping shrink-0" />
+                        <span>
+                          {isIlustrasiRequest
+                            ? `GuruPro AI sedang menganalisis materi & me-render ilustrasi FLUX.1 (${outlineSettings.illustrationStyleName})...`
+                            : "GuruPro AI sedang menyusun materi terstruktur secara lengkap & mendalam..."}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <div className="rounded-2xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground flex items-center gap-2.5 shadow-xs">
-                    <span className="h-2 w-2 rounded-full bg-primary animate-ping shrink-0" />
-                    <span>
-                      {currentMessages[currentMessages.length - 1]?.content?.includes("@generate_ilustrasi")
-                        ? `GuruPro AI sedang menganalisis materi & me-render ilustrasi FLUX.1 (${outlineSettings.illustrationStyleName})...`
-                        : currentMessages[currentMessages.length - 1]?.content?.includes("@generate_ppt")
-                        ? `GuruPro AI sedang menyusun slide presentasi PPT (${outlineSettings.pptStyleName})...`
-                        : "GuruPro AI sedang menyusun materi terstruktur sesuai outline..."}
-                    </span>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               <div ref={messagesEndRef} />
             </div>

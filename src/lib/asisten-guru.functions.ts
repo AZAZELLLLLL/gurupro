@@ -121,13 +121,16 @@ ATURAN KHUSUS PERANCANGAN PRESENTASI SLIDE PPT SUPER DETAIL (@generate_ppt / ran
 Bila guru meminta slide presentasi (misal: "rancang slide presentasi...", "buatkan ppt...", tag @generate_ppt, atau kebutuhan tayangan proyektor kelas):
 1. DILARANG KERAS MENULISKAN CATATAN META-LAYOUT / PROMPT DESAINER ke dalam teks slide:
    - Dilarang menulis "**Gaya Visual:** ...", "**Elemen Visual:** ...", "**Header / Tagline:** ...", "**Catatan Visual:** ...", "**Catatan Presenter:** ...", "**Prompt Visual Footnote:** ...", atau instruksi desainer grafis. Teks tersebut BUKAN materi pelajaran dan dilarang muncul dalam teks slide!
-2. MATERI SLIDE HARUS SUPER DETAIL, LENGKAP, DAN AKURAT:
-   - JUMLAH SLIDE FLEKSIBEL: Jumlah slide TIDAK DIBATASI KAKU (jangan dibatasi harus 5 atau 10 slide), melainkan ditentukan secara alami dan fleksibel berdasarkan keluasan materi agar seluruh pokok bahasan tuntas terbahas tuntas dari konsep dasar hingga implementasi nyata.
+2. MATERI SLIDE HARUS SUPER DETAIL, LENGKAP, DAN AKURAT DARI AWAL HINGGA AKHIR:
+   - JUMLAH SLIDE FLEKSIBEL & WAJIB TUNTAS: Jumlah slide TIDAK DIBATASI KAKU (jangan dibatasi hanya 1-2 slide atau 5 slide). Wajib membuat seluruh rangkaian slide dari awal sampai akhir secara komprehensif (minimal 6 hingga 10+ slide terstruktur) sehingga mencakup seluruh pokok bahasan tuntas dari pengantar, konsep inti, prinsip kerja/sintaks, studi kasus kontekstual, hingga rangkuman dan refleksi penutup.
+   - DILARANG BERHENTI DI TENGAH JALAN: Seluruh slide wajib dituliskan tuntas sampai bagian penutup dan apresiasi akhir.
    - Jika obrolan membahas konsep dasar (misal: "Dasar Pemrograman Python" atau topik lainnya), presentasi PPT wajib menjabarkan materi dasar tersebut secara mendalam dan komprehensif menjadi judul dan isi slide yang berbobot.
    - Jangan hanya menulis 1-2 kalimat pendek atau frasa 3 kata!
    - Tuliskan REAL PEMBAHASAN MATERI SECARA MENDALAM yang siap dibaca, dipahami, dan dipelajari oleh siswa di proyektor kelas.
    - Setiap slide wajib mengupas aspek konseptual, landasan teori, alur mekanisme/sintaks, studi kasus kontekstual, hingga tips implementasi nyata.
-3. STRUKTUR FORMAT SLIDE WAJIB MENGGUNAKAN FORMAT RESMI BERIKUT:
+3. STRUKTUR FORMAT SLIDE WAJIB MENGGUNAKAN HEADING RESMI DI BARIS BARU:
+   Setiap slide WAJIB diawali dengan heading: \`### Slide [Nomor]: [Judul Slide Lengkap]\` di baris baru agar sistem parser mengenali setiap slide secara sempurna. Contoh struktur:
+
    ### Slide 1: [Judul Topik Pembelajaran yang Lengkap & Formal]
    - Subjudul: [Tagline Pembelajaran Kontekstual yang Jelas]
    - Sasaran: [Target Kompetensi & Sasaran Peserta Didik]
@@ -161,6 +164,7 @@ Bila guru meminta slide presentasi (misal: "rancang slide presentasi...", "buatk
    - [Rangkuman butir-butir emas kunci pembelajaran yang harus diingat siswa.]
    - [Pertanyaan pemantik refleksi diri untuk menguji pemahaman kritis siswa.]
    - [Tantangan eksplorasi mandiri atau tugas tindak lanjut untuk pertemuan berikutnya.]
+   (Lanjutkan ke Slide 7, 8, 9, 10 dst. jika materi membutuhkan penjabaran lebih lanjut hingga tuntas)
 
 ATURAN KHUSUS PERINTAH @generate_ilustrasi:
 Jika pengguna menyertakan tag "@generate_ilustrasi" atau meminta pembuatan ilustrasi/gambar/diagram materi:
@@ -452,7 +456,7 @@ export const chatWithGuruAiServerFn = createServerFn({
               model: modelCandidate,
               messages: conversationMessages,
               temperature: 0.7,
-              max_tokens: 3500,
+              max_tokens: 6500,
             }),
             signal: AbortSignal.timeout(60000),
           });
