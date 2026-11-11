@@ -529,51 +529,137 @@ export function AsistenGuruPage() {
   const handleSaveToModul = async (content: string, msgId: string) => {
     setSavingAction(msgId + "-modul");
     try {
-      // 1. Detect title
+      // 1. Ekstraksi Judul Bersih & Profesional (Hapus tanda petik dan awalan ganda)
       const titleMatch = content.match(/^#+\s*(.+)$/m);
-      const cleanedTitle = titleMatch
-        ? titleMatch[1].replace(/MODUL AJAR KURIKULUM MERDEKA\s*\(TERRINCI\)?/i, "").replace(/^[:\-–\s]+/, "").trim()
+      let cleanedTitle = titleMatch
+        ? titleMatch[1]
+            .replace(/MODUL AJAR KURIKULUM MERDEKA\s*\(TERRINCI\)?/i, "")
+            .replace(/MODUL AJAR\s*[:\-–]?/i, "")
+            .replace(/^[:\-–\s]+/, "")
+            .replace(/["“”'‘’]/g, "")
+            .trim()
         : "";
-      const finalTitle = cleanedTitle || activeSession?.title || "Modul Ajar Baru";
-
-      // 2. Parse sections
-      const sectionBlocks = content.split(/\n(?=##\s+)/);
-      const sections: ModulSection[] = [];
-      for (const block of sectionBlocks) {
-        const headerMatch = block.match(/^##\s+(.+)$/m);
-        const judulSec = headerMatch ? headerMatch[1].trim() : "Materi Pembelajaran";
-        const isiSec = headerMatch ? block.replace(/^##\s+.+$/m, "").trim() : block.trim();
-        if (isiSec) {
-          const poinMatches = Array.from(isiSec.matchAll(/^[-*]\s+(.+)$/gm)).map((m) => m[1].slice(0, 80));
-          sections.push({
-            id: uid(),
-            judul: judulSec,
-            poin: poinMatches.slice(0, 5),
-            isi: isiSec,
-          });
-        }
+      if (!cleanedTitle || cleanedTitle.length < 3) {
+        cleanedTitle = activeSession?.title?.replace(/["“”'‘’]/g, "").trim() || "Modul Ajar Pembelajaran";
       }
 
-      // 3. Ringkasan
-      const firstLines = content.replace(/^#+.*$/gm, "").trim().slice(0, 200);
+      // 2. Ekstraksi Mapel & Jenjang/Fase dari isi
+      const mapelMatch = content.match(/(?:Mata Pelajaran|Mapel)\s*:\s*([^\n\r|]+)/i);
+      const mapelVal = mapelMatch
+        ? mapelMatch[1].replace(/["“”'‘’]/g, "").trim()
+        : "Dasar-Dasar Kejuruan / Umum";
 
-      // 4. Deteksi Mapel & Kelas dari isi jika ada
-      const mapelMatch = content.match(/(?:Mata Pelajaran|Mapel)\s*:\s*([^\n\r]+)/i);
-      const mapelVal = mapelMatch ? mapelMatch[1].trim() : "Dasar-Dasar Kejuruan / Umum";
-
-      const kelasMatch = content.match(/(?:Kelas(?:\/Fase)?|Fase)\s*:\s*([^\n\r]+)/i);
+      const kelasMatch = content.match(/(?:Kelas(?:\/Fase)?|Jenjang\/Fase|Fase)\s*:\s*([^\n\r|]+)/i);
       const kelasVal = kelasMatch
-        ? kelasMatch[1].trim()
+        ? kelasMatch[1].replace(/["“”'‘’]/g, "").trim()
         : outlineSettings.jenjang.includes("SMK")
         ? "X (SMK)"
         : "X";
 
+      // 3. Ringkasan Modul yang Elegan
+      const cleanContentNoHeaders = content
+        .replace(/^#+.*$/gm, "")
+        .replace(/```[\s\S]*?```/g, "")
+        .replace(/[>_~`]/g, "")
+        .trim();
+      const firstParagraph = cleanContentNoHeaders.split(/\n\s*\n/)[0] || "";
+      const ringkasanVal =
+        firstParagraph.slice(0, 250).trim() ||
+        `Modul ajar ${cleanedTitle} terstruktur berbasis Kurikulum Merdeka dengan model ${outlineSettings.modelPembelajaran}.`;
+
+      // 4. PARSING BAB-BAB SECARA FLEKSIBEL SESUAI DETAIL KONTEN AI
+      // Pisahkan berdasarkan header: "## Bagian X", "## Bab X", "## X.", "### X." atau "**X. ...**"
+      const rawBlocks = content.split(/\n(?=(?:##+\s+|(?:\*\*)?(?:Bagian|Bab|\b[IVXLCDM]+\b|\d+)\s*[\.:\-–]))/i);
+      const parsedSections: ModulSection[] = [];
+
+      for (const block of rawBlocks) {
+        const trimmed = block.trim();
+        if (!trimmed || trimmed.length < 25) continue;
+
+        // Filter keluar prompt generator gambar AI (jangan jadikan bab modul)
+        if (
+          /PROMPT\s+GENERATOR\s+GAMBAR|DALL-E|MIDJOURNEY|BING\s+IMAGE|ai_image_prompt/i.test(trimmed) ||
+          trimmed.startsWith("```ai_image_prompt")
+        ) {
+          continue;
+        }
+
+        // Ekstraksi header/judul bab
+        const headerMatch = trimmed.match(
+          /^(?:##+\s+|\*\*\s*)?((?:Bagian\s*\d+|Bab\s*\d+|\b[IVXLCDM]+\b|\d+[\.:])?[^\n*#]+)(?:\*\*)?$/m
+        );
+        const rawJudul = headerMatch ? headerMatch[1].trim() : "";
+
+        // Bersihkan judul dari emoji, tanda petik, dan nomor bab ganda
+        const cleanJudul = rawJudul
+          .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "") // Buang emoji
+          .replace(/^(?:Bagian|Bab|\d+[\.:]|\b[IVXLCDM]+\b[\.:])\s*(\d+)?[\.:\-–\s]*/i, "")
+          .replace(/["“”'‘’]/g, "")
+          .replace(/^[:\-–\s]+/, "")
+          .trim();
+
+        // Ambil isi teks bab
+        const isiSec = trimmed.replace(/^(?:##+\s*|\*\*\s*)[^\n]+(?:\*\*)?$/m, "").trim();
+
+        // Bersihkan isi dari tanda kutip liar atau instruksi prompt gambar
+        const cleanIsi = isiSec
+          .replace(/```ai_image_prompt[\s\S]*?```/gi, "")
+          .replace(/^>\s*\*"?[A-Za-z\s,.\-0-9:]+"?\*$/gm, "")
+          .replace(/^>\s*\*\*Prompt AI:\*\*.*$/gim, "")
+          .replace(/["“”]{2,}/g, '"')
+          .trim();
+
+        if (cleanIsi.length > 20) {
+          // Ekstraksi poin capaian secara bersih (maksimal 3-4 poin, tanpa memotong kata dan tanpa markdown)
+          const bulletLines = Array.from(cleanIsi.matchAll(/^[-*•]\s+(.+)$/gm));
+          const cleanPoin: string[] = [];
+          for (const b of bulletLines) {
+            const rawText = b[1]
+              .replace(/\*\*([^*]+)\*\*/g, "$1")
+              .replace(/["“”'‘’]/g, "")
+              .replace(/^[:\-–\s]+/, "")
+              .trim();
+            if (rawText.length > 10 && rawText.length < 120 && !cleanPoin.includes(rawText)) {
+              cleanPoin.push(rawText);
+            }
+            if (cleanPoin.length >= 4) break;
+          }
+
+          parsedSections.push({
+            id: uid(),
+            judul: cleanJudul || `Materi Pokok Bagian ${parsedSections.length + 1}`,
+            poin: cleanPoin,
+            isi: cleanIsi,
+          });
+        }
+      }
+
+      // Fallback jika tidak terdeteksi pembagian bab spesifik
+      let finalSections = parsedSections;
+      if (finalSections.length === 0) {
+        finalSections = [
+          {
+            id: uid(),
+            judul: "Informasi Umum & Materi Pokok",
+            poin: ["Tujuan Pembelajaran Kurikulum Merdeka", "Konsep Pokok & Pembahasan Pembelajaran"],
+            isi: cleanContentNoHeaders || content,
+          },
+        ];
+      }
+
+      // Sematkan ilustrasi gambar AI jika pesan chat memiliki gambar (imageUrl)
+      const currentMsg = activeSession?.messages?.find((m) => m.id === msgId);
+      if (currentMsg?.imageUrl && finalSections.length > 0) {
+        const targetIndex = finalSections.length > 1 ? 1 : 0;
+        finalSections[targetIndex].ilustrasi = currentMsg.imageUrl;
+      }
+
       const saved = await addModul({
-        judul: finalTitle,
+        judul: cleanedTitle,
         kelas: kelasVal,
         mapel: mapelVal,
-        ringkasan: firstLines || "Modul pembelajaran dirancang terstruktur bersama GuruPro AI Asisten Guru.",
-        sections: sections.length > 0 ? sections : [{ id: uid(), judul: "Materi Pokok", poin: [], isi: content }],
+        ringkasan: ringkasanVal,
+        sections: finalSections,
         slides: [],
         status: "Draft",
         sumberTipe: "Teks",
@@ -582,12 +668,15 @@ export function AsistenGuruPage() {
 
       await reloadModuls();
 
-      toast.success(`Modul Ajar "${saved.judul}" berhasil disimpan ke Penyimpanan Modul!`, {
-        action: {
-          label: "Buka Modul Ajar",
-          onClick: () => navigate({ to: "/modul-ajar" }),
-        },
-      });
+      toast.success(
+        `Modul Ajar "${saved.judul}" (${finalSections.length} Bab) berhasil disimpan ke Penyimpanan Modul!`,
+        {
+          action: {
+            label: "Buka Modul Ajar",
+            onClick: () => navigate({ to: "/modul-ajar" }),
+          },
+        }
+      );
     } catch (err: any) {
       console.error("[handleSaveToModul] Error:", err);
       toast.error(err?.message || "Gagal menyimpan modul ajar ke database.");
@@ -1245,7 +1334,7 @@ export function AsistenGuruPage() {
                 <button
                   onClick={() =>
                     handleSendMessage(
-                      `Tolong buatkan Modul Ajar Kurikulum Merdeka yang lengkap untuk jenjang ${outlineSettings.jenjang} dengan model ${outlineSettings.modelPembelajaran} mengenai materi Percabangan Logika IF-ELSE. Sertakan Tujuan Pembelajaran, Pertanyaan Pemantik, Kegiatan Inti, dan Asesmen.`
+                      `Tolong susunkan Modul Ajar Kurikulum Merdeka yang sangat lengkap, mendalam, dan terperinci untuk jenjang ${outlineSettings.jenjang} dengan model ${outlineSettings.modelPembelajaran} mengenai materi Percabangan Logika IF-ELSE. Sajikan secara profesional dan terstruktur mencakup Bagian 1: Informasi Umum & Tujuan Pembelajaran, Bagian 2: Uraian Materi & Konsep Pokok, Bagian 3: Skenario Kegiatan Pembelajaran Rinci (Pendahuluan, Inti PBL per sintaks, Penutup), Bagian 4: Asesmen & Rubrik KKTP, Bagian 5: Lembar Kerja Peserta Didik (LKPD), serta Bagian 6: Pengayaan & Remedial.`
                     )
                   }
                   className="group flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 sm:p-4 text-left transition-all hover:border-primary/50 hover:bg-muted/40 hover:shadow-xs active:scale-[0.99]"

@@ -57,6 +57,7 @@ import { validateTeacherDraftEdit } from "@/lib/ai/modul-contract";
 import { supabase } from "@/integrations/supabase/client";
 import { isRecoverableAuthError, withAuthRetry } from "@/integrations/supabase/auth-token";
 import { uid } from "@/lib/cloud-store";
+import { ChatMarkdownRenderer } from "@/components/chat-markdown-renderer";
 
 const INSTRUKSI_MODUL = [
   "Buat bahasa lebih sederhana",
@@ -64,6 +65,17 @@ const INSTRUKSI_MODUL = [
   "Perdalam materi",
   "Tambahkan kegiatan praktik",
 ];
+
+export function formatBabTitle(index: number, rawJudul: string) {
+  const cleaned = (rawJudul || "")
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "")
+    .replace(/^[\s*#\-–—]+/g, "")
+    .replace(/^(?:Bab|Bagian|\d+[\.:]|\b[IVXLCDM]+\b[\.:])\s*(\d+)?[\.:\-–\s]*/i, "")
+    .replace(/^[:\-–\s]+/, "")
+    .replace(/["“”'‘’]/g, "")
+    .trim();
+  return `Bab ${index + 1}: ${cleaned || rawJudul || "Materi Pembelajaran"}`;
+}
 
 export function ModulEditor({
   modul,
@@ -1100,7 +1112,7 @@ export function ModulEditor({
                     </div>
                   ) : (
                     <CardTitle className="font-display text-base text-navy">
-                      Bab {i + 1}. {s.judul}
+                      {formatBabTitle(i, s.judul)}
                     </CardTitle>
                   )}
                   {manual && (
@@ -1142,17 +1154,25 @@ export function ModulEditor({
                     </>
                   ) : (
                     <>
-                      <ul className="grid gap-1.5 text-sm">
-                        {s.poin.map((p) => (
-                          <li key={p} className="flex gap-2">
-                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                            <span>{p}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                        {s.isi}
-                      </p>
+                      {s.poin && s.poin.length > 0 && (
+                        <div className="rounded-xl border border-border/60 bg-muted/30 p-3.5 mb-1">
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-primary mb-2 flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                            Poin Capaian & Fokus Bab:
+                          </p>
+                          <ul className="grid gap-1.5 text-xs sm:text-sm text-foreground/80 pl-1">
+                            {s.poin.map((p, pIdx) => (
+                              <li key={pIdx} className="flex items-start gap-2">
+                                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" />
+                                <span className="leading-relaxed">{p}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="text-sm leading-relaxed text-foreground/90">
+                        <ChatMarkdownRenderer content={s.isi} />
+                      </div>
                     </>
                   )}
                   {s.ilustrasi ? (

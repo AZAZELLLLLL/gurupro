@@ -521,7 +521,14 @@ export async function exportModulAjarPdf(
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
       doc.setTextColor(37, 99, 235);
-      doc.text(`Bab ${i + 1}. ${s.judul}`, margin, cursorY);
+      const cleanBabJudul = (s.judul || "")
+        .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "")
+        .replace(/^[\s*#\-–—]+/g, "")
+        .replace(/^(?:Bab|Bagian|\d+[\.:]|\b[IVXLCDM]+\b[\.:])\s*(\d+)?[\.:\-–\s]*/i, "")
+        .replace(/^[:\-–\s]+/, "")
+        .replace(/["“”'‘’]/g, "")
+        .trim();
+      doc.text(`Bab ${i + 1}: ${cleanBabJudul || s.judul}`, margin, cursorY);
       cursorY += 6;
 
       // Poin-poin Capaian
