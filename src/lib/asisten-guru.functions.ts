@@ -119,60 +119,77 @@ CATATAN PENTING:
 
 ATURAN KHUSUS PERANCANGAN PRESENTASI SLIDE PPT SUPER DETAIL (@generate_ppt / rancang presentasi):
 Bila guru meminta slide presentasi (misal: "rancang slide presentasi...", "buatkan ppt...", tag @generate_ppt, atau kebutuhan tayangan proyektor kelas):
-1. DILARANG KERAS MEMBUAT SLIDE NANGGUNG / BOROS HALAMAN (HANYA 1 POIN / 1 KALIMAT SEPI):
-   - DILARANG KERAS membuat slide yang isinya hanya 1 butir poin atau 1 kalimat pendek terisolasi! Slide semacam ini sangat nanggung, mubazir, dan tidak layak tayang di kelas.
-   - Setiap slide non-cover WAJIB memuat materi yang substansial, padat wawasan, dan bernilai edukatif tinggi.
-   - Jika ada catatan penutup, tips singkat, atau pertanyaan refleksi, JANGAN dibuat menjadi 1 slide terpisah yang sepi; gabungkan langsung ke dalam slide pembahasan sebelumnya dengan penataan yang rapi.
-2. PERBANYAK BAGIAN PENJELASAN MATERI MENJADI BEBERAPA SLIDE MENDALAM (MULTI-SLIDE DEEP DIVE):
-   - Alokasikan beberapa slide tematik berturut-turut (minimal 3–5 slide khusus penjelasan) untuk membedah materi pelajaran secara mendalam dan menyeluruh dari berbagai sudut pandang.
-   - Jangan memadatkan seluruh materi dalam 1 slide singkat! Jabarkan topik bahasan ke dalam beberapa slide berseri:
-     - **Slide 2: Landasan Teori & Sejarah Konseptual** (latar belakang lahirnya konsep, mengapa penting dipelajari, filosofi dasar).
-     - **Slide 3: Anatomi Struktur & Logika Sistematis** (komponen penyusun, kaidah sintaks/rumus, diagram alur cara kerja).
-     - **Slide 4: Mekanisme Operasional Langkah-demi-Langkah** (bagaimana proses bekerja saat dijalankan secara teknis).
-     - **Slide 5: Bedah Kasus & Analisis Penerapan Industri** (studi kasus kontekstual di dunia kerja atau fenomena nyata).
-     - **Slide 6: Best Practices, Kesalahan Umum (Pitfalls) & Solusi** (jebakan logika yang sering dialami siswa serta cara pencegahannya).
-     - (Lanjutkan dengan slide tambahan jika materi membutuhkan elaborasi lebih jauh).
-3. SISTEM PARAGRAF DETAIL BERBOBOT AKADEMIS (FLEKSIBEL & ALAMI):
-   - Setiap slide penjelasan WAJIB menyajikan 1 hingga 2 paragraf narasi deskriptif utuh (3–5 kalimat komprehensif per paragraf) yang menjelaskan konsep secara tuntas, BUKAN sekadar deretan poin bullet centang!
-   - Kombinasikan narasi paragraf tersebut dengan 2–3 butir poin kunci pendukung menggunakan format \`- **[Label Kunci]**: [Penjelasan spesifik]\` dan 1 blok studi kasus kontekstual.
-4. DILARANG KERAS MENULISKAN CATATAN META-LAYOUT / PROMPT DESAINER / INSTRUKSI PROMPT:
-   - Dilarang menulis "Visual:", "Visual Ilustrasi (3D):", "Judul Slide:", "Sub-TeKS:", "Isi Poin:", "Footer:", "Poin Rangkuman:", "Gaya Visual:", "Elemen Visual:", "Catatan Visual:", "Catatan Presenter:", atau instruksi desainer grafis lainnya. Tulisan tersebut BUKAN materi pelajaran dan DILARANG KERAS muncul dalam teks slide! Tuliskan langsung materi ajar nyata yang siap dipelajari siswa!
-5. STRUKTUR FORMAT SLIDE WAJIB MENGGUNAKAN HEADING RESMI DI BARIS BARU:
-   Setiap slide WAJIB diawali dengan heading: \`### Slide [Nomor]: [Judul Slide Lengkap]\` di baris baru agar sistem parser mengenali setiap slide secara sempurna. Contoh struktur format ideal:
+1. DILARANG KERAS MENULISKAN CATATAN META-LAYOUT / PROMPT DESAINER / INSTRUKSI PROMPT:
+   - Dilarang menulis "Visual:", "Visual Ilustrasi (3D):", "Judul Slide:", "Sub-TeKS:", "Isi Poin:", "Footer:", "Poin Rangkuman:", "Gaya Visual:", "Elemen Visual:", "Catatan Visual:", "Catatan Presenter:", atau instruksi desainer grafis. Tulisan tersebut BUKAN materi pelajaran dan DILARANG KERAS muncul dalam teks slide! Tuliskan langsung materi ajar nyata yang siap dipelajari siswa!
+2. DEDIKASIKAN BEBERAPA SLIDE KHUSUS UNTUK PENJELASAN MATERI SECARA MENDALAM DENGAN SISTEM PARAGRAF DETAIL:
+   - DILARANG membuat presentasi yang hanya berisi ringkasan dangkal atau tumpukan butir bullet points kaku!
+   - Pembahasan materi pembelajaran menggunakan sistem paragraf lengkap sangat penting agar siswa dan guru mendapatkan pemahaman konsep yang utuh, komprehensif, dan bernas.
+   - OLEH KARENA ITU, WAJIB DEDIKASIKAN BEBERAPA SLIDE BERURUTAN (minimal 3 sampai 6 slide khusus) yang isinya adalah URAIAN PENJELASAN MATERI MENGGUNAKAN PARAGRAF LENGKAP & DETAIL (2 hingga 3 paragraf per slide penjelasan):
+     * Setiap paragraf penjelasan harus memaparkan materi secara mengalir (3-5 kalimat komprehensif berbobot akademis per paragraf), mengupas tuntas definisi ilmiah, asal-usul/latar belakang, prinsip kerja, mekanisme operasional, rumus/kaidah, analogi kontekstual, hingga bedah logika sebab-akibat.
+     * TULISKAN LANGSUNG SEBAGAI PARAGRAF TEKS BIASA TANPA BULLET DASH (-).
+   - Susun setiap slide secara fleksibel, alami, dan bervariasi sesuai peruntukan materinya (tidak monoton kaku):
+     a) **Slide Penjelasan Materi Mendalam (Full Paragraf Detail)**: Fokus memaparkan teori, konsep, dan mekanisme secara naratif dan detail tanpa terpecah-pecah menjadi poin.
+     b) **Slide Kombinasi (Paragraf Narasi + Poin Kunci/Komparasi)**: Paragraf pengantar konsep yang dipertegas oleh 2-3 poin karakteristik atau pembeda.
+     c) **Slide Studi Kasus & Penerapan Konkret**: Paragraf bedah kasus nyata di industri/kehidupan sehari-hari disertai solusi aplikatif. Jika pelajaran pemrograman, sertakan blok kode rapi (\`\`\`python ... \`\`\`).
+     d) **Slide Poin Kunci & Komparasi**: Rangkuman butir penting terstruktur \`- **[Label Kunci]**: [Uraian]\`.
+     e) **Slide Rangkuman & Refleksi**: Butir emas pembelajaran dan pertanyaan pemantik kritis.
+3. JUMLAH SLIDE FLEKSIBEL & MENUNTASKAN SELURUH POKOK BAHASAN:
+   - Jumlah slide tidak dibatasi kaku (jangan dibatasi hanya 5 slide; buatlah 8 hingga 12+ slide jika materi luas) agar seluruh materi dari pengantar, penjelasan detail tiap sub-bab, studi kasus, hingga penutup dapat tersampaikan secara komprehensif dari awal sampai akhir.
+   - DILARANG BERHENTI DI TENGAH JALAN: Seluruh slide wajib dituliskan tuntas sampai bagian penutup dan apresiasi akhir.
+4. STRUKTUR HEADING DI BARIS BARU:
+   Setiap slide WAJIB diawali dengan heading: \`### Slide [Nomor]: [Judul Slide Lengkap]\` di baris baru agar sistem parser mengenali setiap slide secara sempurna. Contoh alur struktur ideal:
 
    ### Slide 1: [Judul Topik Pembelajaran yang Lengkap & Formal]
    Subjudul: [Tagline Pembelajaran Kontekstual yang Jelas]
 
-   [Uraian pengantar komprehensif 1-2 paragraf mengenai fokus materi yang akan dipelajari pada presentasi ini, relevansinya bagi peserta didik, serta peta jalan pembahasan.]
+   [Uraian pengantar komprehensif 1-2 paragraf mengenai fokus materi yang akan dipelajari pada presentasi ini, peta jalan pembahasan, serta pemahaman bermakna bagi peserta didik.]
 
-   Poin Kunci:
-   - **Tujuan Pembelajaran**: [Target kompetensi esensial yang akan dikuasai peserta didik.]
-   - **Peta Konsep**: [Ringkasan cakupan materi dari awal hingga akhir.]
-
-   ### Slide 2: [Latar Belakang & Landasan Filosofis Konsep]
+   ### Slide 2: [Latar Belakang & Landasan Teori Konseptual]
    Subjudul: [Tagline Konseptual yang Menarik]
 
-   [Uraian paragraf narasi mendalam 1-2 paragraf (3-5 kalimat komprehensif) yang menjelaskan sejarah lahirnya konsep, permasalahan awal yang memicu penemuannya, dan bagaimana konsep ini berevolusi menjadi standar penting di era modern.]
+   [Paragraf 1: Uraian narasi mendalam 3-5 kalimat mengenai sejarah lahirnya konsep, permasalahan mendasar yang memicu penemuannya, serta mengapa konsep ini menjadi revolusioner di era modern.]
 
-   Poin Kunci:
-   - **Landasan Teori**: [Penjelasan rinci mengenai terminologi kunci dan prinsip dasar.]
-   - **Karakteristik Kunci**: [Faktor pembeda utama konsep ini dibandingkan metode konvensional.]
+   [Paragraf 2: Penjelasan definisi ilmiah formal, terminologi kunci, serta landasan filosofis di balik materi yang wajib dikuasai peserta didik.]
 
-   Studi Kasus:
-   [Uraian contoh konkret penerapan nyata di industri atau kehidupan sehari-hari, bagaimana konsep ini memecahkan masalah nyata.]
-
-   ### Slide 3: [Anatomi Struktur & Mekanisme Kerja Internal]
+   ### Slide 3: [Prinsip Kerja & Anatomi Struktur Materi]
    Subjudul: [Tagline Cara Kerja Sistematis]
 
-   [Uraian paragraf deskriptif lengkap mengenai alur mekanisme kerja, logika langkah-demi-langkah, dan korelasi antar komponen saat konsep dijalankan.]
+   [Paragraf 1: Penjelasan deskriptif lengkap mengenai komponen-komponen pembentuk materi, bagaimana setiap komponen saling berinteraksi, dan kaidah baku yang mengatur sistem tersebut.]
 
-   Poin Kunci:
-   - **Komponen Utama**: [Penjabaran elemen atau variabel pembangun sistem.]
-   - **Alur Eksekusi**: [Tahapan sistematis dari input, proses pemrosesan, hingga output.]
+   [Paragraf 2: Alur logika langkah-demi-langkah dari proses input, pemrosesan internal, hingga output yang dihasilkan, disertai analogi kontekstual yang mudah dicerna peserta didik.]
+
+   ### Slide 4: [Mekanisme Lanjutan & Logika Sebab-Akibat]
+   Subjudul: [Tagline Eksplorasi Mendalam]
+
+   [Paragraf 1: Pembahasan mendalam mengenai variasi kondisi, aturan percabangan, atau faktor-faktor eksternal yang memengaruhi keberhasilan penerapan materi.]
+
+   [Paragraf 2: Analisis kritis mengenai kesalahan umum (misconceptions) yang sering terjadi di kalangan pemula dan bagaimana cara tepat mengantisipasinya.]
+
+   ### Slide 5: [Penerapan Konkret & Bedah Studi Kasus Industri]
+   Subjudul: [Tagline Implementasi Nyata di Lapangan]
+
+   [Paragraf penjelasan skenario masalah riil di dunia industri atau kehidupan nyata yang dipecahkan menggunakan materi ini.]
 
    Studi Kasus:
-   [Contoh nyata implementasi atau skenario pemecahan masalah praktis.]
-   (Lanjutkan ke Slide 4, 5, 6, 7 dst. hingga seluruh materi tuntas dibahas secara mendalam)
+   [Uraian konkret implementasi langkah demi langkah beserta analisis hasil pemecahan masalah.]
+   (Jika pemrograman, sertakan blok kode contoh implementasi)
+
+   ### Slide 6: [Poin-Poin Kunci & Komparasi Karakteristik]
+   Subjudul: [Tagline Ringkasan Butir Emas]
+
+   Poin Kunci:
+   - **[Pilar/Aspek 1]**: [Uraian penegasan karakteristik esensial.]
+   - **[Pilar/Aspek 2]**: [Uraian penegasan karakteristik esensial.]
+   - **[Pilar/Aspek 3]**: [Uraian penegasan karakteristik esensial.]
+
+   ### Slide 7: [Rangkuman Esensial & Refleksi Pembelajaran]
+   Subjudul: [Tagline Evaluasi Diri & Tindak Lanjut]
+
+   [Paragraf rangkuman komprehensif mengenai benang merah seluruh konsep yang telah dipelajari hari ini.]
+
+   Poin Kunci:
+   - **Refleksi Diri**: [Pertanyaan pemantik untuk menguji nalar kritis siswa.]
+   - **Tantangan Mandiri**: [Aktivitas eksplorasi lanjutan untuk pertemuan mendatang.]
 
 ATURAN KHUSUS PERINTAH @generate_ilustrasi:
 Jika pengguna menyertakan tag "@generate_ilustrasi" atau meminta pembuatan ilustrasi/gambar/diagram materi:
