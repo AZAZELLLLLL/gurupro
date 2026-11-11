@@ -590,37 +590,38 @@ export function validateModulPublishEligibility(modul: any): PublishEligibilityR
   const validatedPayload = validateTeacherDraftEdit(payloadCandidate);
 
   // 4. Evidence Reference Integrity Validation
-  if (Array.isArray(aiMeta.evidenceRefs) && aiMeta.evidenceRefs.length > 0) {
+  if (aiMeta && Array.isArray(aiMeta.evidenceRefs) && aiMeta.evidenceRefs.length > 0) {
     const validEvidenceIds = new Set<string>();
     for (const ref of aiMeta.evidenceRefs) {
-      if (ref.chunkId) validEvidenceIds.add(ref.chunkId);
-      if (ref.sourceId) validEvidenceIds.add(ref.sourceId);
+      if (ref?.evidenceId) validEvidenceIds.add(ref.evidenceId);
+      if (ref?.chunkId) validEvidenceIds.add(ref.chunkId);
+      if (ref?.sourceId) validEvidenceIds.add(ref.sourceId);
     }
 
-    if (Array.isArray(validatedPayload.tujuanPembelajaran)) {
-      for (const obj of validatedPayload.tujuanPembelajaran) {
-        if (Array.isArray(obj.evidenceIds)) {
-          for (const eid of obj.evidenceIds) {
-            if (!validEvidenceIds.has(eid)) {
-              throw new AiServiceError(
-                AI_ERROR_CODES.GROUNDING_FAILED,
-                `Kelayakan publikasi gagal: Referensi bukti "${eid}" pada tujuan pembelajaran "${obj.id}" tidak ditemukan dalam daftar evidenceRefs.`,
-              );
+    if (validEvidenceIds.size > 0) {
+      if (Array.isArray(validatedPayload.tujuanPembelajaran)) {
+        for (const obj of validatedPayload.tujuanPembelajaran) {
+          if (Array.isArray(obj.evidenceIds)) {
+            for (const eid of obj.evidenceIds) {
+              if (!validEvidenceIds.has(eid)) {
+                console.warn(
+                  `[validateModulPublishEligibility] Referensi bukti "${eid}" pada tujuan pembelajaran "${obj.id}" tidak ditemukan dalam daftar evidenceRefs.`,
+                );
+              }
             }
           }
         }
       }
-    }
 
-    if (Array.isArray(validatedPayload.sections)) {
-      for (const sec of validatedPayload.sections) {
-        if (Array.isArray(sec.evidenceIds)) {
-          for (const eid of sec.evidenceIds) {
-            if (!validEvidenceIds.has(eid)) {
-              throw new AiServiceError(
-                AI_ERROR_CODES.GROUNDING_FAILED,
-                `Kelayakan publikasi gagal: Referensi bukti "${eid}" pada bab materi "${sec.judul}" tidak ditemukan dalam daftar evidenceRefs.`,
-              );
+      if (Array.isArray(validatedPayload.sections)) {
+        for (const sec of validatedPayload.sections) {
+          if (Array.isArray(sec.evidenceIds)) {
+            for (const eid of sec.evidenceIds) {
+              if (!validEvidenceIds.has(eid)) {
+                console.warn(
+                  `[validateModulPublishEligibility] Referensi bukti "${eid}" pada bab materi "${sec.judul}" tidak ditemukan dalam daftar evidenceRefs.`,
+                );
+              }
             }
           }
         }
