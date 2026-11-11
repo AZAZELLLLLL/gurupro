@@ -59,7 +59,7 @@ Pedoman Kerapian & Format Penulisan (SANGAT PENTING):
 
 ATURAN KHUSUS PENYUSUNAN MODUL AJAR (KURIKULUM MERDEKA):
 Bila guru meminta penyusunan modul ajar (misal: "buatkan modul ajar...", "rancang modul...", tag @generate_modul, atau pertanyaan seputar modul/RPP):
-Paparkan materi dengan SANGAT DETAIL, MENDALAM, KOMPREHENSIF, dan PROFESIONAL. Hindari ringkasan singkat.
+PENTING: Guru sendirilah yang akan menentukan sasaran kelas/jenjang dan metode pembelajaran spesifik di kelasnya masing-masing. Oleh karena itu, paparkan materi modul ajar dengan SANGAT DETAIL, MENDALAM, KOMPREHENSIF, LENGKAP, dan PROFESIONAL. Hindari ringkasan singkat.
 Wajib gunakan struktur resmi berikut dengan tingkatan heading markdown (## untuk setiap bagian):
 
 # MODUL AJAR: [Judul Modul Lengkap & Jelas Tanpa Tanda Kutip]
@@ -122,6 +122,7 @@ Bila guru meminta slide presentasi (misal: "rancang slide presentasi...", "buatk
 1. DILARANG KERAS MENULISKAN CATATAN META-LAYOUT / PROMPT DESAINER ke dalam teks slide:
    - Dilarang menulis "**Gaya Visual:** ...", "**Elemen Visual:** ...", "**Header / Tagline:** ...", "**Catatan Visual:** ...", "**Catatan Presenter:** ...", "**Prompt Visual Footnote:** ...", atau instruksi desainer grafis. Teks tersebut BUKAN materi pelajaran dan dilarang muncul dalam teks slide!
 2. MATERI SLIDE HARUS SUPER DETAIL, LENGKAP, DAN AKURAT:
+   - JUMLAH SLIDE FLEKSIBEL: Jumlah slide TIDAK DIBATASI KAKU (jangan dibatasi harus 5 atau 10 slide), melainkan ditentukan secara alami dan fleksibel berdasarkan keluasan materi agar seluruh pokok bahasan tuntas terbahas tuntas dari konsep dasar hingga implementasi nyata.
    - Jika obrolan membahas konsep dasar (misal: "Dasar Pemrograman Python" atau topik lainnya), presentasi PPT wajib menjabarkan materi dasar tersebut secara mendalam dan komprehensif menjadi judul dan isi slide yang berbobot.
    - Jangan hanya menulis 1-2 kalimat pendek atau frasa 3 kata!
    - Tuliskan REAL PEMBAHASAN MATERI SECARA MENDALAM yang siap dibaca, dipahami, dan dipelajari oleh siswa di proyektor kelas.
@@ -415,21 +416,15 @@ export const chatWithGuruAiServerFn = createServerFn({
     if (data.outlineSettings) {
       const parts: string[] = [];
       if (data.outlineSettings.pptStyle) {
-        parts.push(`- Template Gaya Slide Presentasi (PPT): ${data.outlineSettings.pptStyle} (Target: ${data.outlineSettings.slideCount || 5} slide)`);
+        parts.push(`- Template Gaya Slide Presentasi (PPT): ${data.outlineSettings.pptStyle} (Jumlah slide fleksibel & mendalam sesuai keluasan materi)`);
       }
       if (data.outlineSettings.illustrationStyle) {
         parts.push(`- Gaya Visual Ilustrasi Edukasi: ${data.outlineSettings.illustrationStyle} (Rasio: ${data.outlineSettings.illustrationAspect || "16:9"})`);
       }
-      if (data.outlineSettings.jenjang) {
-        parts.push(`- Jenjang / Sasaran Siswa: ${data.outlineSettings.jenjang}`);
-      }
-      if (data.outlineSettings.modelPembelajaran) {
-        parts.push(`- Model Pembelajaran: ${data.outlineSettings.modelPembelajaran}`);
-      }
       if (parts.length > 0) {
         conversationMessages.push({
           role: "system",
-          content: `Panduan Konfigurasi Outline & Gaya Aktif Pilihan Guru:\n${parts.join("\n")}\nInstruksi: Bila guru meminta pembuatan modul ajar, slide presentasi PPT, atau ilustrasi gambar (termasuk tag @generate_ilustrasi, @generate_ppt, @generate_modul), sesuaikan struktur, nuansa bahasa, dan kedalaman materi dengan konfigurasi aktif di atas.`,
+          content: `Panduan Konfigurasi Outline & Gaya Aktif Pilihan Guru:\n${parts.join("\n")}\nInstruksi: Bila guru meminta pembuatan modul ajar, slide presentasi PPT, atau ilustrasi gambar (termasuk tag @generate_ilustrasi, @generate_ppt, @generate_modul), sesuaikan struktur, nuansa bahasa, dan kedalaman materi dengan konfigurasi aktif di atas. Guru sendirilah yang menentukan sasaran kelas dan metode pembelajaran di kelasnya, sehingga buatlah modul dan slide secara lengkap, komprehensif, dan sedetail mungkin.`,
         });
       }
     }

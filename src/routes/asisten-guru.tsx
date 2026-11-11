@@ -6,6 +6,7 @@ import {
   Bot,
   Check,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   ClipboardList,
   Copy,
@@ -80,13 +81,29 @@ interface ChatSession {
 export interface OutlineSettings {
   pptStyle: string;
   pptStyleName: string;
-  slideCount: number;
+  slideCount?: number;
   aspectRatio: string;
   illustrationStyle: string;
   illustrationStyleName: string;
   illustrationAspect: string;
-  jenjang: string;
-  modelPembelajaran: string;
+  jenjang?: string;
+  modelPembelajaran?: string;
+}
+
+export interface ParsedSlideItem {
+  id: string;
+  num: number;
+  title: string;
+  subtitle?: string;
+  bullets: string[];
+  isCover: boolean;
+}
+
+export interface ParsedSlideDeck {
+  title: string;
+  subtitle?: string;
+  slideCount: number;
+  slides: ParsedSlideItem[];
 }
 
 const STORAGE_KEY = "gurupro_asisten_guru_sessions_v1";
@@ -223,11 +240,18 @@ export function AsistenGuruPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Outline and Template Configuration State
+  // Outline and Template Configuration State (PPT Theme & Illustration Style)
   const [outlineSettings, setOutlineSettings] = useState<OutlineSettings>(DEFAULT_OUTLINE_SETTINGS);
   const [tempOutlineSettings, setTempOutlineSettings] = useState<OutlineSettings>(DEFAULT_OUTLINE_SETTINGS);
   const [showOutlineModal, setShowOutlineModal] = useState(false);
-  const [outlineModalTab, setOutlineModalTab] = useState<"ppt" | "illustration" | "modul">("ppt");
+  const [outlineModalTab, setOutlineModalTab] = useState<"ppt" | "illustration">("ppt");
+
+  // Interactive Presentation Slide Viewer State
+  const [slideViewerOpen, setSlideViewerOpen] = useState(false);
+  const [activeSlideDeck, setActiveSlideDeck] = useState<ParsedSlideDeck | null>(null);
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [slideViewerRawContent, setSlideViewerRawContent] = useState("");
+  const [slideViewerMsgId, setSlideViewerMsgId] = useState("");
 
   // Save actions progress state
   const [savingAction, setSavingAction] = useState<string | null>(null);
@@ -285,6 +309,22 @@ export function AsistenGuruPage() {
       console.error("Failed to load chat sessions:", e);
     }
   }, []);
+
+  // Keyboard navigation listener for Slide Viewer Modal
+  useEffect(() => {
+    if (!slideViewerOpen || !activeSlideDeck) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        setActiveSlideIndex((prev) => Math.max(0, prev - 1));
+      } else if (e.key === "ArrowRight") {
+        setActiveSlideIndex((prev) => Math.min((activeSlideDeck?.slides.length || 1) - 1, prev + 1));
+      } else if (e.key === "Escape") {
+        setSlideViewerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [slideViewerOpen, activeSlideDeck]);
 
   // Save sessions to localStorage
   const persistSessions = (newSessions: ChatSession[]) => {
@@ -694,7 +734,7 @@ export function AsistenGuruPage() {
       .replace(/_([^_]+)_/g, "$1")
       .replace(/`([^`]+)`/g, "$1")
       .replace(/^#+\s*/g, "")
-      .replace(/^[•\-\*]\s*/g, "")
+      .replace(/^[\s\t]*[•\-\*✓✔]\s*/g, "")
       .replace(/[""]/g, '"')
       .replace(/^[-–—]\s*/, "")
       .trim();
@@ -715,8 +755,91 @@ export function AsistenGuruPage() {
       lower.startsWith("skema warna") ||
       lower.startsWith("layout:") ||
       lower.startsWith("prompt gambar") ||
+      lower.startsWith("visual:") ||
+      lower.startsWith("visual :") ||
+      lower.startsWith("judul slide:") ||
       lower.startsWith("```ai_image_prompt")
     );
+  };
+
+  const parseSlidesFromContent = (content: string, defaultTitle?: string): ParsedSlideDeck | null => {
+    if (!/(?:###?\s*Slide|\*\*Slide\s*\d+|Slide\s*\d+[:\-–])/i.test(content)) {
+      return null;
+    }
+
+    const slideBlocks = content.split(/\n(?=###?\s+Slide|\n\*\*Slide\s+\d+|Slide\s*\d+[:\-–])/i);
+    if (slideBlocks.length === 0) return null;
+
+    const slides: ParsedSlideItem[] = [];
+    let mainTitle = defaultTitle || "Materi Pembelajaran";
+    let mainSubtitle = "";
+
+    slideBlocks.forEach((block, idx) => {
+      const titleMatch = block.match(/(?:Slide\s*\d*[:\-–]?\s*)([^\n]+)/i);
+      const subMatch = block.match(/(?:Sub-?Judul|Tagline|Sasaran)\s*[:\-–]?\s*([^\n]+)/i);
+      const subtitle = subMatch ? cleanSlideText(subMatch[1]) : undefined;
+
+      const rawBullets = Array.from(block.matchAll(/^[\s\t]*[-*•✓✔]\s+(.+)$/gm)).map((m) => m[1].trim());
+      const cleanBullets = rawBullets
+        .filter((b) => !isMetaPromptLine(b))
+        .map((b) => cleanSlideText(b))
+        .filter((b) => b.length > 3);
+
+      let cleanTitle = titleMatch ? cleanSlideText(titleMatch[1]) : "";
+      
+      // If there is an inner "Judul Slide: ..." line, use that as cleanTitle
+      const innerJudulMatch = block.match(/(?:Judul Slide|Topik Slide)\s*[:\-–]?\s*([^\n]+)/i);
+      if (innerJudulMatch) {
+        cleanTitle = cleanSlideText(innerJudulMatch[1]);
+      }
+
+      const isCover =
+        idx === 0 &&
+        (cleanTitle.toLowerCase().includes("cover") ||
+          cleanTitle.toLowerCase().includes("judul utama") ||
+          slideBlocks.length > 1);
+
+      if (isCover) {
+        const mainTitleMatch = block.match(/(?:Judul Utama|Materi Utama)\s*[:\-–]?\s*([^\n]+)/i);
+        if (mainTitleMatch) {
+          mainTitle = cleanSlideText(mainTitleMatch[1]);
+        } else if (cleanTitle && !cleanTitle.toLowerCase().includes("cover")) {
+          mainTitle = cleanTitle.replace(/^Cover\s*[:\-–]?\s*/i, "").trim();
+        }
+        if (subtitle) mainSubtitle = subtitle;
+      }
+
+      if (cleanTitle || cleanBullets.length > 0) {
+        slides.push({
+          id: `slide_${idx + 1}`,
+          num: idx + 1,
+          title: cleanTitle ? cleanTitle.replace(/^Slide\s*\d*[:\-–]?\s*/i, "").trim() : `Slide ${idx + 1}`,
+          subtitle,
+          bullets:
+            cleanBullets.length > 0
+              ? cleanBullets
+              : [cleanSlideText(block.slice(0, 150))].filter(Boolean),
+          isCover,
+        });
+      }
+    });
+
+    if (slides.length === 0) return null;
+
+    return {
+      title: mainTitle,
+      subtitle: mainSubtitle,
+      slideCount: slides.length,
+      slides,
+    };
+  };
+
+  const openSlideViewer = (deck: ParsedSlideDeck, rawContent: string, msgId: string, initialIndex = 0) => {
+    setActiveSlideDeck(deck);
+    setSlideViewerRawContent(rawContent);
+    setSlideViewerMsgId(msgId);
+    setActiveSlideIndex(initialIndex);
+    setSlideViewerOpen(true);
   };
 
   const handleSaveToPPT = async (content: string, msgId: string) => {
@@ -1626,7 +1749,7 @@ export function AsistenGuruPage() {
                 <button
                   onClick={() =>
                     handleSendMessage(
-                      `Rancang ${outlineSettings.slideCount} slide presentasi PPT dengan tema ${outlineSettings.pptStyleName} untuk materi Struktur Data Array. Berikan judul tiap slide, poin-poin materi ringkas, dan arahan visual interaktif.`
+                      `Rancang presentasi PPT komprehensif & mendalam dengan tema ${outlineSettings.pptStyleName} untuk materi Struktur Data Array. Berikan judul tiap slide, pembahasan materi rinci, dan arahan visual interaktif.`
                     )
                   }
                   className="group flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 sm:p-4 text-left transition-all hover:border-primary/50 hover:bg-muted/40 hover:shadow-xs active:scale-[0.99]"
@@ -1635,7 +1758,7 @@ export function AsistenGuruPage() {
                     <div className="flex items-center justify-between mb-1.5 sm:mb-2">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                         <Presentation className="h-3 w-3" />
-                        Presentasi PPT ({outlineSettings.slideCount} Slide)
+                        Presentasi PPT ({outlineSettings.pptStyleName.split(" ")[0]})
                       </span>
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </div>
@@ -1706,6 +1829,7 @@ export function AsistenGuruPage() {
             <div className="mx-auto max-w-3xl w-full space-y-3.5 sm:space-y-5 px-0.5 sm:px-1">
               {currentMessages.map((m) => {
                 const isUser = m.role === "user";
+                const chatSlideDeck = !isUser ? parseSlidesFromContent(m.content, activeSession?.title) : null;
                 return (
                   <div
                     key={m.id}
@@ -1782,6 +1906,85 @@ export function AsistenGuruPage() {
                         </div>
                       )}
 
+                      {/* PRESENTATION SLIDE DECK CARD (BACKGROUND LAZYLOADING PREVIEW) */}
+                      {!isUser && chatSlideDeck && (
+                        <div className="mt-3.5 overflow-hidden rounded-xl border border-blue-500/30 bg-gradient-to-br from-blue-500/5 via-primary/5 to-card p-3 sm:p-4 shadow-sm transition-all hover:border-blue-500/50">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
+                            <div className="flex items-start gap-2.5">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-sm">
+                                <Presentation className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[10px] font-bold tracking-wider uppercase text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                                    Pratinjau Presentasi Siap
+                                  </span>
+                                  <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                    {chatSlideDeck.slideCount} Slide • 16:9 Widescreen
+                                  </span>
+                                </div>
+                                <h4 className="text-xs sm:text-sm font-bold text-foreground mt-1 line-clamp-1">
+                                  {chatSlideDeck.title}
+                                </h4>
+                                {chatSlideDeck.subtitle && (
+                                  <p className="text-[11px] text-muted-foreground line-clamp-1">
+                                    {chatSlideDeck.subtitle}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => openSlideViewer(chatSlideDeck, m.content, m.id)}
+                              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 text-xs font-semibold shadow-xs transition-all hover:scale-[1.02] shrink-0"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              <span>Buka & Tinjau PPT</span>
+                            </button>
+                          </div>
+
+                          {/* Mini Slide Strip */}
+                          <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                            {chatSlideDeck.slides.map((s, idx) => (
+                              <button
+                                key={s.id || idx}
+                                onClick={() => openSlideViewer(chatSlideDeck, m.content, m.id, idx)}
+                                className="group relative shrink-0 w-32 sm:w-36 h-20 rounded-lg border border-border/80 bg-background/90 hover:border-blue-500/60 hover:bg-blue-500/5 p-2 text-left flex flex-col justify-between transition-all shadow-2xs hover:shadow-xs"
+                                title={`Klik untuk buka Slide ${s.num}: ${s.title}`}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                                    #{s.num}
+                                  </span>
+                                  {s.isCover && (
+                                    <span className="text-[8px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 rounded">
+                                      COVER
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] font-semibold text-foreground line-clamp-2 leading-tight">
+                                  {s.title}
+                                </p>
+                                <span className="text-[8.5px] text-muted-foreground line-clamp-1">
+                                  {s.bullets.length} butir materi
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="mt-2.5 flex items-center justify-between text-[10.5px] text-muted-foreground pt-2 border-t border-border/40">
+                            <span>PPT dibuat di latar belakang. Klik slide di atas untuk meninjau secara mendalam.</span>
+                            <button
+                              onClick={() => openSlideViewer(chatSlideDeck, m.content, m.id)}
+                              className="text-blue-600 dark:text-blue-400 hover:underline font-semibold shrink-0 ml-2 inline-flex items-center gap-1"
+                            >
+                              <span>Tinjau Lengkap</span>
+                              <ChevronRight className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {!isUser && (
                         <div className="mt-3.5 pt-3 border-t border-border/60 flex flex-wrap items-center justify-between gap-2 text-muted-foreground">
                           {/* AI Provider Info */}
@@ -1825,15 +2028,15 @@ export function AsistenGuruPage() {
                               <span>{savingAction === m.id + "-soal" ? "Menyimpan..." : "Simpan ke Soal"}</span>
                             </button>
 
-                            {/* 3b. Download PPTX Direct Button */}
-                            {/(?:###?\s*Slide|\*\*Slide\s*\d+)/i.test(m.content) && (
+                            {/* 3b. Tinjau PPT Button */}
+                            {chatSlideDeck && (
                               <button
-                                onClick={() => handleDownloadPPTFromChat(m.content, activeSession?.title)}
+                                onClick={() => openSlideViewer(chatSlideDeck, m.content, m.id)}
                                 className="inline-flex items-center gap-1 rounded-lg border border-blue-500/40 bg-blue-500/10 px-2 py-1 text-[10.5px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors"
-                                title="Unduh presentasi PowerPoint (.pptx) asli"
+                                title="Buka pratinjau slide 16:9 dan pilih unduh atau sesuaikan"
                               >
-                                <Download className="h-3 w-3" />
-                                <span>Unduh PPTX</span>
+                                <Eye className="h-3 w-3" />
+                                <span>Tinjau PPT ({chatSlideDeck.slideCount} Slide)</span>
                               </button>
                             )}
 
@@ -1933,11 +2136,11 @@ export function AsistenGuruPage() {
                   setShowOutlineModal(true);
                 }}
                 className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/10 transition-colors shadow-2xs"
-                title="Klik untuk mengubah template PPT, gaya ilustrasi, dan model modul ajar"
+                title="Klik untuk mengubah template tema PPT dan gaya visual ilustrasi"
               >
                 <SlidersHorizontal className="h-3 w-3 shrink-0" />
                 <span className="font-semibold text-foreground">
-                  📊 PPT: {outlineSettings.pptStyleName.split(" ")[0]} ({outlineSettings.slideCount} Slide)
+                  📊 PPT: {outlineSettings.pptStyleName.split(" ")[0]}
                 </span>
                 <span className="text-border">•</span>
                 <span className="font-semibold text-foreground">
@@ -1970,7 +2173,7 @@ export function AsistenGuruPage() {
               <button
                 onClick={() => {
                   setInputMessage(
-                    `@generate_ppt rancang ${outlineSettings.slideCount} slide presentasi tema ${outlineSettings.pptStyleName} tentang `
+                    `@generate_ppt susun presentasi PPT lengkap & mendalam tema ${outlineSettings.pptStyleName} tentang `
                   );
                   setTimeout(() => textareaRef.current?.focus(), 80);
                 }}
@@ -1984,7 +2187,7 @@ export function AsistenGuruPage() {
               <button
                 onClick={() => {
                   setInputMessage(
-                    `@generate_modul buatkan modul ajar Kurikulum Merdeka ${outlineSettings.jenjang} model ${outlineSettings.modelPembelajaran} tentang `
+                    `@generate_modul buatkan modul ajar Kurikulum Merdeka yang lengkap, mendalam, dan rinci dengan struktur Capaian Pembelajaran, Alur Tujuan Pembelajaran, Materi Inti, Asesmen & Refleksi tentang `
                   );
                   setTimeout(() => textareaRef.current?.focus(), 80);
                 }}
@@ -1998,7 +2201,7 @@ export function AsistenGuruPage() {
               <button
                 onClick={() => {
                   setInputMessage(
-                    `Buatkan 5 soal HOTS pilihan ganda untuk jenjang ${outlineSettings.jenjang} lengkap dengan kunci jawaban dan pembahasan tentang `
+                    `Buatkan 5 soal HOTS pilihan ganda lengkap dengan kunci jawaban dan pembahasan mendalam tentang `
                   );
                   setTimeout(() => textareaRef.current?.focus(), 80);
                 }}
@@ -2024,7 +2227,7 @@ export function AsistenGuruPage() {
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border-b border-blue-500/20 text-blue-600 dark:text-blue-400 text-[11px] font-medium">
                   <Presentation className="h-3.5 w-3.5 animate-pulse shrink-0" />
                   <span className="truncate">
-                    Mode Presentasi Aktif: <strong>{outlineSettings.pptStyleName}</strong> ({outlineSettings.slideCount} Slide)
+                    Mode Presentasi Aktif: <strong>{outlineSettings.pptStyleName}</strong> (Slide Lengkap & Mendalam)
                   </span>
                 </div>
               )}
@@ -2032,7 +2235,7 @@ export function AsistenGuruPage() {
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border-b border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium">
                   <BookOpen className="h-3.5 w-3.5 animate-pulse shrink-0" />
                   <span className="truncate">
-                    Mode Modul Aktif: <strong>{outlineSettings.jenjang}</strong> ({outlineSettings.modelPembelajaran})
+                    Mode Modul Aktif: <strong>Modul Lengkap & Mendalam</strong> (Kurikulum Merdeka)
                   </span>
                 </div>
               )}
@@ -2115,7 +2318,7 @@ export function AsistenGuruPage() {
                     Pengaturan Template & Outline AI
                   </h3>
                   <p className="text-[11px] text-muted-foreground">
-                    Tentukan gaya presentasi PPT, visual ilustrasi, dan sasaran modul yang akan digenerate
+                    Tentukan gaya presentasi PPT dan visual ilustrasi yang akan digenerate oleh AI
                   </p>
                 </div>
               </div>
@@ -2150,17 +2353,6 @@ export function AsistenGuruPage() {
               >
                 <Palette className="h-3.5 w-3.5" />
                 <span>Gaya Ilustrasi</span>
-              </button>
-              <button
-                onClick={() => setOutlineModalTab("modul")}
-                className={`flex items-center gap-1.5 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all ${
-                  outlineModalTab === "modul"
-                    ? "border-primary text-primary font-bold"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <BookOpen className="h-3.5 w-3.5" />
-                <span>Modul & Model</span>
               </button>
             </div>
 
@@ -2217,30 +2409,11 @@ export function AsistenGuruPage() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border">
-                    <div>
-                      <label className="text-xs font-bold text-foreground block mb-1.5">
-                        Target Jumlah Slide:
-                      </label>
-                      <div className="flex gap-2">
-                        {[3, 5, 7, 10].map((count) => (
-                          <button
-                            key={count}
-                            type="button"
-                            onClick={() =>
-                              setTempOutlineSettings({
-                                ...tempOutlineSettings,
-                                slideCount: count,
-                              })
-                            }
-                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                              tempOutlineSettings.slideCount === count
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border bg-muted/40 text-foreground hover:bg-muted"
-                            }`}
-                          >
-                            {count} Slide
-                          </button>
-                        ))}
+                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-muted-foreground flex items-start gap-2.5">
+                      <Sparkles className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-foreground block mb-0.5">Jumlah Slide Fleksibel</span>
+                        <span>AI asisten menyusun slide secara mendalam sesuai keluasan materi tanpa batasan kaku.</span>
                       </div>
                     </div>
 
@@ -2359,71 +2532,6 @@ export function AsistenGuruPage() {
                   </div>
                 </div>
               )}
-
-              {/* TAB 3: MODUL & MODEL PEMBELAJARAN */}
-              {outlineModalTab === "modul" && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-foreground block mb-2">
-                      Jenjang & Sasaran Siswa:
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {JENJANG_OPTIONS.map((j) => {
-                        const isSelected = tempOutlineSettings.jenjang === j;
-                        return (
-                          <button
-                            key={j}
-                            type="button"
-                            onClick={() =>
-                              setTempOutlineSettings({
-                                ...tempOutlineSettings,
-                                jenjang: j,
-                              })
-                            }
-                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all ${
-                              isSelected
-                                ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary"
-                                : "border-border bg-card text-foreground hover:bg-muted/40"
-                            }`}
-                          >
-                            {j}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-border">
-                    <label className="text-xs font-bold text-foreground block mb-2">
-                      Model Pembelajaran Kurikulum Merdeka:
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {MODEL_PEMBELAJARAN_OPTIONS.map((m) => {
-                        const isSelected = tempOutlineSettings.modelPembelajaran === m;
-                        return (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() =>
-                              setTempOutlineSettings({
-                                ...tempOutlineSettings,
-                                modelPembelajaran: m,
-                              })
-                            }
-                            className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all ${
-                              isSelected
-                                ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary"
-                                : "border-border bg-card text-foreground hover:bg-muted/40"
-                            }`}
-                          >
-                            {m}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Footer */}
@@ -2452,16 +2560,11 @@ export function AsistenGuruPage() {
                         `@generate_ilustrasi ${cleanPrev ? cleanPrev : `buatkan ilustrasi edukatif gaya ${tempOutlineSettings.illustrationStyleName} (rasio ${tempOutlineSettings.illustrationAspect}) tentang `}`
                       );
                       toast.success(`Gaya ${tempOutlineSettings.illustrationStyleName} diterapkan! Tambahkan instruksi materi di chat.`);
-                    } else if (outlineModalTab === "ppt") {
-                      setInputMessage(
-                        `@generate_ppt ${cleanPrev ? cleanPrev : `rancang ${tempOutlineSettings.slideCount} slide presentasi tema ${tempOutlineSettings.pptStyleName} tentang `}`
-                      );
-                      toast.success(`Tema PPT ${tempOutlineSettings.pptStyleName} diterapkan! Tambahkan topik di chat.`);
                     } else {
                       setInputMessage(
-                        `@generate_modul ${cleanPrev ? cleanPrev : `buatkan modul ajar Kurikulum Merdeka ${tempOutlineSettings.jenjang} model ${tempOutlineSettings.modelPembelajaran} tentang `}`
+                        `@generate_ppt ${cleanPrev ? cleanPrev : `susun presentasi PPT lengkap & mendalam tema ${tempOutlineSettings.pptStyleName} tentang `}`
                       );
-                      toast.success("Outline modul ajar diterapkan! Tambahkan materi di chat.");
+                      toast.success(`Tema PPT ${tempOutlineSettings.pptStyleName} diterapkan! Tambahkan topik di chat.`);
                     }
 
                     setTimeout(() => {
@@ -2722,6 +2825,245 @@ export function AsistenGuruPage() {
                 <BookOpen className="h-4 w-4" />
                 <span>Pasang ke Modul Ajar</span>
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================== */}
+      {/* MODAL: PRATINJAU INTERAKTIF PRESENTASI PPT (16:9 SLIDE VIEWER)                */}
+      {/* ============================================================================== */}
+      {slideViewerOpen && activeSlideDeck && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 md:p-6 backdrop-blur-md animate-in fade-in"
+          onClick={() => setSlideViewerOpen(false)}
+        >
+          <div
+            className="w-full max-w-5xl max-h-[95vh] flex flex-col rounded-2xl border border-white/10 bg-card shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Toolbar */}
+            <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-muted/40 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-xs">
+                  <Presentation className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs sm:text-sm font-bold text-foreground truncate">
+                      {activeSlideDeck.title}
+                    </h3>
+                    <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                      Slide {activeSlideIndex + 1} / {activeSlideDeck.slideCount}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground truncate hidden sm:block">
+                    Pratinjau Slide 16:9 • Tinjau sebelum mengunduh berkas .pptx
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCopy(slideViewerMsgId, slideViewerRawContent)}
+                  className="h-8 gap-1 text-xs hidden md:inline-flex"
+                  title="Salin isi teks presentasi"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>Salin Teks</span>
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleSaveToPPT(slideViewerRawContent, slideViewerMsgId)}
+                  disabled={savingAction === slideViewerMsgId + "-ppt"}
+                  className="h-8 gap-1 text-xs hidden sm:inline-flex"
+                  title="Simpan slide ke Modul Ajar"
+                >
+                  <BookOpen className="h-3.5 w-3.5 text-primary" />
+                  <span>Simpan ke Modul</span>
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => handleDownloadPPTFromChat(slideViewerRawContent, activeSlideDeck.title)}
+                  className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs"
+                  title="Unduh berkas presentasi PowerPoint (.pptx)"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="hidden xs:inline">Unduh PPTX</span>
+                </Button>
+
+                <button
+                  onClick={() => setSlideViewerOpen(false)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-1"
+                  title="Tutup (Esc)"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Slide Presentation Canvas (16:9 Interactive Area) */}
+            <div className="relative flex-1 bg-slate-950 p-2 sm:p-4 md:p-6 flex items-center justify-center overflow-hidden min-h-[320px] sm:min-h-[420px] md:min-h-[480px]">
+              {/* Previous Slide Button */}
+              <button
+                onClick={() => setActiveSlideIndex((prev) => Math.max(0, prev - 1))}
+                disabled={activeSlideIndex === 0}
+                className="absolute left-2 sm:left-4 z-10 flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-xs hover:bg-black/90 disabled:opacity-20 disabled:cursor-not-allowed transition-all shadow-lg hover:scale-105"
+                title="Slide Sebelumnya (←)"
+              >
+                <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
+              </button>
+
+              {/* Next Slide Button */}
+              <button
+                onClick={() => setActiveSlideIndex((prev) => Math.min(activeSlideDeck.slideCount - 1, prev + 1))}
+                disabled={activeSlideIndex === activeSlideDeck.slideCount - 1}
+                className="absolute right-2 sm:right-4 z-10 flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-xs hover:bg-black/90 disabled:opacity-20 disabled:cursor-not-allowed transition-all shadow-lg hover:scale-105"
+                title="Slide Selanjutnya (→)"
+              >
+                <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
+              </button>
+
+              {/* Slide 16:9 Board */}
+              {(() => {
+                const currentSlide = activeSlideDeck.slides[activeSlideIndex] || activeSlideDeck.slides[0];
+                if (!currentSlide) return null;
+
+                if (currentSlide.isCover || activeSlideIndex === 0) {
+                  return (
+                    <div className="w-full max-w-4xl aspect-video rounded-xl sm:rounded-2xl border border-indigo-500/30 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-10 md:p-12 flex flex-col justify-between shadow-2xl relative overflow-hidden select-text">
+                      {/* Decorative background glows */}
+                      <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+                      <div className="absolute bottom-0 left-0 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                      {/* Header Badge */}
+                      <div className="flex items-center justify-between relative z-10">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold text-sky-300">
+                          <Sparkles className="h-3 w-3" />
+                          KURIKULUM MERDEKA • GURUPRO AI
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          Slide #{currentSlide.num} • Cover
+                        </span>
+                      </div>
+
+                      {/* Cover Center Content */}
+                      <div className="my-auto py-4 relative z-10 space-y-3">
+                        <h1 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-tight">
+                          {currentSlide.title || activeSlideDeck.title}
+                        </h1>
+                        {currentSlide.subtitle && (
+                          <p className="text-xs sm:text-base text-sky-200/90 font-medium max-w-2xl leading-relaxed">
+                            {currentSlide.subtitle}
+                          </p>
+                        )}
+                        <div className="h-1 w-20 bg-gradient-to-r from-sky-400 to-indigo-500 rounded-full mt-4" />
+                      </div>
+
+                      {/* Cover Footer */}
+                      <div className="flex items-center justify-between border-t border-white/10 pt-4 text-[11px] text-slate-400 relative z-10">
+                        <span>Media Pembelajaran Digital Interaktif</span>
+                        <span>GuruPro AI Presentation Suite</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Standard Content Slide
+                return (
+                  <div className="w-full max-w-4xl aspect-video rounded-xl sm:rounded-2xl border border-border bg-card text-card-foreground p-5 sm:p-8 md:p-10 flex flex-col justify-between shadow-2xl relative overflow-hidden select-text">
+                    {/* Slide Header */}
+                    <div className="border-b border-border/80 pb-3 sm:pb-4">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                          SLIDE #{currentSlide.num}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          {activeSlideDeck.title}
+                        </span>
+                      </div>
+                      <h2 className="text-sm sm:text-lg md:text-xl font-bold text-foreground tracking-tight leading-snug">
+                        {currentSlide.title}
+                      </h2>
+                      {currentSlide.subtitle && (
+                        <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+                          {currentSlide.subtitle}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Slide Body: Bullets / Cards */}
+                    <div className="flex-1 my-3 sm:my-4 overflow-y-auto pr-1 space-y-2.5 sm:space-y-3">
+                      {currentSlide.bullets.map((bullet, bIdx) => (
+                        <div
+                          key={bIdx}
+                          className="flex items-start gap-2.5 sm:gap-3 rounded-xl border border-border/60 bg-muted/20 p-2.5 sm:p-3 transition-colors hover:bg-muted/40 hover:border-border"
+                        >
+                          <div className="flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 mt-0.5 text-xs font-bold">
+                            ✓
+                          </div>
+                          <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed font-normal">
+                            {bullet}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Slide Footer */}
+                    <div className="border-t border-border/60 pt-2.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                      <span>Bahan Tayang Pembelajaran Kelas</span>
+                      <span className="font-mono">
+                        {activeSlideIndex + 1} / {activeSlideDeck.slideCount}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Bottom Slide Strip Carousel */}
+            <div className="border-t border-border bg-card p-2 sm:p-3 shrink-0">
+              <div className="flex items-center justify-between mb-1.5 px-1 text-[11px] text-muted-foreground">
+                <span className="font-semibold text-foreground">Daftar Seluruh Slide ({activeSlideDeck.slideCount}):</span>
+                <span className="hidden sm:inline">Gunakan tombol panah ← / → di keyboard untuk beralih</span>
+              </div>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {activeSlideDeck.slides.map((s, idx) => {
+                  const isActive = idx === activeSlideIndex;
+                  return (
+                    <button
+                      key={s.id || idx}
+                      onClick={() => setActiveSlideIndex(idx)}
+                      className={`group relative shrink-0 w-28 sm:w-32 h-16 rounded-lg border p-1.5 text-left flex flex-col justify-between transition-all ${
+                        isActive
+                          ? "border-blue-600 bg-blue-500/10 ring-2 ring-blue-600 shadow-xs"
+                          : "border-border/80 bg-background/80 hover:border-muted-foreground/40 hover:bg-muted/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className={`text-[9px] font-bold px-1 rounded ${isActive ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground"}`}>
+                          #{s.num}
+                        </span>
+                        {s.isCover && (
+                          <span className="text-[8px] font-bold text-amber-500">COVER</span>
+                        )}
+                      </div>
+                      <p className={`text-[9.5px] font-semibold line-clamp-1 leading-tight ${isActive ? "text-blue-600 dark:text-blue-400 font-bold" : "text-foreground"}`}>
+                        {s.title}
+                      </p>
+                      <span className="text-[8px] text-muted-foreground truncate">
+                        {s.bullets.length} butir
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
