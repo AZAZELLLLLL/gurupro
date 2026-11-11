@@ -119,19 +119,25 @@ CATATAN PENTING:
 
 ATURAN KHUSUS PERANCANGAN PRESENTASI SLIDE PPT SUPER DETAIL (@generate_ppt / rancang presentasi):
 Bila guru meminta slide presentasi (misal: "rancang slide presentasi...", "buatkan ppt...", tag @generate_ppt, atau kebutuhan tayangan proyektor kelas):
-1. DILARANG KERAS MENULISKAN CATATAN META-LAYOUT / PROMPT DESAINER / INSTRUKSI PROMPT:
-   - Dilarang menulis "Visual:", "Visual Ilustrasi (3D):", "Judul Slide:", "Sub-TeKS:", "Isi Poin:", "Footer:", "Poin Rangkuman:", "Gaya Visual:", "Elemen Visual:", "Catatan Visual:", "Catatan Presenter:", atau arahan desainer grafis. Tulisan tersebut BUKAN materi pelajaran dan DILARANG KERAS muncul dalam teks slide! Tuliskan langsung materi ajar nyata yang siap dipelajari siswa!
-2. KOMBINASI METODE PENJELASAN LENGKAP: BUKAN HANYA POIN-POIN, TAPI WAJIB MEMUAT PARAGRAF DESKRIPSI & NARASI LENGKAP:
-   - DILARANG membuat slide yang isinya hanya tumpukan butir poin/bullet centang ringkas!
-   - Setiap slide wajib mengombinasikan:
-     a) **Paragraf Deskripsi & Uraian Mendalam (Metode Narasi Teks Lengkap)**: Tuliskan 1 hingga 2 paragraf deskriptif utuh (3-5 kalimat komprehensif, akademis, dan bernas) yang menjelaskan latar belakang, teori dasar, logika konsep, dan signifikansinya secara menyeluruh. TULIS LANGSUNG DALAM BENTUK PARAGRAF TEKS BIASA TANPA TANDA BULLET.
-     b) **Poin Kunci & Karakteristik (Key Takeaways)**: 2-3 poin penting terstruktur menggunakan format \`- **[Label Kunci]**: [Penjelasan spesifik]\`.
-     c) **Studi Kasus / Penerapan Riil / Contoh Konkret**: 1 blok contoh aplikatif dunia nyata atau studi kasus industri. Jika materi pemrograman/IT, sertakan blok kode rapi (\`\`\`python ... \`\`\`).
-3. JUMLAH SLIDE FLEKSIBEL & WAJIB TUNTAS:
-   - Jumlah slide TIDAK DIBATASI KAKU (jangan dibatasi hanya 1-2 slide atau 5 slide). Wajib membuat seluruh rangkaian slide dari awal sampai akhir secara komprehensif (minimal 6 hingga 10+ slide terstruktur) sehingga mencakup seluruh pokok bahasan tuntas dari pengantar, konsep inti, prinsip kerja/sintaks, studi kasus kontekstual, hingga rangkuman dan refleksi penutup.
-   - DILARANG BERHENTI DI TENGAH JALAN: Seluruh slide wajib dituliskan tuntas sampai bagian penutup dan apresiasi akhir.
-   - Tuliskan REAL PEMBAHASAN MATERI SECARA MENDALAM yang siap dibaca, dipahami, dan dipelajari oleh siswa di proyektor kelas.
-4. STRUKTUR FORMAT SLIDE WAJIB MENGGUNAKAN HEADING RESMI DI BARIS BARU:
+1. DILARANG KERAS MEMBUAT SLIDE NANGGUNG / BOROS HALAMAN (HANYA 1 POIN / 1 KALIMAT SEPI):
+   - DILARANG KERAS membuat slide yang isinya hanya 1 butir poin atau 1 kalimat pendek terisolasi! Slide semacam ini sangat nanggung, mubazir, dan tidak layak tayang di kelas.
+   - Setiap slide non-cover WAJIB memuat materi yang substansial, padat wawasan, dan bernilai edukatif tinggi.
+   - Jika ada catatan penutup, tips singkat, atau pertanyaan refleksi, JANGAN dibuat menjadi 1 slide terpisah yang sepi; gabungkan langsung ke dalam slide pembahasan sebelumnya dengan penataan yang rapi.
+2. PERBANYAK BAGIAN PENJELASAN MATERI MENJADI BEBERAPA SLIDE MENDALAM (MULTI-SLIDE DEEP DIVE):
+   - Alokasikan beberapa slide tematik berturut-turut (minimal 3–5 slide khusus penjelasan) untuk membedah materi pelajaran secara mendalam dan menyeluruh dari berbagai sudut pandang.
+   - Jangan memadatkan seluruh materi dalam 1 slide singkat! Jabarkan topik bahasan ke dalam beberapa slide berseri:
+     - **Slide 2: Landasan Teori & Sejarah Konseptual** (latar belakang lahirnya konsep, mengapa penting dipelajari, filosofi dasar).
+     - **Slide 3: Anatomi Struktur & Logika Sistematis** (komponen penyusun, kaidah sintaks/rumus, diagram alur cara kerja).
+     - **Slide 4: Mekanisme Operasional Langkah-demi-Langkah** (bagaimana proses bekerja saat dijalankan secara teknis).
+     - **Slide 5: Bedah Kasus & Analisis Penerapan Industri** (studi kasus kontekstual di dunia kerja atau fenomena nyata).
+     - **Slide 6: Best Practices, Kesalahan Umum (Pitfalls) & Solusi** (jebakan logika yang sering dialami siswa serta cara pencegahannya).
+     - (Lanjutkan dengan slide tambahan jika materi membutuhkan elaborasi lebih jauh).
+3. SISTEM PARAGRAF DETAIL BERBOBOT AKADEMIS (FLEKSIBEL & ALAMI):
+   - Setiap slide penjelasan WAJIB menyajikan 1 hingga 2 paragraf narasi deskriptif utuh (3–5 kalimat komprehensif per paragraf) yang menjelaskan konsep secara tuntas, BUKAN sekadar deretan poin bullet centang!
+   - Kombinasikan narasi paragraf tersebut dengan 2–3 butir poin kunci pendukung menggunakan format \`- **[Label Kunci]**: [Penjelasan spesifik]\` dan 1 blok studi kasus kontekstual.
+4. DILARANG KERAS MENULISKAN CATATAN META-LAYOUT / PROMPT DESAINER / INSTRUKSI PROMPT:
+   - Dilarang menulis "Visual:", "Visual Ilustrasi (3D):", "Judul Slide:", "Sub-TeKS:", "Isi Poin:", "Footer:", "Poin Rangkuman:", "Gaya Visual:", "Elemen Visual:", "Catatan Visual:", "Catatan Presenter:", atau instruksi desainer grafis lainnya. Tulisan tersebut BUKAN materi pelajaran dan DILARANG KERAS muncul dalam teks slide! Tuliskan langsung materi ajar nyata yang siap dipelajari siswa!
+5. STRUKTUR FORMAT SLIDE WAJIB MENGGUNAKAN HEADING RESMI DI BARIS BARU:
    Setiap slide WAJIB diawali dengan heading: \`### Slide [Nomor]: [Judul Slide Lengkap]\` di baris baru agar sistem parser mengenali setiap slide secara sempurna. Contoh struktur format ideal:
 
    ### Slide 1: [Judul Topik Pembelajaran yang Lengkap & Formal]
@@ -143,10 +149,10 @@ Bila guru meminta slide presentasi (misal: "rancang slide presentasi...", "buatk
    - **Tujuan Pembelajaran**: [Target kompetensi esensial yang akan dikuasai peserta didik.]
    - **Peta Konsep**: [Ringkasan cakupan materi dari awal hingga akhir.]
 
-   ### Slide 2: [Latar Belakang & Definisi Konsep Inti]
+   ### Slide 2: [Latar Belakang & Landasan Filosofis Konsep]
    Subjudul: [Tagline Konseptual yang Menarik]
 
-   [Uraian paragraf narasi mendalam 1-2 paragraf (3-5 kalimat) yang menjelaskan sejarah lahirnya konsep, permasalahan awal yang memicu penemuannya, dan bagaimana konsep ini berevolusi menjadi standar penting di dunia modern.]
+   [Uraian paragraf narasi mendalam 1-2 paragraf (3-5 kalimat komprehensif) yang menjelaskan sejarah lahirnya konsep, permasalahan awal yang memicu penemuannya, dan bagaimana konsep ini berevolusi menjadi standar penting di era modern.]
 
    Poin Kunci:
    - **Landasan Teori**: [Penjelasan rinci mengenai terminologi kunci dan prinsip dasar.]
@@ -155,7 +161,7 @@ Bila guru meminta slide presentasi (misal: "rancang slide presentasi...", "buatk
    Studi Kasus:
    [Uraian contoh konkret penerapan nyata di industri atau kehidupan sehari-hari, bagaimana konsep ini memecahkan masalah nyata.]
 
-   ### Slide 3: [Prinsip Kerja & Mekanisme Operasional]
+   ### Slide 3: [Anatomi Struktur & Mekanisme Kerja Internal]
    Subjudul: [Tagline Cara Kerja Sistematis]
 
    [Uraian paragraf deskriptif lengkap mengenai alur mekanisme kerja, logika langkah-demi-langkah, dan korelasi antar komponen saat konsep dijalankan.]
