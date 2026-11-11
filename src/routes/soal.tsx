@@ -91,6 +91,7 @@ import {
   updatePaket,
   usePaketSoal,
 } from "@/lib/soal-store";
+import { createPenugasan } from "@/lib/penugasan-store";
 import {
   JENIS_SOAL,
   TINGKAT,
@@ -1597,13 +1598,29 @@ function SoalPage() {
               Batal
             </Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 if (kelasPilihan.length === 0) {
                   toast.error("Pilih minimal satu kelas.");
                   return;
                 }
                 if (terbitTarget) {
-                  void terbitkanSebagaiTugas(terbitTarget.id, kelasPilihan);
+                  await terbitkanSebagaiTugas(terbitTarget.id, kelasPilihan);
+
+                  // Create actual penugasan in public.penugasan table for each chosen class
+                  for (const label of kelasPilihan) {
+                    const targetKelas = myKelas.find(
+                      (k) => `${k.tingkat} ${k.namaKelas}`.trim() === label.trim(),
+                    );
+                    if (targetKelas) {
+                      await createPenugasan({
+                        kelasId: targetKelas.id,
+                        paketSoalId: terbitTarget.id,
+                        judul: `Tugas: ${terbitTarget.judul}`,
+                        status: "published",
+                      });
+                    }
+                  }
+
                   void trackProductEvent("QUESTION_PACKAGE_PUBLISHED", "soal", {
                     userId: currentGuruId,
                     role: profile.role,
@@ -1616,7 +1633,7 @@ function SoalPage() {
                   });
                 }
                 setTerbitTarget(null);
-                toast.success("Soal diterbitkan sebagai tugas.");
+                toast.success("Soal berhasil diterbitkan sebagai tugas ke kelas pilihan!");
               }}
               className="w-full sm:w-auto"
             >

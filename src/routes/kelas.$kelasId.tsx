@@ -72,11 +72,19 @@ import {
 import { useModuls, saveModul, addModul, reloadModuls } from "@/lib/modul-store";
 import type { Modul } from "@/lib/modul-types";
 import {
+  usePenugasanGuru,
+  createPenugasan,
+  deletePenugasan,
+  type Penugasan,
+} from "@/lib/penugasan-store";
+import { getTeacherSubmissionsSummary } from "@/lib/pengumpulan-store";
+import { usePaketSoal, terbitkanSebagaiTugas, reloadPaketSoal } from "@/lib/soal-store";
+import type { PaketSoal } from "@/lib/soal-types";
+import {
   formatNilai,
   getKelasRekapData,
   type KelasRekapData,
 } from "@/lib/rekap-store";
-import { usePaketSoal } from "@/lib/soal-store";
 
 export const Route = createFileRoute("/kelas/$kelasId")({
   head: () => ({
@@ -123,6 +131,18 @@ function DetailKelasMonitoringPage() {
   // Store data untuk tab modul dan tugas
   const allModuls = useModuls();
   const allPakets = usePaketSoal();
+  const { penugasanList, reload: reloadPenugasan } = usePenugasanGuru();
+
+  // Submissions summary cache untuk metrik pengumpulan tugas
+  const [submissionSummary, setSubmissionSummary] = useState<
+    Record<string, { submitted: number; perluDinilai: number; dinilai: number }>
+  >({});
+
+  useEffect(() => {
+    getTeacherSubmissionsSummary().then((res) => {
+      setSubmissionSummary(res.submissionsPerPenugasan || {});
+    });
+  }, [penugasanList]);
 
   // State Rekap Nilai Riil
   const [rekapData, setRekapData] = useState<KelasRekapData | null>(null);
@@ -376,14 +396,59 @@ function DetailKelasMonitoringPage() {
   };
 
 
-  // Filter tugas/soal untuk kelas ini
-  const tugasKelas = allPakets.filter((p) => {
-    if (!kelasDetail) return true;
+  // List tugas/penugasan terpadu untuk kelas ini
+  const tugasKelasList = useMemo(() => {
+    if (!kelasDetail) return [];
+
+    const totalMurid = aktifList.length;
+    const items: Array<{
+      id: string;
+      penugasanId?: string;
+      paketSoalId?: string;
+      judul: string;
+      topik: string;
+      totalSoal: number;
+      deadline?: string | null;
+      kkm: number;
+      status: "published" | "draft" | "closed";
+      submittedCount: number;
+      totalSiswa: number;
+    }> = [];
+
+    const handledPaketIds = new Set<string>();
+
+    // 1. Data penugasan resmi dari tabel penugasan untuk kelas ini
+    const forThisClass = penugasanList.filter(
+      (p) => p.kelasId === kelasId && !p.isArchived,
+    );
+
+    for (const p of forThisClass) {
+      if (p.paketSoalId) handledPaketIds.add(p.paketSoalId);
+      const summ = submissionSummary[p.id];
+      const submittedCount = summ?.submitted ?? 0;
+      items.push({
+        id: p.id,
+        penugasanId: p.id,
+        paketSoalId: p.paketSoalId,
+        judul: p.judul,
+        topik: p.paketSoalJudul || "Umum",
+        totalSoal: p.totalSoal || 0,
+        deadline: p.deadline,
+        kkm: p.kkm || 75,
+        status: p.status,
+        submittedCount,
+        totalSiswa: totalMurid,
+      });
+    }
+
+    // 2. Paket soal dari Bank Soal yang ditandai untuk kelas ini
     const namaKelasStr = (kelasDetail.namaKelas || "").toLowerCase();
     const tingkatStr = (kelasDetail.tingkat || "").toLowerCase();
     const combinedStr = `${tingkatStr} ${namaKelasStr}`.trim();
 
-    if (p.kelas && p.kelas.length > 0) {
+    const taggedPakets = allPakets.filter((p) => {
+      if (handledPaketIds.has(p.id)) return false;
+      if (!p.kelas || p.kelas.length === 0) return false;
       return p.kelas.some((k) => {
         const kStr = (k || "").toLowerCase();
         return (
@@ -392,9 +457,101 @@ function DetailKelasMonitoringPage() {
           kStr === tingkatStr
         );
       });
+    });
+
+    for (const p of taggedPakets) {
+      items.push({
+        id: p.id,
+        paketSoalId: p.id,
+        judul: p.judul,
+        topik: p.topik || "Umum",
+        totalSoal: p.soal?.length || 0,
+        deadline: null,
+        kkm: 75,
+        status: p.status === "Terbit" ? "published" : "draft",
+        submittedCount: 0,
+        totalSiswa: totalMurid,
+      });
     }
-    return true;
-  });
+
+    return items;
+  }, [kelasDetail, penugasanList, allPakets, kelasId, aktifList.length, submissionSummary]);
+
+  // State Tambah Tugas ke Kelas
+  const [openTambahTugas, setOpenTambahTugas] = useState(false);
+  const [searchPaketQuery, setSearchPaketQuery] = useState("");
+  const [selectedPaketIds, setSelectedPaketIds] = useState<string[]>([]);
+  const [deadlineTugas, setDeadlineTugas] = useState("");
+  const [kkmTugas, setKkmTugas] = useState(75);
+  const [instruksiTugas, setInstruksiTugas] = useState("");
+  const [kirimTugasLoading, setKirimTugasLoading] = useState(false);
+
+  // Paket Soal yang siap ditugaskan dari Bank Soal
+  const availablePaketSoal = useMemo(() => {
+    return (allPakets || []).filter((p) => p.soal && p.soal.length > 0);
+  }, [allPakets]);
+
+  const filteredPaketSoal = useMemo(() => {
+    const q = searchPaketQuery.trim().toLowerCase();
+    if (!q) return availablePaketSoal;
+    return availablePaketSoal.filter(
+      (p) =>
+        p.judul.toLowerCase().includes(q) ||
+        (p.topik || "").toLowerCase().includes(q),
+    );
+  }, [availablePaketSoal, searchPaketQuery]);
+
+  const isPaketAlreadyInThisClass = (paketId: string) => {
+    return tugasKelasList.some((t) => t.paketSoalId === paketId);
+  };
+
+  const handleKirimTugasKeKelas = async () => {
+    if (!kelasDetail || selectedPaketIds.length === 0) return;
+    setKirimTugasLoading(true);
+    try {
+      let suksesCount = 0;
+      const kelasLabel = `${kelasDetail.tingkat} ${kelasDetail.namaKelas}`.trim();
+
+      for (const paketId of selectedPaketIds) {
+        const paket = allPakets.find((p) => p.id === paketId);
+        if (!paket) continue;
+
+        const res = await createPenugasan({
+          kelasId: kelasDetail.id,
+          paketSoalId: paket.id,
+          judul: `Tugas: ${paket.judul}`,
+          instruksi: instruksiTugas ? instruksiTugas.trim() : undefined,
+          deadline: deadlineTugas ? new Date(deadlineTugas).toISOString() : null,
+          status: "published",
+          kkm: Number(kkmTugas) || 75,
+        });
+
+        if (res.ok) {
+          suksesCount++;
+        }
+
+        await terbitkanSebagaiTugas(paket.id, [kelasLabel]);
+      }
+
+      await reloadPenugasan();
+      await reloadPaketSoal();
+
+      toast.success(
+        `Berhasil menerbitkan ${suksesCount} tugas ke kelas ${kelasDetail.namaKelas}!`,
+      );
+      setSelectedPaketIds([]);
+      setSearchPaketQuery("");
+      setDeadlineTugas("");
+      setInstruksiTugas("");
+      setKkmTugas(75);
+      setOpenTambahTugas(false);
+    } catch (err: any) {
+      console.error("[handleKirimTugasKeKelas] Gagal mengirim penugasan:", err);
+      toast.error(err?.message || "Gagal mengirim penugasan ke kelas.");
+    } finally {
+      setKirimTugasLoading(false);
+    }
+  };
 
 
   if (loadingKelas) {
@@ -864,31 +1021,38 @@ function DetailKelasMonitoringPage() {
                     {kelasDetail.namaKelas}.
                   </CardDescription>
                 </div>
-                <Button asChild size="sm" className="gap-1.5 shadow-xs font-medium">
-                  <Link to="/soal">
-                    <Plus className="h-3.5 w-3.5" />
-                    Terbitkan Tugas Baru
-                  </Link>
+                <Button
+                  size="sm"
+                  className="gap-1.5 shadow-xs font-medium"
+                  onClick={() => setOpenTambahTugas(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Tambah Tugas
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="px-0 sm:px-6">
-              {tugasKelas.length === 0 ? (
+              {tugasKelasList.length === 0 ? (
                 <div className="py-12 text-center">
                   <FileQuestion className="mx-auto h-10 w-10 text-muted-foreground/30" />
                   <p className="mt-3 font-display text-base font-semibold text-navy">
-                    Belum Ada Tugas Aktif
+                    Belum Ada Tugas Aktif untuk Kelas Ini
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Buat paket soal baru dan terbitkan sebagai tugas untuk dikerjakan murid kelas{" "}
-                    {kelasDetail.namaKelas}.
+                  <p className="mt-1 text-sm text-muted-foreground max-w-md mx-auto">
+                    Kirim paket soal dari Bank Soal ke kelas ini sebagai penugasan aktif, atau susun paket soal baru.
                   </p>
-                  <Button asChild className="mt-4 gap-2">
-                    <Link to="/soal">
-                      <FileQuestion className="h-4 w-4" />
-                      Susun Tugas dari Bank Soal
-                    </Link>
-                  </Button>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                    <Button onClick={() => setOpenTambahTugas(true)} className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Tambah Tugas ke Kelas
+                    </Button>
+                    <Button asChild variant="outline" className="gap-2">
+                      <Link to="/soal">
+                        <Sparkles className="h-4 w-4" />
+                        Susun di Bank Soal
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -904,22 +1068,30 @@ function DetailKelasMonitoringPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tugasKelas.map((tugas, idx) => {
-                        const totalSiswa = aktifList.length || 30;
-                        const terkumpul = Math.min(
-                          totalSiswa,
-                          Math.max(1, Math.round(totalSiswa * (0.75 + (idx % 3) * 0.08))),
-                        );
+                      {tugasKelasList.map((tugas) => {
+                        const totalSiswa = tugas.totalSiswa || aktifList.length || 0;
+                        const terkumpul = tugas.submittedCount || 0;
+                        const persentase = totalSiswa > 0 ? Math.round((terkumpul / totalSiswa) * 100) : 0;
 
                         return (
                           <TableRow key={tugas.id}>
-                            <TableCell className="font-semibold text-navy">{tugas.judul}</TableCell>
+                            <TableCell className="font-semibold text-navy">
+                              <div>
+                                <p>{tugas.judul}</p>
+                                {tugas.deadline && (
+                                  <p className="text-xs font-normal text-amber-600 flex items-center gap-1 mt-0.5">
+                                    <Clock className="h-3 w-3" />
+                                    Tenggat: {formatTanggal(tugas.deadline)}
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
                               {tugas.topik}
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className="font-mono text-xs">
-                                {tugas.soal.length} Butir
+                                {tugas.totalSoal} Butir
                               </Badge>
                             </TableCell>
                             <TableCell>
@@ -928,36 +1100,60 @@ function DetailKelasMonitoringPage() {
                                   <div
                                     className="h-full bg-primary"
                                     style={{
-                                      width: `${(terkumpul / totalSiswa) * 100}%`,
+                                      width: `${Math.min(100, persentase)}%`,
                                     }}
                                   />
                                 </div>
                                 <span className="font-mono text-xs font-semibold">
-                                  {terkumpul}/{totalSiswa} Siswa
+                                  {terkumpul}/{totalSiswa} Siswa ({persentase}%)
                                 </span>
                               </div>
                             </TableCell>
                             <TableCell>
-                              {tugas.status === "Terbit" ? (
+                              {tugas.status === "published" ? (
                                 <Badge className="bg-emerald-600 hover:bg-emerald-700">
                                   Berjalan
                                 </Badge>
+                              ) : tugas.status === "closed" ? (
+                                <Badge variant="secondary">Ditutup</Badge>
                               ) : (
                                 <Badge variant="secondary">Draft</Badge>
                               )}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                asChild
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 gap-1 text-xs"
-                              >
-                                <Link to="/soal">
-                                  Detail Soal
-                                  <ArrowRight className="h-3 w-3" />
-                                </Link>
-                              </Button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  asChild
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 gap-1 text-xs"
+                                >
+                                  <Link
+                                    to="/penugasan"
+                                    search={tugas.penugasanId ? { penugasanId: tugas.penugasanId } : undefined}
+                                  >
+                                    Buka Penugasan
+                                    <ArrowRight className="h-3 w-3" />
+                                  </Link>
+                                </Button>
+                                {tugas.penugasanId && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                    onClick={async () => {
+                                      if (confirm(`Lepaskan / hapus tugas "${tugas.judul}" dari kelas ${kelasDetail.namaKelas}?`)) {
+                                        await deletePenugasan(tugas.penugasanId!);
+                                        await reloadPenugasan();
+                                        toast.success(`Tugas dilepas dari kelas ${kelasDetail.namaKelas}.`);
+                                      }
+                                    }}
+                                    title="Lepas tugas dari kelas ini"
+                                  >
+                                    Lepas
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -1433,6 +1629,211 @@ function DetailKelasMonitoringPage() {
                   <>
                     <Share2 className="h-3.5 w-3.5" />
                     Kirim ke Kelas ({selectedModulIds.length})
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Tambah Tugas ke Kelas */}
+      <Dialog
+        open={openTambahTugas}
+        onOpenChange={(open) => {
+          setOpenTambahTugas(open);
+          if (!open) {
+            setSelectedPaketIds([]);
+            setSearchPaketQuery("");
+            setDeadlineTugas("");
+            setInstruksiTugas("");
+            setKkmTugas(75);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[88vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="text-xl font-display font-semibold text-navy">
+              Beri Penugasan ke Kelas {kelasDetail.namaKelas}
+            </DialogTitle>
+            <DialogDescription>
+              Pilih paket soal dari Bank Soal untuk diterbitkan sebagai tugas bagi murid kelas{" "}
+              {kelasDetail.tingkat} {kelasDetail.namaKelas}.
+            </DialogDescription>
+            <div className="relative mt-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari paket soal berdasarkan judul atau topik materi..."
+                value={searchPaketQuery}
+                onChange={(e) => setSearchPaketQuery(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-2 space-y-2.5 min-h-[200px] max-h-[42vh]">
+            {availablePaketSoal.length === 0 ? (
+              <div className="py-10 text-center">
+                <FileQuestion className="mx-auto h-10 w-10 text-muted-foreground/30 mb-2" />
+                <p className="font-semibold text-navy text-sm">Belum Ada Paket Soal di Bank Soal</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                  Buat paket soal terlebih dahulu di menu Bank Soal agar dapat diterbitkan sebagai tugas ke kelas ini.
+                </p>
+                <Button
+                  asChild
+                  size="sm"
+                  className="mt-4 gap-1.5"
+                  onClick={() => setOpenTambahTugas(false)}
+                >
+                  <Link to="/soal">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Buka Menu Bank Soal
+                  </Link>
+                </Button>
+              </div>
+            ) : filteredPaketSoal.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground text-sm">
+                Tidak ada paket soal yang cocok dengan pencarian "{searchPaketQuery}".
+              </div>
+            ) : (
+              filteredPaketSoal.map((paket) => {
+                const alreadyAssigned = isPaketAlreadyInThisClass(paket.id);
+                const isSelected = selectedPaketIds.includes(paket.id);
+
+                return (
+                  <div
+                    key={paket.id}
+                    onClick={() => {
+                      if (alreadyAssigned) return;
+                      setSelectedPaketIds((prev) =>
+                        prev.includes(paket.id)
+                          ? prev.filter((id) => id !== paket.id)
+                          : [...prev, paket.id],
+                      );
+                    }}
+                    className={cn(
+                      "flex items-start gap-3 p-3.5 rounded-lg border transition-all text-left",
+                      alreadyAssigned
+                        ? "bg-muted/40 border-border/60 opacity-80 cursor-default"
+                        : isSelected
+                        ? "bg-primary/5 border-primary shadow-xs cursor-pointer ring-1 ring-primary"
+                        : "bg-card border-border hover:border-primary/50 hover:bg-muted/20 cursor-pointer",
+                    )}
+                  >
+                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isSelected || alreadyAssigned}
+                        disabled={alreadyAssigned}
+                        onCheckedChange={() => {
+                          if (alreadyAssigned) return;
+                          setSelectedPaketIds((prev) =>
+                            prev.includes(paket.id)
+                              ? prev.filter((id) => id !== paket.id)
+                              : [...prev, paket.id],
+                          );
+                        }}
+                        aria-label={`Pilih ${paket.judul}`}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-sm text-navy line-clamp-1">{paket.judul}</p>
+                        <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-4">
+                          {paket.soal?.length || 0} Soal
+                        </Badge>
+                        {alreadyAssigned && (
+                          <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200 text-[10px] px-1.5 py-0 h-4">
+                            <Check className="h-2.5 w-2.5 mr-0.5 inline" /> Sudah Ditugaskan
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Topik: {paket.topik || "Umum"} {paket.kelas && paket.kelas.length > 0 ? `· Kelas asal: ${paket.kelas.join(", ")}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Opsi Pengaturan Penugasan */}
+          {selectedPaketIds.length > 0 && (
+            <div className="border-t bg-muted/10 p-4 space-y-3">
+              <p className="text-xs font-semibold text-navy flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-primary" /> Pengaturan Penugasan ({selectedPaketIds.length} paket dipilih):
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="text-muted-foreground block mb-1">Tenggat Waktu (Opsional):</label>
+                  <Input
+                    type="datetime-local"
+                    value={deadlineTugas}
+                    onChange={(e) => setDeadlineTugas(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-muted-foreground block mb-1">Nilai KKM Kelulusan:</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={kkmTugas}
+                    onChange={(e) => setKkmTugas(Number(e.target.value) || 75)}
+                    className="h-8 text-xs w-28"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-muted-foreground block mb-1 text-xs">Instruksi Pengerjaan (Opsional):</label>
+                <Input
+                  placeholder="Contoh: Kerjakan secara mandiri dan teliti sebelum tenggat waktu..."
+                  value={instruksiTugas}
+                  onChange={(e) => setInstruksiTugas(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="p-4 border-t bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground w-full sm:w-auto text-left">
+              {selectedPaketIds.length > 0 ? (
+                <span>
+                  <strong>{selectedPaketIds.length}</strong> paket soal dipilih untuk ditugaskan
+                </span>
+              ) : (
+                <span>Pilih paket soal yang ingin ditugaskan</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedPaketIds([]);
+                  setOpenTambahTugas(false);
+                }}
+                disabled={kirimTugasLoading}
+              >
+                Batal
+              </Button>
+              <Button
+                size="sm"
+                disabled={selectedPaketIds.length === 0 || kirimTugasLoading}
+                onClick={handleKirimTugasKeKelas}
+                className="gap-1.5"
+              >
+                {kirimTugasLoading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Menerbitkan...
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="h-3.5 w-3.5" />
+                    Kirim Tugas ke Kelas ({selectedPaketIds.length})
                   </>
                 )}
               </Button>
