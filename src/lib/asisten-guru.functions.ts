@@ -119,52 +119,54 @@ CATATAN PENTING:
 
 ATURAN KHUSUS PERANCANGAN PRESENTASI SLIDE PPT SUPER DETAIL (@generate_ppt / rancang presentasi):
 Bila guru meminta slide presentasi (misal: "rancang slide presentasi...", "buatkan ppt...", tag @generate_ppt, atau kebutuhan tayangan proyektor kelas):
-1. DILARANG KERAS MENULISKAN CATATAN META-LAYOUT / PROMPT DESAINER ke dalam teks slide:
-   - Dilarang menulis "**Gaya Visual:** ...", "**Elemen Visual:** ...", "**Header / Tagline:** ...", "**Catatan Visual:** ...", "**Catatan Presenter:** ...", "**Prompt Visual Footnote:** ...", atau instruksi desainer grafis. Teks tersebut BUKAN materi pelajaran dan dilarang muncul dalam teks slide!
-2. MATERI SLIDE HARUS SUPER DETAIL, LENGKAP, DAN AKURAT DARI AWAL HINGGA AKHIR:
-   - JUMLAH SLIDE FLEKSIBEL & WAJIB TUNTAS: Jumlah slide TIDAK DIBATASI KAKU (jangan dibatasi hanya 1-2 slide atau 5 slide). Wajib membuat seluruh rangkaian slide dari awal sampai akhir secara komprehensif (minimal 6 hingga 10+ slide terstruktur) sehingga mencakup seluruh pokok bahasan tuntas dari pengantar, konsep inti, prinsip kerja/sintaks, studi kasus kontekstual, hingga rangkuman dan refleksi penutup.
+1. DILARANG KERAS MENULISKAN CATATAN META-LAYOUT / PROMPT DESAINER / INSTRUKSI PROMPT:
+   - Dilarang menulis "Visual:", "Visual Ilustrasi (3D):", "Judul Slide:", "Sub-TeKS:", "Isi Poin:", "Footer:", "Poin Rangkuman:", "Gaya Visual:", "Elemen Visual:", "Catatan Visual:", "Catatan Presenter:", atau arahan desainer grafis. Tulisan tersebut BUKAN materi pelajaran dan DILARANG KERAS muncul dalam teks slide! Tuliskan langsung materi ajar nyata yang siap dipelajari siswa!
+2. KOMBINASI METODE PENJELASAN LENGKAP: BUKAN HANYA POIN-POIN, TAPI WAJIB MEMUAT PARAGRAF DESKRIPSI & NARASI LENGKAP:
+   - DILARANG membuat slide yang isinya hanya tumpukan butir poin/bullet centang ringkas!
+   - Setiap slide wajib mengombinasikan:
+     a) **Paragraf Deskripsi & Uraian Mendalam (Metode Narasi Teks Lengkap)**: Tuliskan 1 hingga 2 paragraf deskriptif utuh (3-5 kalimat komprehensif, akademis, dan bernas) yang menjelaskan latar belakang, teori dasar, logika konsep, dan signifikansinya secara menyeluruh. TULIS LANGSUNG DALAM BENTUK PARAGRAF TEKS BIASA TANPA TANDA BULLET.
+     b) **Poin Kunci & Karakteristik (Key Takeaways)**: 2-3 poin penting terstruktur menggunakan format \`- **[Label Kunci]**: [Penjelasan spesifik]\`.
+     c) **Studi Kasus / Penerapan Riil / Contoh Konkret**: 1 blok contoh aplikatif dunia nyata atau studi kasus industri. Jika materi pemrograman/IT, sertakan blok kode rapi (\`\`\`python ... \`\`\`).
+3. JUMLAH SLIDE FLEKSIBEL & WAJIB TUNTAS:
+   - Jumlah slide TIDAK DIBATASI KAKU (jangan dibatasi hanya 1-2 slide atau 5 slide). Wajib membuat seluruh rangkaian slide dari awal sampai akhir secara komprehensif (minimal 6 hingga 10+ slide terstruktur) sehingga mencakup seluruh pokok bahasan tuntas dari pengantar, konsep inti, prinsip kerja/sintaks, studi kasus kontekstual, hingga rangkuman dan refleksi penutup.
    - DILARANG BERHENTI DI TENGAH JALAN: Seluruh slide wajib dituliskan tuntas sampai bagian penutup dan apresiasi akhir.
-   - Jika obrolan membahas konsep dasar (misal: "Dasar Pemrograman Python" atau topik lainnya), presentasi PPT wajib menjabarkan materi dasar tersebut secara mendalam dan komprehensif menjadi judul dan isi slide yang berbobot.
-   - Jangan hanya menulis 1-2 kalimat pendek atau frasa 3 kata!
    - Tuliskan REAL PEMBAHASAN MATERI SECARA MENDALAM yang siap dibaca, dipahami, dan dipelajari oleh siswa di proyektor kelas.
-   - Setiap slide wajib mengupas aspek konseptual, landasan teori, alur mekanisme/sintaks, studi kasus kontekstual, hingga tips implementasi nyata.
-3. STRUKTUR FORMAT SLIDE WAJIB MENGGUNAKAN HEADING RESMI DI BARIS BARU:
-   Setiap slide WAJIB diawali dengan heading: \`### Slide [Nomor]: [Judul Slide Lengkap]\` di baris baru agar sistem parser mengenali setiap slide secara sempurna. Contoh struktur:
+4. STRUKTUR FORMAT SLIDE WAJIB MENGGUNAKAN HEADING RESMI DI BARIS BARU:
+   Setiap slide WAJIB diawali dengan heading: \`### Slide [Nomor]: [Judul Slide Lengkap]\` di baris baru agar sistem parser mengenali setiap slide secara sempurna. Contoh struktur format ideal:
 
    ### Slide 1: [Judul Topik Pembelajaran yang Lengkap & Formal]
-   - Subjudul: [Tagline Pembelajaran Kontekstual yang Jelas]
-   - Sasaran: [Target Kompetensi & Sasaran Peserta Didik]
-   - Gambaran Materi: [Uraian 2-3 kalimat komprehensif mengenai fokus materi yang akan dipelajari pada tayangan presentasi ini]
+   Subjudul: [Tagline Pembelajaran Kontekstual yang Jelas]
+
+   [Uraian pengantar komprehensif 1-2 paragraf mengenai fokus materi yang akan dipelajari pada presentasi ini, relevansinya bagi peserta didik, serta peta jalan pembahasan.]
+
+   Poin Kunci:
+   - **Tujuan Pembelajaran**: [Target kompetensi esensial yang akan dikuasai peserta didik.]
+   - **Peta Konsep**: [Ringkasan cakupan materi dari awal hingga akhir.]
 
    ### Slide 2: [Latar Belakang & Definisi Konsep Inti]
-   - [Penjabaran mendalam 2-3 kalimat mengenai latar belakang mengapa materi ini penting, asal-usul, dan relevansinya di era modern.]
-   - [Uraian definisi formal konsep disertai terminologi kunci yang wajib dipahami siswa.]
-   - [Karakteristik atau sifat utama konsep yang membedakannya dengan konsep lainnya.]
-   - [Pentingnya penguasaan konsep ini dalam kehidupan sehari-hari maupun industri profesional.]
+   Subjudul: [Tagline Konseptual yang Menarik]
 
-   ### Slide 3: [Prinsip Kerja & Anatomi Struktur / Sintaks]
-   - [Penjelasan rinci mengenai komponen pembentuk materi atau aturan tata bahasa/sintaks dasar.]
-   - [Alur kerja sistematis atau langkah operasional bagaimana konsep ini bekerja secara teknis.]
-   - [Analisis logika di balik setiap komponen atau variabel penting.]
-   - [Poin kritis yang sering disalahpahami (common misconceptions) dan cara tepat memahaminya.]
+   [Uraian paragraf narasi mendalam 1-2 paragraf (3-5 kalimat) yang menjelaskan sejarah lahirnya konsep, permasalahan awal yang memicu penemuannya, dan bagaimana konsep ini berevolusi menjadi standar penting di dunia modern.]
 
-   ### Slide 4: [Penerapan Konkret & Analisis Studi Kasus]
-   - [Deskripsi skenario masalah riil yang dapat diselesaikan menggunakan konsep ini.]
-   - [Contoh implementasi nyata langkah-demi-langkah (sertakan potongan kode rapi jika pelajaran informatika, atau skenario kontekstual jika mapel lain).]
-   - [Bedah analisis mengapa solusi tersebut efektif dan bagaimana logika penerapannya.]
-   - [Variasi kondisi lain yang mungkin dihadapi saat menerapkan konsep di lapangan.]
+   Poin Kunci:
+   - **Landasan Teori**: [Penjelasan rinci mengenai terminologi kunci dan prinsip dasar.]
+   - **Karakteristik Kunci**: [Faktor pembeda utama konsep ini dibandingkan metode konvensional.]
 
-   ### Slide 5: [Best Practices & Tips Penting Implementasi]
-   - [Panduan praktis dan standar baku (best practices) yang diterapkan oleh para profesional.]
-   - [Kesalahan umum (common errors/bugs) yang sering terjadi serta langkah pencegahannya.]
-   - [Teknik optimasi atau strategi mempermudah pemahaman logika.]
-   - [Etika atau nilai Profil Pelajar Pancasila yang relevan dalam penerapan materi.]
+   Studi Kasus:
+   [Uraian contoh konkret penerapan nyata di industri atau kehidupan sehari-hari, bagaimana konsep ini memecahkan masalah nyata.]
 
-   ### Slide 6: [Rangkuman Esensial & Refleksi Pembelajaran]
-   - [Rangkuman butir-butir emas kunci pembelajaran yang harus diingat siswa.]
-   - [Pertanyaan pemantik refleksi diri untuk menguji pemahaman kritis siswa.]
-   - [Tantangan eksplorasi mandiri atau tugas tindak lanjut untuk pertemuan berikutnya.]
-   (Lanjutkan ke Slide 7, 8, 9, 10 dst. jika materi membutuhkan penjabaran lebih lanjut hingga tuntas)
+   ### Slide 3: [Prinsip Kerja & Mekanisme Operasional]
+   Subjudul: [Tagline Cara Kerja Sistematis]
+
+   [Uraian paragraf deskriptif lengkap mengenai alur mekanisme kerja, logika langkah-demi-langkah, dan korelasi antar komponen saat konsep dijalankan.]
+
+   Poin Kunci:
+   - **Komponen Utama**: [Penjabaran elemen atau variabel pembangun sistem.]
+   - **Alur Eksekusi**: [Tahapan sistematis dari input, proses pemrosesan, hingga output.]
+
+   Studi Kasus:
+   [Contoh nyata implementasi atau skenario pemecahan masalah praktis.]
+   (Lanjutkan ke Slide 4, 5, 6, 7 dst. hingga seluruh materi tuntas dibahas secara mendalam)
 
 ATURAN KHUSUS PERINTAH @generate_ilustrasi:
 Jika pengguna menyertakan tag "@generate_ilustrasi" atau meminta pembuatan ilustrasi/gambar/diagram materi:

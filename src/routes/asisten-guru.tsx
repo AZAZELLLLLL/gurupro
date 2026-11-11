@@ -16,6 +16,7 @@ import {
   FileQuestion,
   FileText,
   Layers,
+  Lightbulb,
   Menu,
   MessageSquare,
   Palette,
@@ -95,7 +96,10 @@ export interface ParsedSlideItem {
   num: number;
   title: string;
   subtitle?: string;
+  description?: string;
   bullets: string[];
+  highlight?: string;
+  codeSnippet?: string;
   isCover: boolean;
 }
 
@@ -742,28 +746,38 @@ export function AsistenGuruPage() {
   };
 
   const isMetaPromptLine = (text: string): boolean => {
-    const lower = text.toLowerCase().trim();
+    const clean = text
+      .replace(/^[\s\t]*[•\-\*✓✔]+\s*/g, "")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .trim()
+      .toLowerCase();
+
     return (
-      lower.startsWith("gaya visual") ||
-      lower.startsWith("elemen visual") ||
-      lower.startsWith("catatan visual") ||
-      lower.startsWith("arah visual") ||
-      lower.startsWith("catatan presenter") ||
-      lower.startsWith("header / tagline") ||
-      lower.startsWith("tagline:") ||
-      lower.startsWith("color palette") ||
-      lower.startsWith("visual footnote") ||
-      lower.startsWith("skema warna") ||
-      lower.startsWith("layout:") ||
-      lower.startsWith("prompt gambar") ||
-      lower.startsWith("visual:") ||
-      lower.startsWith("visual :") ||
-      lower.startsWith("judul slide:") ||
-      lower.startsWith("footer:") ||
-      lower.startsWith("footer :") ||
-      lower.startsWith("poin rangkuman:") ||
-      lower.startsWith("poin inti:") ||
-      lower.startsWith("```ai_image_prompt")
+      clean.startsWith("visual") ||
+      clean.startsWith("elemen visual") ||
+      clean.startsWith("catatan visual") ||
+      clean.startsWith("gaya visual") ||
+      clean.startsWith("arah visual") ||
+      clean.startsWith("catatan presenter") ||
+      clean.startsWith("header / tagline") ||
+      clean.startsWith("tagline:") ||
+      clean.startsWith("color palette") ||
+      clean.startsWith("visual footnote") ||
+      clean.startsWith("skema warna") ||
+      clean.startsWith("layout:") ||
+      clean.startsWith("prompt gambar") ||
+      clean.startsWith("prompt visual") ||
+      clean.startsWith("ai_image_prompt") ||
+      clean.startsWith("judul slide") ||
+      clean.startsWith("judul:") ||
+      clean.startsWith("footer") ||
+      clean.startsWith("isi poin") ||
+      clean.startsWith("poin rangkuman") ||
+      clean.startsWith("poin inti") ||
+      clean.startsWith("gambaran materi") ||
+      clean.startsWith("sasaran") ||
+      clean.startsWith("```ai_image_prompt")
     );
   };
 
@@ -811,13 +825,19 @@ export function AsistenGuruPage() {
 
       // Clean title
       let cleanTitle = cleanSlideText(cur.rawTitle);
-      cleanTitle = cleanTitle.replace(/^[*\-–—:]+\s*/, "").replace(/[*\-–—:]+$/, "").trim();
+      cleanTitle = cleanTitle
+        .replace(/^(?:Slide|SLIDE)\s*\d*[:\-–.]*\s*/i, "")
+        .replace(/^[*\-–—:]+\s*/, "")
+        .replace(/[*\-–—:]+$/, "")
+        .trim();
 
       // If title is empty or generic, look for inner Judul Slide
       if (!cleanTitle || cleanTitle.toLowerCase() === "cover" || cleanTitle.toLowerCase().startsWith("slide")) {
         const innerJudul = bodyText.match(/(?:Judul Slide|Judul Utama|Materi Utama|Topik Slide|Judul)\s*[:\-–]?\s*([^\n]+)/i);
         if (innerJudul) {
-          cleanTitle = cleanSlideText(innerJudul[1]);
+          cleanTitle = cleanSlideText(innerJudul[1])
+            .replace(/^(?:Slide|SLIDE)\s*\d*[:\-–.]*\s*/i, "")
+            .trim();
         }
       }
       if (!cleanTitle) {
@@ -828,12 +848,65 @@ export function AsistenGuruPage() {
       const subMatch = bodyText.match(/(?:Sub-?Judul|Tagline|Sasaran|Sub-TeKS|Sub-Teks)\s*[:\-–]?\s*([^\n]+)/i);
       const subtitle = subMatch ? cleanSlideText(subMatch[1]) : undefined;
 
-      // Extract bullets
-      const rawBullets = Array.from(bodyText.matchAll(/^[\s\t]*[-*•✓✔]\s+(.+)$/gm)).map((m) => m[1].trim());
-      const cleanBullets = rawBullets
-        .filter((b) => !isMetaPromptLine(b))
-        .map((b) => cleanSlideText(b))
-        .filter((b) => b.length > 3);
+      // Code block extraction
+      let codeSnippet: string | undefined = undefined;
+      const codeMatch = bodyText.match(/```(?:python|js|ts|html|css|java|cpp)?\n([\s\S]*?)```/i);
+      if (codeMatch) {
+        codeSnippet = codeMatch[1].trim();
+      }
+
+      // Highlight / Case study / Tips extraction
+      let highlight: string | undefined = undefined;
+      const highlightRegex = /(?:Studi Kasus(?: Kontekstual)?|Kasus Riil|Contoh Kasus|Contoh Penerapan|Tips Guru|Tips Penting|Penerapan Konkret)\s*[:\-–]?\s*([^\n]+(?:\n(?![•\-\*#]|(?:Poin|Sub-?Judul|Contoh|Tips))[^\n]+)*)/i;
+      const highlightMatch = bodyText.match(highlightRegex);
+      if (highlightMatch) {
+        const rawH = highlightMatch[1].trim();
+        if (!isMetaPromptLine(rawH)) {
+          highlight = cleanSlideText(rawH);
+        }
+      }
+
+      let textWithoutCode = bodyText.replace(/```[\s\S]*?```/g, "");
+      if (highlightMatch) {
+        textWithoutCode = textWithoutCode.replace(highlightMatch[0], "");
+      }
+
+      const lines = textWithoutCode.split("\n").map((l) => l.trim()).filter(Boolean);
+      const narrativeParagraphs: string[] = [];
+      const bullets: string[] = [];
+
+      for (const line of lines) {
+        if (isMetaPromptLine(line)) continue;
+        if (/^(?:Sub-?Judul|Tagline|Sasaran|Sub-TeKS|Sub-Teks)\s*[:\-–]/i.test(line)) continue;
+        if (/^(?:###|##|#)\s+/i.test(line)) continue;
+        if (/^(?:Poin Kunci|Poin Inti|Rangkuman Poin|Karakteristik|Prinsip Operasional|Uraian Materi)\s*[:\-–]?$/i.test(line)) continue;
+
+        const isBulletLine = /^[\s\t]*[•\-\*✓✔]\s+/.test(line);
+        const cleanedLine = cleanSlideText(line);
+        if (!cleanedLine || cleanedLine.length < 4) continue;
+
+        if (subtitle && cleanedLine.toLowerCase() === subtitle.toLowerCase()) continue;
+
+        if (isBulletLine) {
+          if (/^(?:studi kasus|kasus riil|contoh penerapan|tips)\s*[:\-–]/i.test(cleanedLine)) {
+            if (!highlight) {
+              highlight = cleanedLine.replace(/^(?:studi kasus|kasus riil|contoh penerapan|tips)\s*[:\-–]\s*/i, "").trim();
+            }
+          } else {
+            bullets.push(cleanedLine);
+          }
+        } else {
+          // Non-bullet line: narrative paragraph
+          if (cleanedLine.endsWith(":")) {
+            continue;
+          }
+          if (cleanedLine.length > 25) {
+            narrativeParagraphs.push(cleanedLine);
+          }
+        }
+      }
+
+      const description = narrativeParagraphs.length > 0 ? narrativeParagraphs.join("\n\n") : undefined;
 
       const isCover = cur.slideNum === 1 || cleanTitle.toLowerCase().includes("cover");
 
@@ -851,10 +924,15 @@ export function AsistenGuruPage() {
         num: cur.slideNum || i + 1,
         title: cleanTitle,
         subtitle,
+        description,
         bullets:
-          cleanBullets.length > 0
-            ? cleanBullets
+          bullets.length > 0
+            ? bullets
+            : description
+            ? []
             : [cleanSlideText(bodyText.slice(0, 150))].filter(Boolean),
+        highlight,
+        codeSnippet,
         isCover,
       });
     }
@@ -1077,48 +1155,111 @@ export function AsistenGuruPage() {
         });
 
         // Subtitle banner if available
-        let contentStartY = 1.55;
+        let currentY = 1.45;
         if (s.subtitle) {
           slide.addText(s.subtitle, {
             x: 0.8,
-            y: 1.4,
+            y: currentY,
             w: 8.4,
-            h: 0.4,
-            fontSize: 12,
+            h: 0.35,
+            fontSize: 11,
             italic: true,
             color: "475569",
             fontFace: "Arial",
           });
-          contentStartY = 1.85;
+          currentY += 0.4;
         }
 
-        // Body Content Bullets
-        const bulletsToRender =
-          s.bullets.length > 0
-            ? s.bullets
-            : [
-                `Pembahasan mendalam dan terstruktur mengenai ${cleanTitle} untuk memfasilitasi ketercapaian tujuan pembelajaran peserta didik secara komprehensif.`,
-              ];
+        // Narrative Description Paragraph (if available)
+        if (s.description) {
+          const hasBulletsOrHighlight = s.bullets.length > 0 || !!s.highlight;
+          const descHeight = hasBulletsOrHighlight ? 1.35 : 2.9;
+          slide.addShape(pptx.ShapeType.roundRect, {
+            x: 0.8,
+            y: currentY,
+            w: 8.4,
+            h: descHeight,
+            fill: { color: "F1F5F9" },
+            line: { color: "CBD5E1", width: 1 },
+          });
+          slide.addText(s.description, {
+            x: 0.95,
+            y: currentY + 0.08,
+            w: 8.1,
+            h: descHeight - 0.16,
+            fontSize: 10.5,
+            color: "0F172A",
+            fontFace: "Arial",
+            lineSpacing: 16,
+            valign: "top",
+          });
+          currentY += descHeight + 0.15;
+        }
 
-        const textItems = bulletsToRender.map((b) => ({
-          text: `${b}\n`,
-          options: {
-            fontSize: 13,
-            color: "1E293B",
-            bullet: true,
-            breakLine: true,
-          },
-        }));
+        // Body Content Bullets (if available)
+        if (s.bullets.length > 0) {
+          const textItems = s.bullets.map((b) => ({
+            text: `${b}\n`,
+            options: {
+              fontSize: 11,
+              color: "1E293B",
+              bullet: true,
+              breakLine: true,
+            },
+          }));
 
-        slide.addText(textItems as any, {
-          x: 0.8,
-          y: contentStartY,
-          w: 8.4,
-          h: 5.0 - contentStartY,
-          fontFace: "Arial",
-          lineSpacing: 22,
-          valign: "top",
-        });
+          const remainingHeight = Math.max(0.7, 5.0 - currentY - (s.highlight ? 0.85 : 0.2));
+          slide.addText(textItems as any, {
+            x: 0.8,
+            y: currentY,
+            w: 8.4,
+            h: remainingHeight,
+            fontFace: "Arial",
+            lineSpacing: 17,
+            valign: "top",
+          });
+          currentY += remainingHeight + 0.1;
+        } else if (!s.description) {
+          // Fallback if neither description nor bullets were parsed
+          slide.addText(
+            `Pembahasan mendalam dan terstruktur mengenai ${cleanTitle} untuk memfasilitasi ketercapaian tujuan pembelajaran peserta didik secara komprehensif.`,
+            {
+              x: 0.8,
+              y: currentY,
+              w: 8.4,
+              h: 2.5,
+              fontSize: 12,
+              color: "1E293B",
+              fontFace: "Arial",
+              lineSpacing: 18,
+              valign: "top",
+            }
+          );
+        }
+
+        // Highlight Callout (if available)
+        if (s.highlight && currentY < 4.85) {
+          const calloutY = Math.min(currentY, 4.3);
+          slide.addShape(pptx.ShapeType.roundRect, {
+            x: 0.8,
+            y: calloutY,
+            w: 8.4,
+            h: 0.75,
+            fill: { color: "FEF3C7" },
+            line: { color: "F59E0B", width: 1 },
+          });
+          slide.addText(`💡 Studi Kasus / Penerapan: ${s.highlight}`, {
+            x: 0.95,
+            y: calloutY + 0.08,
+            w: 8.1,
+            h: 0.6,
+            fontSize: 9.5,
+            color: "92400E",
+            bold: false,
+            fontFace: "Arial",
+            valign: "top",
+          });
+        }
 
         // Slide Footer
         slide.addText(`${coverTitle} • GuruPro AI Pembelajaran Interaktif`, {
@@ -1933,7 +2074,7 @@ export function AsistenGuruPage() {
                                   {s.title}
                                 </p>
                                 <span className="text-[8.5px] text-muted-foreground line-clamp-1">
-                                  {s.bullets.length} butir materi
+                                  {s.description ? "Paragraf & Poin" : `${s.bullets.length} butir materi`}
                                 </span>
                               </button>
                             ))}
@@ -2978,46 +3119,117 @@ export function AsistenGuruPage() {
 
                 // Standard Content Slide
                 return (
-                  <div className="w-full max-w-4xl aspect-video rounded-xl sm:rounded-2xl border border-border bg-card text-card-foreground p-5 sm:p-8 md:p-10 flex flex-col justify-between shadow-2xl relative overflow-hidden select-text">
+                  <div className="w-full max-w-4xl aspect-video rounded-xl sm:rounded-2xl border border-border bg-card text-card-foreground p-4 sm:p-7 md:p-9 flex flex-col justify-between shadow-2xl relative overflow-hidden select-text">
                     {/* Slide Header */}
-                    <div className="border-b border-border/80 pb-3 sm:pb-4">
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="border-b border-border/80 pb-2.5 sm:pb-3.5 shrink-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
                         <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400">
                           SLIDE #{currentSlide.num}
                         </span>
-                        <span className="text-[10px] text-muted-foreground truncate">
+                        <span className="text-[10px] text-muted-foreground truncate max-w-[240px]">
                           {activeSlideDeck.title}
                         </span>
                       </div>
-                      <h2 className="text-sm sm:text-lg md:text-xl font-bold text-foreground tracking-tight leading-snug">
+                      <h2 className="text-sm sm:text-base md:text-xl font-bold text-foreground tracking-tight leading-snug">
                         {currentSlide.title}
                       </h2>
                       {currentSlide.subtitle && (
-                        <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+                        <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 line-clamp-1">
                           {currentSlide.subtitle}
                         </p>
                       )}
                     </div>
 
-                    {/* Slide Body: Bullets / Cards */}
-                    <div className="flex-1 my-3 sm:my-4 overflow-y-auto pr-1 space-y-2.5 sm:space-y-3">
-                      {currentSlide.bullets.map((bullet, bIdx) => (
-                        <div
-                          key={bIdx}
-                          className="flex items-start gap-2.5 sm:gap-3 rounded-xl border border-border/60 bg-muted/20 p-2.5 sm:p-3 transition-colors hover:bg-muted/40 hover:border-border"
-                        >
-                          <div className="flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 mt-0.5 text-xs font-bold">
-                            ✓
+                    {/* Slide Body: Narrative Paragraphs + Structured Key Points + Case Study Callout */}
+                    <div className="flex-1 my-2.5 sm:my-3.5 overflow-y-auto pr-1.5 space-y-2.5 sm:space-y-3">
+                      {/* 1. Narrative Description Paragraph */}
+                      {currentSlide.description && (
+                        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 dark:bg-blue-950/20 p-3 sm:p-4 text-xs sm:text-[13px] leading-relaxed shadow-2xs">
+                          <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 mb-1.5 uppercase tracking-wider">
+                            <BookOpen className="h-3.5 w-3.5" />
+                            <span>Uraian & Penjelasan Komprehensif</span>
                           </div>
-                          <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed font-normal">
-                            {bullet}
-                          </p>
+                          <div className="text-foreground/90 leading-relaxed font-normal whitespace-pre-line space-y-2">
+                            {currentSlide.description}
+                          </div>
                         </div>
-                      ))}
+                      )}
+
+                      {/* 2. Structured Bullets / Key Points */}
+                      {currentSlide.bullets.length > 0 && (
+                        <div className="space-y-2">
+                          {currentSlide.description && (
+                            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider px-1">
+                              <span>Poin Kunci & Karakteristik:</span>
+                            </div>
+                          )}
+                          <div
+                            className={
+                              currentSlide.bullets.length >= 4 && !currentSlide.description
+                                ? "grid grid-cols-1 sm:grid-cols-2 gap-2"
+                                : "space-y-2"
+                            }
+                          >
+                            {currentSlide.bullets.map((bullet, bIdx) => {
+                              const colonIdx = bullet.indexOf(":");
+                              const hasLabel = colonIdx > 0 && colonIdx < 35;
+                              const label = hasLabel ? bullet.slice(0, colonIdx).trim() : null;
+                              const value = hasLabel ? bullet.slice(colonIdx + 1).trim() : bullet;
+
+                              return (
+                                <div
+                                  key={bIdx}
+                                  className="flex items-start gap-2.5 rounded-xl border border-border/70 bg-card/90 p-2.5 sm:p-3 transition-all hover:bg-muted/30 hover:border-blue-500/30 shadow-2xs"
+                                >
+                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 mt-0.5 text-xs font-bold">
+                                    •
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    {label ? (
+                                      <p className="text-xs sm:text-[13px] text-foreground/90 leading-relaxed">
+                                        <strong className="text-foreground font-semibold mr-1.5">
+                                          {label}:
+                                        </strong>
+                                        {value}
+                                      </p>
+                                    ) : (
+                                      <p className="text-xs sm:text-[13px] text-foreground/90 leading-relaxed font-normal">
+                                        {value}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 3. Code Snippet Block (if any) */}
+                      {currentSlide.codeSnippet && (
+                        <div className="rounded-xl border border-slate-700/80 bg-slate-900 text-slate-100 p-3 font-mono text-[11px] sm:text-xs overflow-x-auto shadow-md">
+                          <pre className="leading-relaxed">{currentSlide.codeSnippet}</pre>
+                        </div>
+                      )}
+
+                      {/* 4. Highlight Callout (Case Study / Concrete Example / Teaching Tip) */}
+                      {currentSlide.highlight && (
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/20 p-2.5 sm:p-3 flex items-start gap-2.5 shadow-2xs">
+                          <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-amber-700 dark:text-amber-300 block">
+                              Studi Kasus & Penerapan Kontekstual
+                            </span>
+                            <p className="text-xs sm:text-[12.5px] text-foreground/90 leading-relaxed font-normal">
+                              {currentSlide.highlight}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Slide Footer */}
-                    <div className="border-t border-border/60 pt-2.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                    <div className="border-t border-border/60 pt-2 flex items-center justify-between text-[10px] text-muted-foreground shrink-0">
                       <span>Bahan Tayang Pembelajaran Kelas</span>
                       <span className="font-mono">
                         {activeSlideIndex + 1} / {activeSlideDeck.slideCount}
@@ -3059,7 +3271,7 @@ export function AsistenGuruPage() {
                         {s.title}
                       </p>
                       <span className="text-[8px] text-muted-foreground truncate">
-                        {s.bullets.length} butir
+                        {s.description ? "Paragraf & Poin" : `${s.bullets.length} butir`}
                       </span>
                     </button>
                   );
