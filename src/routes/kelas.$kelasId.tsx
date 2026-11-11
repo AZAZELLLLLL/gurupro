@@ -50,6 +50,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import { initials, useAuth } from "@/lib/auth-store";
 import {
   getKelasById,
@@ -59,7 +69,8 @@ import {
   type AnggotaKelas,
   type Kelas,
 } from "@/lib/kelas-store";
-import { useModuls } from "@/lib/modul-store";
+import { useModuls, saveModul, addModul, reloadModuls } from "@/lib/modul-store";
+import type { Modul } from "@/lib/modul-types";
 import {
   formatNilai,
   getKelasRekapData,
@@ -274,6 +285,95 @@ function DetailKelasMonitoringPage() {
       modulKelasStr.includes(namaKelasStr)
     );
   });
+
+  // State Tambah Modul ke Kelas
+  const [openTambahModul, setOpenTambahModul] = useState(false);
+  const [searchModulQuery, setSearchModulQuery] = useState("");
+  const [selectedModulIds, setSelectedModulIds] = useState<string[]>([]);
+  const [kirimLoading, setKirimLoading] = useState(false);
+
+  // Modul yang sudah berstatus Terbit dan belum diarsipkan
+  const publishedModuls = useMemo(() => {
+    return allModuls.filter((m) => m.status === "Terbit" && !m.isArchived);
+  }, [allModuls]);
+
+  const isModulInThisClass = (m: Modul) => {
+    if (!kelasDetail) return false;
+    if (m.kelasId) {
+      return m.kelasId === kelasDetail.id;
+    }
+    const modulKelasStr = (m.kelas || "").toLowerCase();
+    const namaKelasStr = (kelasDetail.namaKelas || "").toLowerCase();
+    const tingkatStr = (kelasDetail.tingkat || "").toLowerCase();
+    const combinedStr = `${tingkatStr} ${namaKelasStr}`.trim();
+    return modulKelasStr.includes(combinedStr) || modulKelasStr.includes(namaKelasStr);
+  };
+
+  const filteredPublishedModuls = useMemo(() => {
+    const q = searchModulQuery.trim().toLowerCase();
+    if (!q) return publishedModuls;
+    return publishedModuls.filter(
+      (m) =>
+        m.judul.toLowerCase().includes(q) ||
+        m.mapel.toLowerCase().includes(q) ||
+        (m.kelas || "").toLowerCase().includes(q) ||
+        (m.ringkasan || "").toLowerCase().includes(q),
+    );
+  }, [publishedModuls, searchModulQuery]);
+
+  const handleKirimModulKeKelas = async () => {
+    if (!kelasDetail || selectedModulIds.length === 0) return;
+    setKirimLoading(true);
+    try {
+      let suksesCount = 0;
+      for (const modulId of selectedModulIds) {
+        const modul = allModuls.find((m) => m.id === modulId);
+        if (!modul) continue;
+
+        const kelasLabel = `${kelasDetail.tingkat} ${kelasDetail.namaKelas}`.trim();
+
+        if (!modul.kelasId) {
+          await saveModul({
+            ...modul,
+            kelasId: kelasDetail.id,
+            kelas: kelasLabel,
+          });
+          suksesCount++;
+        } else if (modul.kelasId !== kelasDetail.id) {
+          await addModul({
+            judul: modul.judul,
+            kelas: kelasLabel,
+            kelasId: kelasDetail.id,
+            mapel: modul.mapel,
+            status: "Terbit",
+            sumberTipe: modul.sumberTipe,
+            sumberInput: modul.sumberInput,
+            sumberUrl: modul.sumberUrl,
+            sumberJudul: modul.sumberJudul,
+            sumberKutipan: modul.sumberKutipan,
+            ringkasan: modul.ringkasan,
+            sections: modul.sections,
+            slides: modul.slides,
+            isArchived: false,
+            aiMetadata: modul.aiMetadata,
+          });
+          suksesCount++;
+        }
+      }
+
+      await reloadModuls();
+      toast.success(
+        `Berhasil mengirim ${suksesCount} modul ke kelas ${kelasDetail.namaKelas}!`,
+      );
+      setSelectedModulIds([]);
+      setOpenTambahModul(false);
+    } catch (err: any) {
+      console.error("[handleKirimModulKeKelas] Gagal mengirim modul:", err);
+      toast.error(err?.message || "Gagal mengirim modul ke kelas.");
+    } finally {
+      setKirimLoading(false);
+    }
+  };
 
 
   // Filter tugas/soal untuk kelas ini
@@ -637,11 +737,13 @@ function DetailKelasMonitoringPage() {
                     {kelasDetail.tingkat} {kelasDetail.namaKelas}.
                   </CardDescription>
                 </div>
-                <Button asChild size="sm" className="gap-1.5 shadow-xs font-medium">
-                  <Link to="/modul-ajar">
-                    <Plus className="h-3.5 w-3.5" />
-                    Susun Modul Baru
-                  </Link>
+                <Button
+                  size="sm"
+                  className="gap-1.5 shadow-xs font-medium"
+                  onClick={() => setOpenTambahModul(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Tambah Modul
                 </Button>
               </div>
             </CardHeader>
@@ -652,16 +754,22 @@ function DetailKelasMonitoringPage() {
                   <p className="mt-3 font-display text-base font-semibold text-navy">
                     Belum Ada Modul Khusus untuk Kelas Ini
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Susun modul ajar dengan bantuan GuruPro AI secara cepat untuk mata pelajaran{" "}
+                  <p className="mt-1 text-sm text-muted-foreground max-w-md mx-auto">
+                    Kirim modul yang telah dipublikasikan ke kelas ini, atau susun modul baru untuk mata pelajaran{" "}
                     {kelasDetail.mapel}.
                   </p>
-                  <Button asChild className="mt-4 gap-2">
-                    <Link to="/modul-ajar">
-                      <Sparkles className="h-4 w-4" />
-                      Buat Modul Ajar Baru
-                    </Link>
-                  </Button>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                    <Button onClick={() => setOpenTambahModul(true)} className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Tambah Modul
+                    </Button>
+                    <Button asChild variant="outline" className="gap-2">
+                      <Link to="/modul-ajar">
+                        <Sparkles className="h-4 w-4" />
+                        Susun di Modul Ajar
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -702,12 +810,35 @@ function DetailKelasMonitoringPage() {
                             {formatTanggal(modul.updatedAt)}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button asChild variant="ghost" size="sm" className="h-8 gap-1 text-xs">
-                              <Link to="/modul-ajar">
-                                Buka Modul
-                                <ArrowRight className="h-3 w-3" />
-                              </Link>
-                            </Button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button asChild variant="ghost" size="sm" className="h-8 gap-1 text-xs">
+                                <Link to="/modul-ajar">
+                                  Buka Modul
+                                  <ArrowRight className="h-3 w-3" />
+                                </Link>
+                              </Button>
+                              {modul.kelasId === kelasDetail.id && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                  onClick={async () => {
+                                    if (confirm(`Lepaskan modul "${modul.judul}" dari kelas ${kelasDetail.namaKelas}?`)) {
+                                      await saveModul({
+                                        ...modul,
+                                        kelasId: undefined,
+                                        kelas: "",
+                                      });
+                                      await reloadModuls();
+                                      toast.success(`Modul dilepas dari kelas ${kelasDetail.namaKelas}.`);
+                                    }
+                                  }}
+                                  title="Lepas modul dari kelas ini"
+                                >
+                                  Lepas
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1147,6 +1278,168 @@ function DetailKelasMonitoringPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog Tambah Modul ke Kelas */}
+      <Dialog
+        open={openTambahModul}
+        onOpenChange={(open) => {
+          setOpenTambahModul(open);
+          if (!open) {
+            setSelectedModulIds([]);
+            setSearchModulQuery("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="text-xl font-display font-semibold text-navy">
+              Tambah Modul Ajar ke Kelas {kelasDetail.namaKelas}
+            </DialogTitle>
+            <DialogDescription>
+              Pilih modul ajar yang telah berstatus <strong>Terbit</strong> untuk dikirim dan diakses oleh murid kelas {kelasDetail.tingkat} {kelasDetail.namaKelas}.
+            </DialogDescription>
+            <div className="relative mt-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari modul ajar berdasarkan judul atau mata pelajaran..."
+                value={searchModulQuery}
+                onChange={(e) => setSearchModulQuery(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-2 space-y-2.5 min-h-[200px] max-h-[50vh]">
+            {publishedModuls.length === 0 ? (
+              <div className="py-10 text-center">
+                <BookOpen className="mx-auto h-10 w-10 text-muted-foreground/30 mb-2" />
+                <p className="font-semibold text-navy text-sm">Belum Ada Modul yang Diterbitkan</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                  Hanya modul berstatus <strong>Terbit</strong> yang dapat dikirim ke kelas. Silakan publikasikan modul terlebih dahulu di menu Modul Ajar.
+                </p>
+                <Button
+                  asChild
+                  size="sm"
+                  className="mt-4 gap-1.5"
+                  onClick={() => setOpenTambahModul(false)}
+                >
+                  <Link to="/modul-ajar">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Buka Menu Modul Ajar
+                  </Link>
+                </Button>
+              </div>
+            ) : filteredPublishedModuls.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground text-sm">
+                Tidak ada modul terbit yang cocok dengan pencarian "{searchModulQuery}".
+              </div>
+            ) : (
+              filteredPublishedModuls.map((m) => {
+                const alreadyIn = isModulInThisClass(m);
+                const isSelected = selectedModulIds.includes(m.id);
+
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => {
+                      if (alreadyIn) return;
+                      setSelectedModulIds((prev) =>
+                        prev.includes(m.id) ? prev.filter((id) => id !== m.id) : [...prev, m.id],
+                      );
+                    }}
+                    className={cn(
+                      "flex items-start gap-3 p-3.5 rounded-lg border transition-all text-left",
+                      alreadyIn
+                        ? "bg-muted/40 border-border/60 opacity-80 cursor-default"
+                        : isSelected
+                        ? "bg-primary/5 border-primary shadow-xs cursor-pointer ring-1 ring-primary"
+                        : "bg-card border-border hover:border-primary/50 hover:bg-muted/20 cursor-pointer",
+                    )}
+                  >
+                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isSelected || alreadyIn}
+                        disabled={alreadyIn}
+                        onCheckedChange={() => {
+                          if (alreadyIn) return;
+                          setSelectedModulIds((prev) =>
+                            prev.includes(m.id) ? prev.filter((id) => id !== m.id) : [...prev, m.id],
+                          );
+                        }}
+                        aria-label={`Pilih ${m.judul}`}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-sm text-navy line-clamp-1">{m.judul}</p>
+                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-[10px] px-1.5 py-0 h-4">
+                          Terbit
+                        </Badge>
+                        {alreadyIn && (
+                          <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200 text-[10px] px-1.5 py-0 h-4">
+                            <Check className="h-2.5 w-2.5 mr-0.5 inline" /> Sudah di Kelas Ini
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {[m.mapel, m.kelas].filter(Boolean).join(" · ") || "Umum"} · {m.sections?.length || 0} Bab · Terakhir update {formatTanggal(m.updatedAt)}
+                      </p>
+                      {m.ringkasan && (
+                        <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-2">
+                          {m.ringkasan}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <DialogFooter className="p-4 border-t bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground w-full sm:w-auto text-left">
+              {selectedModulIds.length > 0 ? (
+                <span>
+                  <strong>{selectedModulIds.length}</strong> modul dipilih untuk dikirim
+                </span>
+              ) : (
+                <span>Pilih satu atau beberapa modul terbit</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedModulIds([]);
+                  setOpenTambahModul(false);
+                }}
+                disabled={kirimLoading}
+              >
+                Batal
+              </Button>
+              <Button
+                size="sm"
+                disabled={selectedModulIds.length === 0 || kirimLoading}
+                onClick={handleKirimModulKeKelas}
+                className="gap-1.5"
+              >
+                {kirimLoading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Mengirim...
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="h-3.5 w-3.5" />
+                    Kirim ke Kelas ({selectedModulIds.length})
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
