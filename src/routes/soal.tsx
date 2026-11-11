@@ -91,7 +91,7 @@ import {
   updatePaket,
   usePaketSoal,
 } from "@/lib/soal-store";
-import { createPenugasan } from "@/lib/penugasan-store";
+import { createPenugasan, refreshPenugasanGuru } from "@/lib/penugasan-store";
 import {
   JENIS_SOAL,
   TINGKAT,
@@ -136,6 +136,7 @@ export const Route = createFileRoute("/soal")({
 });
 
 function SoalPage() {
+  const navigate = Route.useNavigate();
   const search = Route.useSearch();
   const { profile, user, ready } = useAuth();
   const currentGuruId = user?.id || profile.id;
@@ -252,6 +253,10 @@ function SoalPage() {
   // bank actions
   const [terbitTarget, setTerbitTarget] = useState<PaketSoal | null>(null);
   const [kelasPilihan, setKelasPilihan] = useState<string[]>([]);
+  const [deadlineTugas, setDeadlineTugas] = useState<string>("");
+  const [kkmTugas, setKkmTugas] = useState<number>(75);
+  const [instruksiTugas, setInstruksiTugas] = useState<string>("");
+  const [submittingTugas, setSubmittingTugas] = useState<boolean>(false);
   const [hapus, setHapus] = useState<PaketSoal | null>(null);
   const [arsipTarget, setArsipTarget] = useState<PaketSoal | null>(null);
   const [arsipLoading, setArsipLoading] = useState(false);
@@ -1549,64 +1554,155 @@ function SoalPage() {
         </>
       )}
 
-      <Dialog open={terbitTarget !== null} onOpenChange={(o) => !o && setTerbitTarget(null)}>
-        <DialogContent className="max-h-[90dvh] w-[calc(100vw-2rem)] sm:max-w-md overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+      <Dialog
+        open={terbitTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setTerbitTarget(null);
+            setSubmittingTugas(false);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90dvh] w-[calc(100vw-2rem)] sm:max-w-lg overflow-y-auto overflow-x-hidden p-4 sm:p-6">
           <DialogHeader className="min-w-0">
-            <DialogTitle className="font-display text-navy break-words">
-              Terbitkan sebagai Tugas
+            <DialogTitle className="font-display text-navy break-words text-lg font-bold">
+              Terbitkan sebagai Tugas Kelas
             </DialogTitle>
-            <DialogDescription className="break-words">
-              Pilih kelas tujuan untuk paket soal &ldquo;{terbitTarget?.judul}&rdquo;.
+            <DialogDescription className="break-words text-xs">
+              Kirim paket soal &ldquo;{terbitTarget?.judul}&rdquo; ke kelas tujuan. Tugas yang diterbitkan akan otomatis aktif di kelas siswa dan muncul di menu Penugasan untuk pemantauan.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2 min-w-0">
-            {myKelas.length > 0 ? (
-              myKelas.map((k) => {
-                const labelKelas = `${k.tingkat} ${k.namaKelas}`;
-                return (
-                  <label
-                    key={k.id}
-                    className="flex items-center gap-3 rounded-lg border p-3 text-sm min-w-0 cursor-pointer hover:bg-muted/50"
-                  >
-                    <Checkbox
-                      checked={kelasPilihan.includes(labelKelas)}
-                      onCheckedChange={(v) =>
-                        setKelasPilihan((prev) =>
-                          v ? [...prev, labelKelas] : prev.filter((x) => x !== labelKelas),
-                        )
-                      }
-                    />
-                    <span className="truncate font-medium">{labelKelas}</span>
-                    {k.mapel ? (
-                      <span className="text-xs text-muted-foreground ml-auto">{k.mapel}</span>
-                    ) : null}
-                  </label>
-                );
-              })
-            ) : (
-              <p className="text-xs text-muted-foreground p-3 border rounded-lg">
-                Anda belum memiliki kelas. Buat kelas di menu Kelas Saya terlebih dahulu.
-              </p>
-            )}
+
+          <div className="space-y-4 py-2">
+            {/* 1. Pilih Kelas */}
+            <div>
+              <Label className="text-xs font-semibold text-foreground flex items-center justify-between mb-2">
+                <span>Pilih Kelas Tujuan</span>
+                <span className="text-[11px] text-muted-foreground font-normal">
+                  {kelasPilihan.length} kelas dipilih
+                </span>
+              </Label>
+              <div className="grid gap-2 max-h-44 overflow-y-auto p-1 border rounded-lg bg-muted/20">
+                {myKelas.length > 0 ? (
+                  myKelas.map((k) => {
+                    const labelKelas = `${k.tingkat} ${k.namaKelas}`;
+                    return (
+                      <label
+                        key={k.id}
+                        className="flex items-center gap-3 rounded-lg border p-2.5 text-xs sm:text-sm min-w-0 cursor-pointer bg-card hover:bg-muted/50 transition-colors"
+                      >
+                        <Checkbox
+                          checked={kelasPilihan.includes(labelKelas)}
+                          onCheckedChange={(v) =>
+                            setKelasPilihan((prev) =>
+                              v ? [...prev, labelKelas] : prev.filter((x) => x !== labelKelas),
+                            )
+                          }
+                        />
+                        <span className="truncate font-medium">{labelKelas}</span>
+                        {k.mapel ? (
+                          <span className="text-xs text-muted-foreground ml-auto">{k.mapel}</span>
+                        ) : null}
+                      </label>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-muted-foreground p-3">
+                    Anda belum memiliki kelas. Buat kelas di menu Kelas Saya terlebih dahulu.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Pengaturan Deadline & KKM */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="deadlineInput" className="text-xs font-semibold text-foreground">
+                  Batas Waktu (Deadline)
+                </Label>
+                <Input
+                  id="deadlineInput"
+                  type="datetime-local"
+                  value={deadlineTugas}
+                  onChange={(e) => setDeadlineTugas(e.target.value)}
+                  className="text-xs h-9"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Kosongkan jika tidak ada batas waktu.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="kkmInput" className="text-xs font-semibold text-foreground">
+                  Nilai KKM (Ketuntasan)
+                </Label>
+                <Input
+                  id="kkmInput"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={kkmTugas}
+                  onChange={(e) => setKkmTugas(Number(e.target.value) || 75)}
+                  className="text-xs h-9"
+                  placeholder="75"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Standar nilai minimal kelulusan tugas.
+                </p>
+              </div>
+            </div>
+
+            {/* 3. Instruksi Pengerjaan */}
+            <div className="space-y-1.5">
+              <Label htmlFor="instruksiInput" className="text-xs font-semibold text-foreground">
+                Instruksi Pengerjaan (Opsional)
+              </Label>
+              <Textarea
+                id="instruksiInput"
+                rows={2}
+                placeholder="Contoh: Kerjakan secara mandiri dan teliti sebelum batas waktu berakhir..."
+                value={instruksiTugas}
+                onChange={(e) => setInstruksiTugas(e.target.value)}
+                className="text-xs resize-none"
+              />
+            </div>
           </div>
+
           <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full pt-2">
             <Button
               variant="ghost"
-              onClick={() => setTerbitTarget(null)}
+              onClick={() => {
+                setTerbitTarget(null);
+                setSubmittingTugas(false);
+              }}
+              disabled={submittingTugas}
               className="w-full sm:w-auto"
             >
               Batal
             </Button>
             <Button
+              disabled={submittingTugas}
               onClick={async () => {
                 if (kelasPilihan.length === 0) {
-                  toast.error("Pilih minimal satu kelas.");
+                  toast.error("Pilih minimal satu kelas tujuan.");
                   return;
                 }
-                if (terbitTarget) {
+                if (!terbitTarget) return;
+
+                setSubmittingTugas(true);
+                try {
+                  // 1. Pastikan paket soal terbit
+                  if (terbitTarget.status !== "Terbit") {
+                    await publishPaket(terbitTarget.id);
+                  }
+
+                  // 2. Tautkan daftar kelas ke paket soal
                   await terbitkanSebagaiTugas(terbitTarget.id, kelasPilihan);
 
-                  // Create actual penugasan in public.penugasan table for each chosen class
+                  // 3. Buat entitas penugasan aktif di tabel public.penugasan untuk setiap kelas
+                  let createdCount = 0;
+                  const deadlineIso = deadlineTugas ? new Date(deadlineTugas).toISOString() : null;
+
                   for (const label of kelasPilihan) {
                     const targetKelas = myKelas.find(
                       (k) => `${k.tingkat} ${k.namaKelas}`.trim() === label.trim(),
@@ -1616,10 +1712,17 @@ function SoalPage() {
                         kelasId: targetKelas.id,
                         paketSoalId: terbitTarget.id,
                         judul: `Tugas: ${terbitTarget.judul}`,
+                        instruksi: instruksiTugas.trim() || undefined,
+                        deadline: deadlineIso,
+                        kkm: kkmTugas || 75,
                         status: "published",
                       });
+                      createdCount++;
                     }
                   }
+
+                  await refreshPenugasanGuru();
+                  await reloadPaketSoal();
 
                   void trackProductEvent("QUESTION_PACKAGE_PUBLISHED", "soal", {
                     userId: currentGuruId,
@@ -1629,16 +1732,45 @@ function SoalPage() {
                       questionCount: terbitTarget.soal?.length || 0,
                       target: "tugas",
                       kelasCount: kelasPilihan.length,
+                      deadline: deadlineIso,
+                      kkm: kkmTugas,
                     },
                   });
+
+                  toast.success(
+                    `Paket soal berhasil diterbitkan sebagai tugas untuk ${createdCount} kelas! Penugasan aktif dan dapat dipantau di menu Penugasan.`,
+                    {
+                      action: {
+                        label: "Buka Penugasan",
+                        onClick: () => navigate({ to: "/penugasan" }),
+                      },
+                    },
+                  );
+
+                  setTerbitTarget(null);
+                  setKelasPilihan([]);
+                  setInstruksiTugas("");
+                  setDeadlineTugas("");
+                } catch (err: any) {
+                  console.error("[terbitkanSebagaiTugas] Error:", err);
+                  toast.error(err?.message || "Gagal menerbitkan tugas ke kelas.");
+                } finally {
+                  setSubmittingTugas(false);
                 }
-                setTerbitTarget(null);
-                toast.success("Soal berhasil diterbitkan sebagai tugas ke kelas pilihan!");
               }}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto gap-2 bg-primary font-semibold"
             >
-              <Send className="h-4 w-4" />
-              Terbitkan
+              {submittingTugas ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Menerbitkan...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  <span>Terbitkan Tugas ({kelasPilihan.length} Kelas)</span>
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

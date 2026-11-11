@@ -685,6 +685,40 @@ export function AsistenGuruPage() {
     }
   };
 
+  // Helper to remove markdown markers and sanitize slide texts
+  const cleanSlideText = (text: string): string => {
+    return text
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/__([^_]+)__/g, "$1")
+      .replace(/_([^_]+)_/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/^#+\s*/g, "")
+      .replace(/^[•\-\*]\s*/g, "")
+      .replace(/[""]/g, '"')
+      .replace(/^[-–—]\s*/, "")
+      .trim();
+  };
+
+  const isMetaPromptLine = (text: string): boolean => {
+    const lower = text.toLowerCase().trim();
+    return (
+      lower.startsWith("gaya visual") ||
+      lower.startsWith("elemen visual") ||
+      lower.startsWith("catatan visual") ||
+      lower.startsWith("arah visual") ||
+      lower.startsWith("catatan presenter") ||
+      lower.startsWith("header / tagline") ||
+      lower.startsWith("tagline:") ||
+      lower.startsWith("color palette") ||
+      lower.startsWith("visual footnote") ||
+      lower.startsWith("skema warna") ||
+      lower.startsWith("layout:") ||
+      lower.startsWith("prompt gambar") ||
+      lower.startsWith("```ai_image_prompt")
+    );
+  };
+
   const handleSaveToPPT = async (content: string, msgId: string) => {
     setSavingAction(msgId + "-ppt");
     try {
@@ -694,12 +728,29 @@ export function AsistenGuruPage() {
 
       for (const block of slideBlocks) {
         const titleMatch = block.match(/(?:Slide\s*\d*[:\-–]?\s*)([^\n]+)/i);
-        const bullets = Array.from(block.matchAll(/^[-*]\s+(.+)$/gm)).map((m) => m[1].trim());
-        if (bullets.length > 0 || titleMatch) {
+        const rawBullets = Array.from(block.matchAll(/^[-*•]\s+(.+)$/gm)).map((m) => m[1].trim());
+
+        // Filter meta-prompts and clean text
+        const cleanBullets = rawBullets
+          .filter((b) => !isMetaPromptLine(b))
+          .map((b) => cleanSlideText(b))
+          .filter((b) => b.length > 5);
+
+        let cleanTitle = titleMatch ? cleanSlideText(titleMatch[1]) : `Slide ${slideNum}: Pembelajaran`;
+        if (cleanTitle.toLowerCase().includes("cover") || cleanTitle.toLowerCase().includes("judul utama")) {
+          const mainTitleMatch = block.match(/(?:Judul Utama|Materi Utama)\s*[:\-–]?\s*([^\n]+)/i);
+          if (mainTitleMatch) {
+            cleanTitle = cleanSlideText(mainTitleMatch[1]);
+          } else {
+            cleanTitle = activeSession?.title || "Materi Pembelajaran";
+          }
+        }
+
+        if (cleanBullets.length > 0 || titleMatch) {
           parsedSlides.push({
             id: uid(),
-            judul: titleMatch ? titleMatch[1].replace(/[*#]/g, "").trim() : `Slide ${slideNum}: Materi Pembelajaran`,
-            bullets: bullets.length > 0 ? bullets.slice(0, 6) : [block.slice(0, 100)],
+            judul: cleanTitle,
+            bullets: cleanBullets.length > 0 ? cleanBullets.slice(0, 6) : [cleanSlideText(block.slice(0, 200))],
             ilustrasi: outlineSettings.illustrationStyleName,
           });
           slideNum++;
@@ -708,11 +759,11 @@ export function AsistenGuruPage() {
 
       if (parsedSlides.length === 0) {
         const paragraphs = content.split(/\n\n+/).filter((p) => p.trim().length > 30);
-        paragraphs.slice(0, Math.min(outlineSettings.slideCount, 5)).forEach((p, idx) => {
+        paragraphs.slice(0, Math.min(outlineSettings.slideCount, 6)).forEach((p, idx) => {
           parsedSlides.push({
             id: uid(),
-            judul: `Slide ${idx + 1}: Konsep Inti`,
-            bullets: [p.slice(0, 120)],
+            judul: `Slide ${idx + 1}: Konsep & Pembahasan Inti`,
+            bullets: [cleanSlideText(p)],
             ilustrasi: outlineSettings.illustrationStyleName,
           });
         });
@@ -724,7 +775,7 @@ export function AsistenGuruPage() {
         judul: pptTitle,
         kelas: outlineSettings.jenjang.includes("SMK") ? "X (SMK)" : "X",
         mapel: "Dasar-Dasar Kejuruan / Umum",
-        ringkasan: `Slide presentasi berisi ${parsedSlides.length} slide bertema ${outlineSettings.pptStyleName}.`,
+        ringkasan: `Slide presentasi interaktif berisi ${parsedSlides.length} materi tayang komprehensif bertema ${outlineSettings.pptStyleName}.`,
         sections: [],
         slides: parsedSlides,
         status: "Draft",
@@ -750,86 +801,255 @@ export function AsistenGuruPage() {
 
   const handleDownloadPPTFromChat = async (content: string, msgTitle?: string) => {
     try {
-      toast.info("Menyiapkan berkas PowerPoint (.pptx)...");
+      toast.info("Menyiapkan dokumen presentasi PowerPoint (.pptx) super detail...");
       const PptxGenJS = (await import("pptxgenjs")).default;
       const pptx = new PptxGenJS();
       pptx.layout = "LAYOUT_16x9";
-      const presentationTitle = msgTitle || activeSession?.title || "Presentasi Pembelajaran";
-      pptx.title = presentationTitle;
 
-      // Cover slide
-      const cover = pptx.addSlide();
-      cover.background = { color: "0F172A" };
-      cover.addText(presentationTitle, {
-        x: 0.8,
-        y: 2.2,
-        w: 8.4,
-        h: 1.5,
-        fontSize: 32,
-        bold: true,
-        color: "FFFFFF",
-      });
-      cover.addText(`Disusun dengan GuruPro AI Asisten Guru • Tema: ${outlineSettings.pptStyleName}`, {
-        x: 0.8,
-        y: 3.8,
-        w: 8.4,
-        h: 0.6,
-        fontSize: 14,
-        color: "94A3B8",
-      });
+      const sessionTitle = msgTitle || activeSession?.title || "Materi Pembelajaran";
+      pptx.title = sessionTitle;
 
       // Parse slide blocks
       const slideBlocks = content.split(/\n(?=###?\s+Slide|\n\*\*Slide\s+\d+)/i);
-      let slideNum = 1;
+      const parsedList: { title: string; bullets: string[]; subtitle?: string }[] = [];
 
       for (const block of slideBlocks) {
         const titleMatch = block.match(/(?:Slide\s*\d*[:\-–]?\s*)([^\n]+)/i);
-        const bullets = Array.from(block.matchAll(/^[-*]\s+(.+)$/gm)).map((m) => m[1].trim());
+        const rawBullets = Array.from(block.matchAll(/^[-*•]\s+(.+)$/gm)).map((m) => m[1].trim());
 
-        if (bullets.length > 0 || titleMatch) {
-          const slide = pptx.addSlide();
-          slide.background = { color: "F8FAFC" };
+        // Extract subjudul or tagline if present
+        const subMatch = block.match(/(?:Sub-?Judul|Tagline|Sasaran)\s*[:\-–]?\s*([^\n]+)/i);
+        const subtitle = subMatch ? cleanSlideText(subMatch[1]) : undefined;
 
-          // Top Header shape
-          slide.addShape(pptx.ShapeType.rect, {
-            x: 0.6,
-            y: 0.5,
-            w: 8.8,
-            h: 0.9,
-            fill: { color: "1E293B" },
+        // Clean bullets and remove meta-prompts
+        const cleanBullets = rawBullets
+          .filter((b) => !isMetaPromptLine(b))
+          .map((b) => cleanSlideText(b))
+          .filter((b) => b.length > 5);
+
+        let cleanTitle = titleMatch ? cleanSlideText(titleMatch[1]) : "";
+        if (cleanTitle.toLowerCase().includes("cover") || cleanTitle.toLowerCase().includes("judul utama")) {
+          const mainTitleMatch = block.match(/(?:Judul Utama|Materi Utama)\s*[:\-–]?\s*([^\n]+)/i);
+          if (mainTitleMatch) {
+            cleanTitle = cleanSlideText(mainTitleMatch[1]);
+          } else {
+            cleanTitle = sessionTitle;
+          }
+        }
+
+        if (cleanTitle || cleanBullets.length > 0) {
+          parsedList.push({
+            title: cleanTitle || `Materi Pembelajaran`,
+            bullets: cleanBullets,
+            subtitle,
           });
-
-          slide.addText(titleMatch ? titleMatch[1].replace(/[*#]/g, "").trim() : `Slide ${slideNum}: Pembelajaran`, {
-            x: 0.8,
-            y: 0.6,
-            w: 8.4,
-            h: 0.7,
-            fontSize: 20,
-            bold: true,
-            color: "FFFFFF",
-          });
-
-          // Bullets
-          const bulletTexts = bullets.length > 0 ? bullets.slice(0, 6) : [block.slice(0, 150)];
-          bulletTexts.forEach((b, idx) => {
-            slide.addText(`•  ${b}`, {
-              x: 0.8,
-              y: 1.8 + idx * 0.7,
-              w: 8.4,
-              h: 0.6,
-              fontSize: 14,
-              color: "334155",
-            });
-          });
-
-          slideNum++;
         }
       }
 
-      const cleanFilename = (presentationTitle || "presentasi").replace(/[^a-zA-Z0-9]/g, "-").slice(0, 30);
+      // If content was not in ### Slide format, convert paragraphs to rich pedagogical slides
+      if (parsedList.length === 0) {
+        const paragraphs = content.split(/\n\n+/).filter((p) => p.trim().length > 30);
+        paragraphs.slice(0, 6).forEach((p, idx) => {
+          parsedList.push({
+            title: `Bagian ${idx + 1}: ${sessionTitle}`,
+            bullets: [cleanSlideText(p)],
+          });
+        });
+      }
+
+      // Ensure first slide is Cover
+      const firstSlide = parsedList[0];
+      const isFirstCover =
+        firstSlide &&
+        (firstSlide.title.toLowerCase().includes("cover") ||
+          firstSlide.title.toLowerCase() === sessionTitle.toLowerCase() ||
+          parsedList.length > 1);
+
+      // Slide 1: Premium Professional Cover Slide
+      const cover = pptx.addSlide();
+      cover.background = { color: "0B132B" }; // Deep Midnight Navy
+
+      // Accent color pill / badge
+      cover.addShape(pptx.ShapeType.roundRect, {
+        x: 0.8,
+        y: 1.0,
+        w: 3.8,
+        h: 0.35,
+        fill: { color: "1C2541" },
+        line: { color: "38BDF8", width: 1 },
+      });
+      cover.addText("KURIKULUM MERDEKA • GURUPRO AI", {
+        x: 0.9,
+        y: 1.0,
+        w: 3.6,
+        h: 0.35,
+        fontSize: 10,
+        bold: true,
+        color: "38BDF8",
+        fontFace: "Arial",
+      });
+
+      const rawCoverTitle =
+        isFirstCover && firstSlide?.title ? firstSlide.title : sessionTitle;
+      const coverTitle = rawCoverTitle.replace(/^Cover\s*[:\-–]?\s*/i, "").trim() || sessionTitle;
+
+      cover.addText(coverTitle, {
+        x: 0.8,
+        y: 1.6,
+        w: 8.4,
+        h: 1.8,
+        fontSize: 30,
+        bold: true,
+        color: "FFFFFF",
+        fontFace: "Arial",
+      });
+
+      const coverSubtitle =
+        firstSlide?.subtitle ||
+        (firstSlide?.bullets?.[0] && firstSlide.bullets[0].length < 120
+          ? firstSlide.bullets[0]
+          : null) ||
+        `Media Pembelajaran Interaktif & Pembahasan Komprehensif Jenjang ${outlineSettings.jenjang}`;
+
+      cover.addText(coverSubtitle, {
+        x: 0.8,
+        y: 3.6,
+        w: 8.4,
+        h: 0.8,
+        fontSize: 14,
+        color: "94A3B8",
+        fontFace: "Arial",
+      });
+
+      cover.addText(
+        `Platform GuruPro AI • Tema Presentasi: ${outlineSettings.pptStyleName}`,
+        {
+          x: 0.8,
+          y: 4.8,
+          w: 8.4,
+          h: 0.4,
+          fontSize: 11,
+          color: "64748B",
+          fontFace: "Arial",
+        },
+      );
+
+      // Render Content Slides (starting from index 1 if index 0 was cover, or all if not)
+      const contentSlides = isFirstCover ? parsedList.slice(1) : parsedList;
+
+      contentSlides.forEach((s, idx) => {
+        const slide = pptx.addSlide();
+        slide.background = { color: "F8FAFC" }; // Soft clean off-white
+
+        // Header Shape Container
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: 0.6,
+          y: 0.45,
+          w: 8.8,
+          h: 0.85,
+          fill: { color: "0F172A" },
+          line: { color: "1E293B", width: 1 },
+        });
+
+        // Slide Badge (SLIDE 01, SLIDE 02, etc.)
+        const badgeText = `SLIDE ${(idx + 1).toString().padStart(2, "0")}`;
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: 0.8,
+          y: 0.65,
+          w: 1.0,
+          h: 0.4,
+          fill: { color: "2563EB" },
+        });
+        slide.addText(badgeText, {
+          x: 0.8,
+          y: 0.65,
+          w: 1.0,
+          h: 0.4,
+          fontSize: 9,
+          bold: true,
+          color: "FFFFFF",
+          align: "center",
+          fontFace: "Arial",
+        });
+
+        // Clean Slide Title
+        const cleanTitle = s.title.replace(/^Slide\s*\d*[:\-–]?\s*/i, "").trim();
+        slide.addText(cleanTitle, {
+          x: 2.0,
+          y: 0.55,
+          w: 7.2,
+          h: 0.65,
+          fontSize: 17,
+          bold: true,
+          color: "FFFFFF",
+          fontFace: "Arial",
+        });
+
+        // Subtitle banner if available
+        let contentStartY = 1.55;
+        if (s.subtitle) {
+          slide.addText(s.subtitle, {
+            x: 0.8,
+            y: 1.4,
+            w: 8.4,
+            h: 0.4,
+            fontSize: 12,
+            italic: true,
+            color: "475569",
+            fontFace: "Arial",
+          });
+          contentStartY = 1.85;
+        }
+
+        // Body Content Bullets (Real, deep, accurate explanation)
+        const bulletsToRender =
+          s.bullets.length > 0
+            ? s.bullets
+            : [
+                `Pembahasan mendalam dan terstruktur mengenai ${cleanTitle} untuk memfasilitasi ketercapaian tujuan pembelajaran peserta didik secara komprehensif.`,
+              ];
+
+        // Format bullet items for pptxgenjs
+        const textItems = bulletsToRender.map((b) => ({
+          text: `${b}\n`,
+          options: {
+            fontSize: 13,
+            color: "1E293B",
+            bullet: true,
+            breakLine: true,
+          },
+        }));
+
+        slide.addText(textItems as any, {
+          x: 0.8,
+          y: contentStartY,
+          w: 8.4,
+          h: 5.0 - contentStartY,
+          fontFace: "Arial",
+          lineSpacing: 22,
+          valign: "top",
+        });
+
+        // Slide Footer
+        slide.addText(`${coverTitle} • GuruPro AI Pembelajaran Interaktif`, {
+          x: 0.8,
+          y: 5.15,
+          w: 8.4,
+          h: 0.3,
+          fontSize: 9,
+          color: "94A3B8",
+          fontFace: "Arial",
+        });
+      });
+
+      const cleanFilename = (sessionTitle || "presentasi-pembelajaran")
+        .replace(/[^a-zA-Z0-9]/g, "-")
+        .replace(/-+/g, "-")
+        .slice(0, 35);
       await pptx.writeFile({ fileName: `${cleanFilename}.pptx` });
-      toast.success("Dokumen PowerPoint (.pptx) berhasil diunduh!");
+      toast.success("Dokumen PowerPoint (.pptx) super detail berhasil diunduh!");
     } catch (err: any) {
+      console.error("[handleDownloadPPTFromChat] Error:", err);
       toast.error(err?.message || "Gagal mengunduh berkas PowerPoint.");
     }
   };
@@ -843,27 +1063,68 @@ export function AsistenGuruPage() {
       for (const qBlock of questionBlocks) {
         const qMatch = qBlock.match(/^(\d+)\.\s+([\s\S]+?)(?=\n[A-E]\.|\n[a-e]\.|$)/);
         if (qMatch) {
-          const pertanyaan = qMatch[2].trim();
+          const rawPertanyaan = qMatch[2].trim();
+          const cleanPertanyaan = cleanSlideText(rawPertanyaan);
           const opsiMatches = Array.from(qBlock.matchAll(/^[A-E]\.\s*(.+)$/gmi));
-          const opsi =
-            opsiMatches.length >= 2
-              ? opsiMatches.map((o) => o[1].trim())
-              : ["Opsi A", "Opsi B", "Opsi C", "Opsi D"];
+
+          let cleanOpsi = opsiMatches.map((o) => cleanSlideText(o[1])).filter(Boolean);
+          if (cleanOpsi.length === 0) {
+            cleanOpsi = ["Opsi A", "Opsi B", "Opsi C", "Opsi D"];
+          } else if (cleanOpsi.length < 4) {
+            const defaults = [
+              "Pernyataan alternatif A",
+              "Pernyataan alternatif B",
+              "Pernyataan alternatif C",
+              "Pernyataan alternatif D",
+            ];
+            while (cleanOpsi.length < 4) {
+              cleanOpsi.push(defaults[cleanOpsi.length]);
+            }
+          } else if (cleanOpsi.length > 4) {
+            cleanOpsi = cleanOpsi.slice(0, 4);
+          }
+
+          // Ensure distinct options
+          const seen = new Set<string>();
+          const distinctOpsi = cleanOpsi.map((opt, idx) => {
+            const lower = opt.toLowerCase();
+            if (seen.has(lower)) {
+              const unique = `${opt} (${String.fromCharCode(65 + idx)})`;
+              seen.add(unique.toLowerCase());
+              return unique;
+            }
+            seen.add(lower);
+            return opt;
+          });
 
           const kunciMatch = qBlock.match(/Kunci(?:\s+Jawaban)?\s*[:\-–]?\s*([A-E])/i);
-          const kunciChar = kunciMatch ? kunciMatch[1].toUpperCase() : "A";
-          const kunciIndex = ["A", "B", "C", "D", "E"].indexOf(kunciChar);
-          const kunci = kunciIndex >= 0 && kunciIndex < opsi.length ? opsi[kunciIndex] : opsi[0];
+          let validKunci = "A";
+          if (kunciMatch) {
+            const char = kunciMatch[1].toUpperCase();
+            if (["A", "B", "C", "D"].includes(char)) {
+              validKunci = char;
+            } else if (char === "E") {
+              validKunci = "D";
+            }
+          }
 
           const pembMatch = qBlock.match(/Pembahasan\s*[:\-–]?\s*([^\n]+(?:\n[^\n]+)*)/i);
-          const pembahasan = pembMatch ? pembMatch[1].trim() : "Pertanyaan asesmen pemahaman konsep.";
+          const pembahasan = pembMatch
+            ? cleanSlideText(pembMatch[1])
+            : "Pertanyaan asesmen pemahaman konsep materi.";
 
           parsedSoal.push({
             id: uid(),
-            pertanyaan,
-            opsi,
-            kunci,
-            pembahasan,
+            pertanyaan:
+              cleanPertanyaan.length >= 5
+                ? cleanPertanyaan
+                : "Pertanyaan evaluasi pemahaman materi pembelajaran.",
+            jenis: "Pilihan Ganda",
+            opsi: distinctOpsi,
+            kunci: validKunci,
+            penjelasan: pembahasan,
+            tingkat: "Sedang",
+            evidenceIds: ["ev_chat_assistant"],
           });
         }
       }
@@ -871,15 +1132,20 @@ export function AsistenGuruPage() {
       if (parsedSoal.length === 0) {
         parsedSoal.push({
           id: uid(),
-          pertanyaan: "Berdasarkan materi yang telah dipelajari, manakah pernyataan berikut yang paling tepat?",
+          pertanyaan:
+            "Berdasarkan materi yang telah dipelajari, manakah pernyataan berikut yang paling tepat sesuai konsep?",
+          jenis: "Pilihan Ganda",
           opsi: [
-            "Pernyataan logis pertama sesuai dengan konsep materi",
-            "Pernyataan kedua memerlukan pertimbangan kondisi",
-            "Pernyataan ketiga bertentangan dengan prinsip dasar",
-            "Pernyataan keempat belum memenuhi kriteria evaluasi",
+            "Pernyataan logis pertama sesuai dengan konsep materi pembelajaran",
+            "Pernyataan kedua memerlukan penyesuaian kondisi spesifik",
+            "Pernyataan ketiga bertentangan dengan prinsip dasar materi",
+            "Pernyataan keempat belum memenuhi kriteria evaluasi konsep",
           ],
-          kunci: "Pernyataan logis pertama sesuai dengan konsep materi",
-          pembahasan: "Pertanyaan dirancang untuk menguji pemahaman kritis siswa terhadap konsep.",
+          kunci: "A",
+          penjelasan:
+            "Pertanyaan asesmen dirancang untuk menguji pemahaman kritis peserta didik terhadap konsep.",
+          tingkat: "Sedang",
+          evidenceIds: ["ev_chat_assistant"],
         });
       }
 

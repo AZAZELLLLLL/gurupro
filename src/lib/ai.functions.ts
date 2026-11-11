@@ -1686,6 +1686,7 @@ export const publishQuestionPackageServerFn = createServerFn({ method: "POST" })
       .from("paket_soal")
       .update({
         status: "Terbit",
+        soal: validatedPackage.questions as never,
         ai_metadata: updatedAiMetadata as never,
         updated_at: nowIso,
       })
@@ -1700,6 +1701,7 @@ export const publishQuestionPackageServerFn = createServerFn({ method: "POST" })
         .from("paket_soal")
         .update({
           status: "Terbit",
+          soal: validatedPackage.questions as never,
           updated_at: nowIso,
         })
         .eq("id", data.paketId)

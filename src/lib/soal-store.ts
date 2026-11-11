@@ -186,8 +186,11 @@ export async function duplicatePaket(id: string) {
 export async function terbitkanSebagaiTugas(id: string, kelas: string[]) {
   const found = store.get().find((p) => p.id === id);
   if (!found) return;
+  if (found.status !== "Terbit") {
+    await publishPaket(id);
+  }
   const merged = Array.from(new Set([...found.kelas, ...kelas]));
-  await updatePaket(id, { kelas: merged, status: "Terbit" });
+  await updatePaket(id, { kelas: merged });
 }
 
 export { uid };
