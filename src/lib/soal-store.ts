@@ -75,8 +75,10 @@ export const getPaketSoalError = store.getError;
 export const reloadPaketSoal = store.reload;
 
 async function currentUserId() {
-  const { data } = await supabase.auth.getUser();
-  const id = data.user?.id;
+  const { data: userData } = await supabase.auth.getUser();
+  if (userData?.user?.id) return userData.user.id;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const id = sessionData?.session?.user?.id;
   if (!id) throw new Error("Sesi berakhir. Silakan masuk kembali.");
   return id;
 }

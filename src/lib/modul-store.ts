@@ -91,8 +91,10 @@ export const getModulsError = store.getError;
 export const reloadModuls = store.reload;
 
 async function currentUserId() {
-  const { data } = await supabase.auth.getUser();
-  const id = data.user?.id;
+  const { data: userData } = await supabase.auth.getUser();
+  if (userData?.user?.id) return userData.user.id;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const id = sessionData?.session?.user?.id;
   if (!id) throw new Error("Sesi berakhir. Silakan masuk kembali.");
   return id;
 }
@@ -124,7 +126,7 @@ export async function addModul(data: Omit<Modul, "id" | "createdAt" | "updatedAt
     throw new Error(error.message || "Gagal menyimpan modul ke database.");
   }
   const modul = toModul(row as unknown as Row);
-  store.set([modul, ...store.get()]);
+  store.set([modul, ...store.get().filter((m) => m.id !== modul.id)]);
   return modul;
 }
 

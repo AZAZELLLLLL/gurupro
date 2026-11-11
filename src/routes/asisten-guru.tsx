@@ -47,7 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { addModul } from "@/lib/modul-store";
+import { addModul, reloadModuls } from "@/lib/modul-store";
 import { addPaket } from "@/lib/soal-store";
 import { uid } from "@/lib/cloud-store";
 import type { ModulSection, Slide } from "@/lib/modul-types";
@@ -557,10 +557,21 @@ export function AsistenGuruPage() {
       // 3. Ringkasan
       const firstLines = content.replace(/^#+.*$/gm, "").trim().slice(0, 200);
 
-      await addModul({
+      // 4. Deteksi Mapel & Kelas dari isi jika ada
+      const mapelMatch = content.match(/(?:Mata Pelajaran|Mapel)\s*:\s*([^\n\r]+)/i);
+      const mapelVal = mapelMatch ? mapelMatch[1].trim() : "Dasar-Dasar Kejuruan / Umum";
+
+      const kelasMatch = content.match(/(?:Kelas(?:\/Fase)?|Fase)\s*:\s*([^\n\r]+)/i);
+      const kelasVal = kelasMatch
+        ? kelasMatch[1].trim()
+        : outlineSettings.jenjang.includes("SMK")
+        ? "X (SMK)"
+        : "X";
+
+      const saved = await addModul({
         judul: finalTitle,
-        kelas: outlineSettings.jenjang.includes("SMK") ? "X (SMK)" : "X",
-        mapel: "Dasar-Dasar Kejuruan / Umum",
+        kelas: kelasVal,
+        mapel: mapelVal,
         ringkasan: firstLines || "Modul pembelajaran dirancang terstruktur bersama GuruPro AI Asisten Guru.",
         sections: sections.length > 0 ? sections : [{ id: uid(), judul: "Materi Pokok", poin: [], isi: content }],
         slides: [],
@@ -569,13 +580,16 @@ export function AsistenGuruPage() {
         sumberInput: content.slice(0, 500),
       });
 
-      toast.success("Modul Ajar berhasil disimpan sebagai Draf!", {
+      await reloadModuls();
+
+      toast.success(`Modul Ajar "${saved.judul}" berhasil disimpan ke Penyimpanan Modul!`, {
         action: {
           label: "Buka Modul Ajar",
           onClick: () => navigate({ to: "/modul-ajar" }),
         },
       });
     } catch (err: any) {
+      console.error("[handleSaveToModul] Error:", err);
       toast.error(err?.message || "Gagal menyimpan modul ajar ke database.");
     } finally {
       setSavingAction(null);
@@ -629,6 +643,8 @@ export function AsistenGuruPage() {
         sumberInput: content.slice(0, 500),
       });
 
+      await reloadModuls();
+
       toast.success(`Berhasil menyimpan ${parsedSlides.length} slide PPT ke Modul Ajar!`, {
         action: {
           label: "Buka di Modul Ajar",
@@ -636,6 +652,7 @@ export function AsistenGuruPage() {
         },
       });
     } catch (err: any) {
+      console.error("[handleSaveToPPT] Error:", err);
       toast.error(err?.message || "Gagal menyimpan slide presentasi.");
     } finally {
       setSavingAction(null);

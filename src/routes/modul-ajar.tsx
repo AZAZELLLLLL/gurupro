@@ -108,6 +108,10 @@ function ModulAjarPage() {
     });
   }, [user?.id, profile?.id, profile?.role]);
 
+  useEffect(() => {
+    void reloadModuls();
+  }, []);
+
   const handleConfirmPublish = async () => {
     if (!targetPublish) return;
     setPublishLoading(true);
@@ -173,18 +177,34 @@ function ModulAjarPage() {
     }
   };
 
-  const teacherClassesInYear = useMemo(() => {
+  const allTeacherClasses = useMemo(() => {
     const list = Array.isArray(kelasList) ? kelasList : [];
-    return list.filter(
-      (k) =>
-        (k.guruId === currentGuruId) &&
-        (!selectedYear || k.tahunAjaran === selectedYear),
-    );
-  }, [kelasList, currentGuruId, selectedYear]);
+    return list.filter((k) => k.guruId === currentGuruId);
+  }, [kelasList, currentGuruId]);
 
-  const teacherClassIdsInYear = useMemo(() => {
-    return new Set(teacherClassesInYear.map((k) => k.id));
-  }, [teacherClassesInYear]);
+  const teacherClassesInYear = useMemo(() => {
+    return allTeacherClasses.filter(
+      (k) => !selectedYear || k.tahunAjaran === selectedYear,
+    );
+  }, [allTeacherClasses, selectedYear]);
+
+  const otherYearClassIds = useMemo(() => {
+    if (!selectedYear) return new Set<string>();
+    return new Set(
+      allTeacherClasses
+        .filter((k) => k.tahunAjaran && k.tahunAjaran !== selectedYear)
+        .map((k) => k.id),
+    );
+  }, [allTeacherClasses, selectedYear]);
+
+  const otherYearClassNames = useMemo(() => {
+    if (!selectedYear) return new Set<string>();
+    return new Set(
+      allTeacherClasses
+        .filter((k) => k.tahunAjaran && k.tahunAjaran !== selectedYear)
+        .map((k) => `${k.tingkat} ${k.namaKelas}`.trim().toLowerCase()),
+    );
+  }, [allTeacherClasses, selectedYear]);
 
   const teacherClassNamesInYear = useMemo(() => {
     return new Set(
@@ -195,15 +215,18 @@ function ModulAjarPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return moduls.filter((m) => {
-      // Filter Tahun Ajaran berbasis relasi kelas guru
+      // Filter Tahun Ajaran berbasis relasi kelas guru:
+      // Hanya sembunyikan modul jika secara eksplisit terikat ke kelas di tahun ajaran LAIN.
+      // Draf umum, modul dari AI Asisten, atau modul yang belum di-assign kelas harus selalu tampil!
       if (selectedYear) {
-        if (m.kelasId) {
-          if (!teacherClassIdsInYear.has(m.kelasId)) return false;
-        } else if (m.kelas) {
-          const cleanName = m.kelas.trim().toLowerCase();
-          if (!teacherClassNamesInYear.has(cleanName)) return false;
-        } else {
+        if (m.kelasId && otherYearClassIds.has(m.kelasId)) {
           return false;
+        }
+        if (m.kelas) {
+          const cleanName = m.kelas.trim().toLowerCase();
+          if (otherYearClassNames.has(cleanName) && !teacherClassNamesInYear.has(cleanName)) {
+            return false;
+          }
         }
       }
 
@@ -216,7 +239,7 @@ function ModulAjarPage() {
         m.kelas.toLowerCase().includes(q);
       return byTab && byQuery;
     });
-  }, [moduls, tab, query, selectedYear, teacherClassIdsInYear, teacherClassNamesInYear]);
+  }, [moduls, tab, query, selectedYear, otherYearClassIds, otherYearClassNames, teacherClassNamesInYear]);
 
   if (ready && profile.role === "siswa") {
     return <SiswaModulAjarView />;
