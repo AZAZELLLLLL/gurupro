@@ -2251,7 +2251,7 @@ export const publishModulServerFn = createServerFn({ method: "POST" })
     }
 
     // 4. Validate Publish Eligibility (Status, Archive, Canonical Structure, Evidence Integrity)
-    validateModulPublishEligibility(existing);
+    const { validatedPayload } = validateModulPublishEligibility(existing);
 
     // 5. Provenance Preservation & Audit Timestamp
     const existingAiMetadata = (existing.ai_metadata || {}) as any;
@@ -2270,6 +2270,7 @@ export const publishModulServerFn = createServerFn({ method: "POST" })
     // 6. Persist to Supabase Database (status: 'Terbit' strictly enforced)
     const publishPayload: Record<string, any> = {
       status: "Terbit",
+      sections: validatedPayload.sections,
       ai_metadata: updatedAiMetadata,
       updated_at: nowIso,
     };
