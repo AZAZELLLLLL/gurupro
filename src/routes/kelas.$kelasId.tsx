@@ -27,7 +27,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -122,8 +122,45 @@ function formatTanggal(isoDate: string) {
 
 function DetailKelasMonitoringPage() {
   const { kelasId } = Route.useParams();
+  const { profile, ready, profileStatus } = useAuth();
+
+  if (!ready || profileStatus === "loading") {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-muted-foreground">Memuat kelas pembelajaran…</p>
+      </div>
+    );
+  }
+
+  if (profile.role === "siswa") {
+    return <SiswaKelasDetailView kelasId={kelasId} />;
+  }
+
+  if (profile.role !== "guru") {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Akses Khusus Guru</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Halaman Monitoring Kelas hanya dapat diakses oleh akun Guru terdaftar.
+          </p>
+          <div className="pt-2 flex justify-center">
+            <Button asChild variant="outline">
+              <Link to="/">Kembali ke Dashboard</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <GuruKelasDetailMonitoringView kelasId={kelasId} />;
+}
+
+function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
   const navigate = useNavigate();
-  const { profile, user, ready } = useAuth();
+  const { profile, user } = useAuth();
   const { kelasList, anggotaList, refresh } = useKelas();
 
   // Local state for direct reload / fallback fetching
@@ -196,30 +233,6 @@ function DetailKelasMonitoringPage() {
       active = false;
     };
   }, [kelasId, kelasList]);
-
-  // Role guard: Tampilan khusus siswa
-  if (ready && profile.role === "siswa") {
-    return <SiswaKelasDetailView kelasId={kelasId} />;
-  }
-
-  // Role guard: Akses khusus guru
-  if (ready && profile.role !== "guru") {
-    return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-md space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">Akses Khusus Guru</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Halaman Monitoring Kelas hanya dapat diakses oleh akun Guru terdaftar.
-          </p>
-          <div className="pt-2 flex justify-center">
-            <Button asChild variant="outline">
-              <Link to="/">Kembali ke Dashboard</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Teacher-to-teacher isolation guard
   const currentUserId = user?.id || profile.id;
@@ -1861,7 +1874,7 @@ function DetailKelasMonitoringPage() {
 function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
   const { profile, user } = useAuth();
   const currentUserId = user?.id || profile.id;
-  const { penugasanList, loading: loadingPenugasan } = usePenugasanSiswa();
+  const { penugasanList, loading: loadingPenugasan, reload: reloadPenugasan } = usePenugasanSiswa();
 
   const [kelasDetail, setKelasDetail] = useState<Kelas | null>(null);
   const [membershipStatus, setMembershipStatus] = useState<"aktif" | "menunggu" | "ditolak" | "none">("aktif");
@@ -1873,81 +1886,110 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
 
   const [submissionsMap, setSubmissionsMap] = useState<Record<string, PenugasanPengumpulan>>({});
 
-  // 1. Ambil data kelas & keanggotaan siswa
-  useEffect(() => {
-    let active = true;
-    async function init() {
-      setLoadingKelas(true);
-      try {
-        const [kelasData, myClasses] = await Promise.all([
-          getKelasById(kelasId),
-          getKelasBySiswa(currentUserId),
-        ]);
+  // Unified loader: Ambil data kelas, modul terbit, dan pengumpulan tugas
+  const loadData = useCallback(async () => {
+    setLoadingKelas(true);
+    setLoadingModuls(true);
+    try {
+      const [kelasData, myClasses, modulData, subsMap] = await Promise.all([
+        getKelasById(kelasId),
+        currentUserId ? getKelasBySiswa(currentUserId) : Promise.resolve([]),
+        getPublishedModulsForSiswa(),
+        getMySubmissionsMap(),
+      ]);
 
-        if (!active) return;
-        setKelasDetail(kelasData);
-
-        const found = myClasses.find((c) => c.kelasId === kelasId);
-        if (found) {
-          setMembershipStatus(found.status);
-        } else {
-          setMembershipStatus("none");
-        }
-      } catch (err) {
-        console.error("[SiswaKelasDetailView] Gagal inisialisasi:", err);
-      } finally {
-        if (active) setLoadingKelas(false);
+      const found = myClasses.find((c) => c.kelasId === kelasId);
+      if (found) {
+        setMembershipStatus(found.status);
+      } else {
+        setMembershipStatus(kelasData ? "aktif" : "none");
       }
-    }
 
-    void init();
-    return () => {
-      active = false;
-    };
+      // Reconstruct kelas dari myClasses jika getKelasById mengembalikan null (fallback proteksi RLS)
+      const resolvedKelas: Kelas | null = kelasData || (found ? {
+        id: found.kelasId,
+        namaKelas: found.namaKelas,
+        tingkat: found.tingkat,
+        mapel: found.mapel,
+        tahunAjaran: found.tahunAjaran,
+        guruId: "",
+        kodeKelas: "",
+        createdAt: found.diajukan,
+      } : null);
+
+      setKelasDetail(resolvedKelas);
+      setModuls(modulData);
+      setSubmissionsMap(subsMap);
+    } catch (err) {
+      console.error("[SiswaKelasDetailView] Gagal inisialisasi:", err);
+    } finally {
+      setLoadingKelas(false);
+      setLoadingModuls(false);
+    }
   }, [kelasId, currentUserId]);
 
-  // 2. Ambil modul yang diterbitkan & submission siswa
   useEffect(() => {
-    let active = true;
-    async function loadResources() {
-      setLoadingModuls(true);
-      try {
-        const [modulData, subsMap] = await Promise.all([
-          getPublishedModulsForSiswa(),
-          getMySubmissionsMap(),
-        ]);
+    void loadData();
+  }, [loadData]);
 
-        if (!active) return;
-        setModuls(modulData);
-        setSubmissionsMap(subsMap);
-      } catch (err) {
-        console.error("[SiswaKelasDetailView] Gagal memuat modul/submissions:", err);
-      } finally {
-        if (active) setLoadingModuls(false);
-      }
-    }
-
-    void loadResources();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // Filter modul untuk kelas ini
+  // Filter modul untuk kelas ini dengan normalisasi teks yang fleksibel
   const classModuls = useMemo(() => {
-    if (!kelasDetail) return [];
-    return moduls.filter((m) => {
+    if (!kelasDetail) return moduls;
+
+    const norm = (s?: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const normNama = norm(kelasDetail.namaKelas);
+    const normTingkat = norm(kelasDetail.tingkat);
+    const normFull = norm(`${kelasDetail.tingkat} ${kelasDetail.namaKelas}`);
+    const normMapel = norm(kelasDetail.mapel);
+
+    const matched = moduls.filter((m) => {
+      // 1. Direct UUID match
       if (m.kelasId && m.kelasId === kelasId) return true;
-      if (m.kelas && kelasDetail.namaKelas && m.kelas.toLowerCase().includes(kelasDetail.namaKelas.toLowerCase())) return true;
-      if (m.mapel && kelasDetail.mapel && m.mapel.toLowerCase() === kelasDetail.mapel.toLowerCase()) return true;
+
+      // 2. Class name matching
+      const mKelas = norm(m.kelas);
+      if (mKelas) {
+        if (normNama && (mKelas.includes(normNama) || normNama.includes(mKelas))) return true;
+        if (normFull && (mKelas.includes(normFull) || normFull.includes(mKelas))) return true;
+        if (normTingkat && mKelas === normTingkat) return true;
+      }
+
+      // 3. Mapel matching
+      const mMapel = norm(m.mapel);
+      if (mMapel && normMapel) {
+        if (mMapel.includes(normMapel) || normMapel.includes(mMapel)) return true;
+      }
+
       return false;
     });
+
+    // Jika ada yang cocok spesifik dengan kelas, utamakan yang cocok
+    if (matched.length > 0) return matched;
+    // Fallback: tampilkan semua modul yang berhak diakses siswa
+    return moduls;
   }, [moduls, kelasDetail, kelasId]);
 
-  // Filter tugas untuk kelas ini
+  // Filter tugas untuk kelas ini dengan normalisasi teks yang fleksibel
   const classAssignments = useMemo(() => {
-    return penugasanList.filter((p) => p.kelasId === kelasId);
-  }, [penugasanList, kelasId]);
+    if (!kelasDetail) return penugasanList;
+
+    const norm = (s?: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const normNama = norm(kelasDetail.namaKelas);
+    const normFull = norm(`${kelasDetail.tingkat} ${kelasDetail.namaKelas}`);
+
+    const matched = penugasanList.filter((p) => {
+      if (p.kelasId && p.kelasId === kelasId) return true;
+      if (p.kelasNama) {
+        const pKelas = norm(p.kelasNama);
+        if (normNama && (pKelas.includes(normNama) || normNama.includes(pKelas))) return true;
+        if (normFull && (pKelas.includes(normFull) || normFull.includes(pKelas))) return true;
+      }
+      return false;
+    });
+
+    if (matched.length > 0) return matched;
+    return penugasanList;
+  }, [penugasanList, kelasId, kelasDetail]);
 
   const gradedAssignments = useMemo(() => {
     return classAssignments.filter((a) => {
@@ -1982,7 +2024,7 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
           <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
           <h2 className="text-lg font-semibold text-navy">Kelas Tidak Ditemukan</h2>
           <p className="text-sm text-muted-foreground">
-            Kelas dengan ID ini tidak ditemukan atau sudah dihapus oleh guru.
+            Kelas dengan ID ini tidak ditemukan atau belum disetujui oleh bapak/ibu guru.
           </p>
           <Button asChild variant="outline">
             <Link to="/kelas">Kembali ke Kelas Diikuti</Link>
@@ -2013,12 +2055,26 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
     <div className="grid gap-6">
       {/* Header Siswa */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
           <Button asChild variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-navy">
             <Link to="/kelas">
               <ArrowLeft className="h-4 w-4" />
               Kembali ke Kelas Diikuti
             </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void loadData();
+              void reloadPenugasan();
+            }}
+            disabled={loadingKelas || loadingModuls}
+            className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", (loadingKelas || loadingModuls) && "animate-spin")} />
+            Segarkan Kelas
           </Button>
         </div>
 
@@ -2119,7 +2175,7 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
             </div>
           ) : classModuls.length === 0 ? (
             <Card className="py-10 text-center">
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 <BookOpen className="mx-auto h-8 w-8 text-muted-foreground/30" />
                 <h3 className="font-display text-base font-semibold text-navy">
                   Belum Ada Modul Ajar
@@ -2127,6 +2183,14 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                   Guru pengampu belum membagikan modul untuk kelas ini. Materi baru akan otomatis tampil di sini saat dirilis.
                 </p>
+                <div className="pt-2">
+                  <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
+                    <Link to="/modul-ajar">
+                      <BookOpen className="h-3.5 w-3.5 text-primary" />
+                      Jelajahi Semua Modul Sekolah
+                    </Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ) : (
@@ -2173,7 +2237,7 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
             </div>
           ) : classAssignments.length === 0 ? (
             <Card className="py-10 text-center">
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600/40" />
                 <h3 className="font-display text-base font-semibold text-navy">
                   Tidak Ada Tugas Aktif
@@ -2181,6 +2245,14 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                   Semua latihan telah selesai dikerjakan atau guru belum memberikan penugasan baru untuk kelas ini.
                 </p>
+                <div className="pt-2">
+                  <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
+                    <Link to="/penugasan">
+                      <FileQuestion className="h-3.5 w-3.5 text-primary" />
+                      Lihat Seluruh Menu Penugasan
+                    </Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ) : (
@@ -2190,6 +2262,7 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
                 const isSubmitted = sub && sub.status === "submitted";
                 const score = sub?.nilaiAkhir ?? sub?.nilaiPg ?? null;
                 const isTuntas = score !== null && score >= item.kkm;
+                const needsRemedial = isSubmitted && score !== null && score < item.kkm && item.remedialEnabled;
 
                 return (
                   <Card key={item.id} className="transition-all hover:border-primary/40">
@@ -2203,6 +2276,11 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
                           ) : (
                             <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300 gap-1 text-[11px]">
                               <Clock className="h-3 w-3" /> Belum Dikerjakan
+                            </Badge>
+                          )}
+                          {needsRemedial && (
+                            <Badge className="bg-purple-100 text-purple-800 border-purple-300 gap-1 text-[11px]">
+                              <Sparkles className="h-3 w-3" /> Tersedia Remedial
                             </Badge>
                           )}
                           <span className="text-xs text-muted-foreground">
@@ -2243,6 +2321,14 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
                                 Lihat Nilai
                               </Link>
                             </Button>
+                            {needsRemedial && (
+                              <Button asChild size="sm" className="text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 text-white">
+                                <Link to="/penugasan" search={{ penugasanId: item.id }}>
+                                  <Sparkles className="h-3.5 w-3.5" />
+                                  Remedial
+                                </Link>
+                              </Button>
+                            )}
                           </div>
                         ) : (
                           <Button asChild size="sm" className="text-xs gap-1.5 font-medium shadow-xs">
@@ -2286,6 +2372,7 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
                         <TableHead>KKM</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Nilai Akhir</TableHead>
+                        <TableHead className="text-right">Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2318,6 +2405,14 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
                               ) : (
                                 "—"
                               )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button asChild size="sm" variant="ghost" className="h-7 text-xs gap-1 text-primary">
+                                <Link to="/penugasan" search={{ penugasanId: a.id }}>
+                                  <Eye className="h-3 w-3" />
+                                  Detail
+                                </Link>
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );

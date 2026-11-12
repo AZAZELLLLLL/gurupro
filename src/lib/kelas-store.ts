@@ -566,16 +566,18 @@ export async function getKelasBySiswa(siswaId: string): Promise<
       .select("*")
       .in("id", kelasIds);
 
-    if (kErr || !kelasRows) return [];
+    if (kErr) {
+      console.warn("[getKelasBySiswa] Catatan saat mengambil detail kelas:", kErr.message);
+    }
 
-    const kelasMap = new Map(kelasRows.map((k) => [k.id, k]));
+    const kelasMap = new Map((kelasRows || []).map((k) => [k.id, k]));
 
     return anggotaRows.map((a) => {
       const k = kelasMap.get(a.kelas_id);
       return {
         anggotaId: a.id,
         kelasId: a.kelas_id,
-        namaKelas: k?.nama_kelas || "Kelas",
+        namaKelas: k?.nama_kelas || "Kelas Pembelajaran",
         tingkat: k?.tingkat || "-",
         mapel: k?.mapel || "-",
         tahunAjaran: k?.tahun_ajaran || "-",

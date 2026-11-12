@@ -223,16 +223,25 @@ export async function getPublishedModulsForSiswa(): Promise<Modul[]> {
     const { data, error } = await supabase
       .from("moduls")
       .select("*")
-      .eq("status", "Terbit")
-      .eq("is_archived", false)
+      .in("status", ["Terbit", "terbit", "published", "Published"])
       .order("updated_at", { ascending: false });
 
     if (error) {
-      console.warn("[ModulStore] Gagal memuat modul siswa:", error.message);
-      return [];
+      console.warn("[ModulStore] Mencoba fallback memuat modul siswa:", error.message);
+      const { data: fallbackData, error: fbErr } = await supabase
+        .from("moduls")
+        .select("*")
+        .order("updated_at", { ascending: false });
+
+      if (fbErr || !fallbackData) return [];
+      return (fallbackData as unknown as Row[])
+        .filter((r) => !r.is_archived)
+        .map(toModul);
     }
 
-    return (data as unknown as Row[]).map(toModul);
+    return (data as unknown as Row[])
+      .filter((r) => !r.is_archived)
+      .map(toModul);
   } catch (err) {
     console.error("[ModulStore] Error getPublishedModulsForSiswa:", err);
     return [];
