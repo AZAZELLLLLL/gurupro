@@ -4,16 +4,18 @@ import {
   ArrowRight,
   BookOpen,
   Check,
+  CheckCircle2,
   Clock,
   Copy,
   GraduationCap,
   Link2,
+  Loader2,
   Plus,
   School,
   Sparkles,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
@@ -47,7 +49,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-store";
-import { buatKelas, useKelas, type Kelas } from "@/lib/kelas-store";
+import {
+  ajukanGabung,
+  buatKelas,
+  getKelasBySiswa,
+  useKelas,
+  type Kelas,
+} from "@/lib/kelas-store";
 
 export const Route = createFileRoute("/kelas/")({
   head: () => ({
@@ -97,6 +105,10 @@ function KelasListPage() {
   // Status copy feedback per kelas id
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
+
+  if (ready && profile.role === "siswa") {
+    return <SiswaKelasListView />;
+  }
 
   if (ready && profile.role !== "guru") {
     return (
@@ -441,6 +453,291 @@ function KelasListPage() {
               </Card>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// TAMPILAN KHUSUS SISWA: KELAS DIIKUTI & GABUNG KELAS
+// ============================================================================
+function SiswaKelasListView() {
+  const { profile, user } = useAuth();
+  const currentUserId = user?.id || profile.id;
+  const [kelasList, setKelasList] = useState<
+    Array<{
+      anggotaId: string;
+      kelasId: string;
+      namaKelas: string;
+      tingkat: string;
+      mapel: string;
+      tahunAjaran: string;
+      status: "menunggu" | "aktif" | "ditolak";
+      diajukan: string;
+    }>
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [openModal, setOpenModal] = useState(false);
+  const [kodeKelasInput, setKodeKelasInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const loadClasses = useCallback(async () => {
+    if (!currentUserId) return;
+    setLoading(true);
+    try {
+      const data = await getKelasBySiswa(currentUserId);
+      setKelasList(data);
+    } catch (err) {
+      console.error("[SiswaKelasListView] Gagal memuat kelas:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    void loadClasses();
+  }, [loadClasses]);
+
+  const handleGabungSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanKode = kodeKelasInput.trim().toUpperCase();
+    if (!cleanKode) {
+      setErrorMessage("Silakan masukkan kode kelas dari gurumu.");
+      return;
+    }
+    setSubmitting(true);
+    setErrorMessage("");
+    try {
+      const res = await ajukanGabung({
+        kodeKelas: cleanKode,
+        siswaId: currentUserId,
+        siswaEmail: profile.email || "",
+        siswaNama: profile.nama || "",
+        siswaNisn: profile.nisn || "",
+        jenis: "tambah-kelas",
+      });
+
+      if (!res.ok) {
+        setErrorMessage(res.message);
+        toast.error(res.message);
+        return;
+      }
+
+      toast.success(
+        `Permintaan bergabung ke kelas ${res.kelas.tingkat} ${res.kelas.namaKelas} berhasil diajukan! Menunggu verifikasi guru.`,
+      );
+      setOpenModal(false);
+      setKodeKelasInput("");
+      await loadClasses();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Gagal mengajukan permintaan gabung kelas.";
+      setErrorMessage(msg);
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const activeClasses = useMemo(() => kelasList.filter((k) => k.status === "aktif"), [kelasList]);
+  const pendingClasses = useMemo(() => kelasList.filter((k) => k.status === "menunggu"), [kelasList]);
+
+  return (
+    <div className="grid gap-6">
+      <PageHeader
+        title="Kelas Diikuti"
+        subtitle="Daftar kelas pembelajaran yang kamu ikuti. Pilih kelas untuk melihat materi modul ajar, tugas latihan, dan hasil nilai."
+        actions={
+          <Dialog open={openModal} onOpenChange={setOpenModal}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 shadow-sm font-medium">
+                <Plus className="h-4 w-4" />
+                Gabung Kelas Baru
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <form onSubmit={handleGabungSubmit}>
+                <DialogHeader>
+                  <DialogTitle className="font-display text-navy">Gabung ke Kelas</DialogTitle>
+                  <DialogDescription>
+                    Masukkan kode kelas unik (misal: <code>XI-PPLG-8F3K</code>) yang kamu peroleh dari bapak/ibu guru.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="kodeKelas">Kode Kelas</Label>
+                    <Input
+                      id="kodeKelas"
+                      placeholder="Contoh: XI-PPLG-8F3K"
+                      value={kodeKelasInput}
+                      onChange={(e) => {
+                        setKodeKelasInput(e.target.value.toUpperCase());
+                        setErrorMessage("");
+                      }}
+                      className="font-mono uppercase tracking-wider"
+                      autoFocus
+                    />
+                    {errorMessage ? (
+                      <p className="text-xs text-destructive">{errorMessage}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Kode kelas tidak peka huruf besar/kecil.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setOpenModal(false)}
+                    disabled={submitting}
+                  >
+                    Batal
+                  </Button>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {submitting ? "Memproses…" : "Gabung Kelas"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
+      />
+
+      {loading ? (
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+          <p className="mt-3">Memuat kelas yang kamu ikuti…</p>
+        </div>
+      ) : kelasList.length === 0 ? (
+        <Card className="py-12 text-center">
+          <CardContent className="space-y-4">
+            <School className="mx-auto h-12 w-12 text-muted-foreground/30" />
+            <div className="space-y-1">
+              <h3 className="font-display text-lg font-semibold text-navy">
+                Kamu belum mengikuti kelas apa pun
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Minta kode kelas kepada guru pengampumu, lalu klik tombol di bawah untuk bergabung ke kelas pembelajaran.
+              </p>
+            </div>
+            <Button onClick={() => setOpenModal(true)} className="gap-2 font-medium">
+              <Plus className="h-4 w-4" />
+              Gabung Kelas dengan Kode
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-8">
+          {/* Kelas Aktif */}
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-lg font-bold text-navy">Kelas Aktif</h2>
+                <p className="text-xs text-muted-foreground">
+                  Kelas yang telah disetujui oleh guru pengampu dan materi dapat diakses.
+                </p>
+              </div>
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 font-semibold">
+                {activeClasses.length} Kelas Aktif
+              </Badge>
+            </div>
+
+            {activeClasses.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                Belum ada kelas aktif yang disetujui. Silakan tunggu verifikasi guru pengampu di bawah.
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {activeClasses.map((k) => (
+                  <Card key={k.kelasId} className="flex flex-col justify-between transition-all hover:shadow-md hover:border-primary/40">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1 text-[11px]">
+                          <CheckCircle2 className="h-3 w-3" /> Aktif
+                        </Badge>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          {k.tahunAjaran}
+                        </span>
+                      </div>
+                      <CardTitle className="font-display text-lg text-navy pt-2">
+                        {k.tingkat} {k.namaKelas}
+                      </CardTitle>
+                      <CardDescription className="font-medium text-foreground text-sm">
+                        {k.mapel}
+                      </CardDescription>
+                    </CardHeader>
+
+                    <CardContent className="pt-0 text-xs text-muted-foreground space-y-2">
+                      <div className="rounded-lg bg-muted/50 p-2.5 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <BookOpen className="h-3.5 w-3.5 text-primary" /> Modul & Materi
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <GraduationCap className="h-3.5 w-3.5 text-emerald-600" /> Tugas & Nilai
+                        </span>
+                      </div>
+                    </CardContent>
+
+                    <CardFooter className="pt-0">
+                      <Button asChild className="w-full gap-2 font-medium">
+                        <Link to="/kelas/$kelasId" params={{ kelasId: k.kelasId }}>
+                          Buka Kelas
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Menunggu Verifikasi */}
+          {pendingClasses.length > 0 && (
+            <div>
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h2 className="font-display text-lg font-bold text-navy">Menunggu Persetujuan Guru</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Permintaan gabung yang sedang menunggu verifikasi oleh bapak/ibu guru.
+                  </p>
+                </div>
+                <Badge variant="secondary" className="bg-amber-100 text-amber-800 font-semibold">
+                  {pendingClasses.length} Menunggu
+                </Badge>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {pendingClasses.map((k) => (
+                  <Card key={k.kelasId} className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300 gap-1 text-[11px]">
+                          <Clock className="h-3 w-3" /> Menunggu Verifikasi
+                        </Badge>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          {k.tahunAjaran}
+                        </span>
+                      </div>
+                      <CardTitle className="font-display text-lg text-navy pt-2">
+                        {k.tingkat} {k.namaKelas}
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        {k.mapel}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-xs text-amber-800 dark:text-amber-300">
+                      Permintaan bergabung telah diajukan. Hubungi guru pengampu untuk menyetujui akunmu.
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

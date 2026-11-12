@@ -3,11 +3,14 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  Award,
   BookOpen,
+  Calendar,
   Check,
   CheckCircle2,
   Clock,
   Copy,
+  Eye,
   FileQuestion,
   FileSpreadsheet,
   FileText,
@@ -63,21 +66,23 @@ import { cn } from "@/lib/utils";
 import { initials, useAuth } from "@/lib/auth-store";
 import {
   getKelasById,
+  getKelasBySiswa,
   setujuiAnggota,
   tolakAnggota,
   useKelas,
   type AnggotaKelas,
   type Kelas,
 } from "@/lib/kelas-store";
-import { useModuls, saveModul, addModul, reloadModuls } from "@/lib/modul-store";
+import { useModuls, saveModul, addModul, reloadModuls, getPublishedModulsForSiswa } from "@/lib/modul-store";
 import type { Modul } from "@/lib/modul-types";
 import {
   usePenugasanGuru,
+  usePenugasanSiswa,
   createPenugasan,
   deletePenugasan,
   type Penugasan,
 } from "@/lib/penugasan-store";
-import { getTeacherSubmissionsSummary } from "@/lib/pengumpulan-store";
+import { getTeacherSubmissionsSummary, getMySubmissionsMap, type PenugasanPengumpulan } from "@/lib/pengumpulan-store";
 import { usePaketSoal, terbitkanSebagaiTugas, reloadPaketSoal } from "@/lib/soal-store";
 import type { PaketSoal } from "@/lib/soal-types";
 import {
@@ -191,6 +196,11 @@ function DetailKelasMonitoringPage() {
       active = false;
     };
   }, [kelasId, kelasList]);
+
+  // Role guard: Tampilan khusus siswa
+  if (ready && profile.role === "siswa") {
+    return <SiswaKelasDetailView kelasId={kelasId} />;
+  }
 
   // Role guard: Akses khusus guru
   if (ready && profile.role !== "guru") {
@@ -1841,6 +1851,546 @@ function DetailKelasMonitoringPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ============================================================================
+// TAMPILAN KHUSUS SISWA: DETAIL KELAS, MODUL & PENUGASAN
+// ============================================================================
+function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
+  const { profile, user } = useAuth();
+  const currentUserId = user?.id || profile.id;
+  const { penugasanList, loading: loadingPenugasan } = usePenugasanSiswa();
+
+  const [kelasDetail, setKelasDetail] = useState<Kelas | null>(null);
+  const [membershipStatus, setMembershipStatus] = useState<"aktif" | "menunggu" | "ditolak" | "none">("aktif");
+  const [loadingKelas, setLoadingKelas] = useState(true);
+
+  const [moduls, setModuls] = useState<Modul[]>([]);
+  const [loadingModuls, setLoadingModuls] = useState(true);
+  const [activeModul, setActiveModul] = useState<Modul | null>(null);
+
+  const [submissionsMap, setSubmissionsMap] = useState<Record<string, PenugasanPengumpulan>>({});
+
+  // 1. Ambil data kelas & keanggotaan siswa
+  useEffect(() => {
+    let active = true;
+    async function init() {
+      setLoadingKelas(true);
+      try {
+        const [kelasData, myClasses] = await Promise.all([
+          getKelasById(kelasId),
+          getKelasBySiswa(currentUserId),
+        ]);
+
+        if (!active) return;
+        setKelasDetail(kelasData);
+
+        const found = myClasses.find((c) => c.kelasId === kelasId);
+        if (found) {
+          setMembershipStatus(found.status);
+        } else {
+          setMembershipStatus("none");
+        }
+      } catch (err) {
+        console.error("[SiswaKelasDetailView] Gagal inisialisasi:", err);
+      } finally {
+        if (active) setLoadingKelas(false);
+      }
+    }
+
+    void init();
+    return () => {
+      active = false;
+    };
+  }, [kelasId, currentUserId]);
+
+  // 2. Ambil modul yang diterbitkan & submission siswa
+  useEffect(() => {
+    let active = true;
+    async function loadResources() {
+      setLoadingModuls(true);
+      try {
+        const [modulData, subsMap] = await Promise.all([
+          getPublishedModulsForSiswa(),
+          getMySubmissionsMap(),
+        ]);
+
+        if (!active) return;
+        setModuls(modulData);
+        setSubmissionsMap(subsMap);
+      } catch (err) {
+        console.error("[SiswaKelasDetailView] Gagal memuat modul/submissions:", err);
+      } finally {
+        if (active) setLoadingModuls(false);
+      }
+    }
+
+    void loadResources();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Filter modul untuk kelas ini
+  const classModuls = useMemo(() => {
+    if (!kelasDetail) return [];
+    return moduls.filter((m) => {
+      if (m.kelasId && m.kelasId === kelasId) return true;
+      if (m.kelas && kelasDetail.namaKelas && m.kelas.toLowerCase().includes(kelasDetail.namaKelas.toLowerCase())) return true;
+      if (m.mapel && kelasDetail.mapel && m.mapel.toLowerCase() === kelasDetail.mapel.toLowerCase()) return true;
+      return false;
+    });
+  }, [moduls, kelasDetail, kelasId]);
+
+  // Filter tugas untuk kelas ini
+  const classAssignments = useMemo(() => {
+    return penugasanList.filter((p) => p.kelasId === kelasId);
+  }, [penugasanList, kelasId]);
+
+  const gradedAssignments = useMemo(() => {
+    return classAssignments.filter((a) => {
+      const sub = submissionsMap[a.id];
+      return sub && sub.status === "submitted" && (sub.nilaiAkhir !== null || sub.nilaiPg !== null);
+    });
+  }, [classAssignments, submissionsMap]);
+
+  const averageScore = useMemo(() => {
+    if (gradedAssignments.length === 0) return null;
+    const sum = gradedAssignments.reduce((acc, a) => {
+      const sub = submissionsMap[a.id];
+      const val = sub?.nilaiAkhir ?? sub?.nilaiPg ?? 0;
+      return acc + Number(val);
+    }, 0);
+    return Math.round((sum / gradedAssignments.length) * 10) / 10;
+  }, [gradedAssignments, submissionsMap]);
+
+  if (loadingKelas) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-muted-foreground">Memuat data kelas pembelajaran…</p>
+      </div>
+    );
+  }
+
+  if (!kelasDetail) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md space-y-4 rounded-xl border p-6 bg-card">
+          <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
+          <h2 className="text-lg font-semibold text-navy">Kelas Tidak Ditemukan</h2>
+          <p className="text-sm text-muted-foreground">
+            Kelas dengan ID ini tidak ditemukan atau sudah dihapus oleh guru.
+          </p>
+          <Button asChild variant="outline">
+            <Link to="/kelas">Kembali ke Kelas Diikuti</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (membershipStatus === "menunggu") {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md space-y-4 rounded-xl border border-amber-300 bg-amber-50/50 dark:bg-amber-950/20 p-6">
+          <Clock className="mx-auto h-8 w-8 text-amber-600" />
+          <h2 className="text-lg font-semibold text-navy">Menunggu Persetujuan Guru</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Permintaan bergabung ke kelas <span className="font-semibold text-navy">{kelasDetail.tingkat} {kelasDetail.namaKelas}</span> sedang menunggu verifikasi oleh guru pengampu.
+          </p>
+          <Button asChild variant="outline">
+            <Link to="/kelas">Kembali ke Kelas Diikuti</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-6">
+      {/* Header Siswa */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-navy">
+            <Link to="/kelas">
+              <ArrowLeft className="h-4 w-4" />
+              Kembali ke Kelas Diikuti
+            </Link>
+          </Button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1 text-[11px]">
+                <CheckCircle2 className="h-3 w-3" /> Anggota Aktif
+              </Badge>
+              <span className="text-xs text-muted-foreground font-mono">
+                Tahun Ajaran {kelasDetail.tahunAjaran}
+              </span>
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-navy mt-1">
+              {kelasDetail.tingkat} {kelasDetail.namaKelas}
+            </h1>
+            <p className="text-sm text-muted-foreground font-medium mt-0.5">
+              Mata Pelajaran: <span className="text-foreground">{kelasDetail.mapel}</span>
+            </p>
+          </div>
+
+          <Button asChild variant="outline" size="sm" className="gap-2 text-xs self-start sm:self-center">
+            <Link to="/penilaian">
+              <GraduationCap className="h-4 w-4 text-primary" />
+              Rekap Seluruh Nilai
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* 3 Kartu Ringkasan Siswa */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card className="transition-shadow hover:shadow-xs">
+          <CardContent className="flex items-center gap-3 p-5">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+              <BookOpen className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-display text-2xl font-bold text-navy">{classModuls.length}</p>
+              <p className="text-sm font-medium">Modul Pembelajaran</p>
+              <p className="text-xs text-muted-foreground">Siap dipelajari</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="transition-shadow hover:shadow-xs">
+          <CardContent className="flex items-center gap-3 p-5">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+              <FileQuestion className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-display text-2xl font-bold text-navy">{classAssignments.length}</p>
+              <p className="text-sm font-medium">Tugas & Latihan</p>
+              <p className="text-xs text-muted-foreground">{gradedAssignments.length} telah selesai</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="transition-shadow hover:shadow-xs">
+          <CardContent className="flex items-center gap-3 p-5">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+              <Award className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-display text-2xl font-bold text-navy">
+                {averageScore !== null ? averageScore : "—"}
+              </p>
+              <p className="text-sm font-medium">Rata-Rata Nilai</p>
+              <p className="text-xs text-muted-foreground">Penilaian otomatis AI</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabs Konten: Modul Pembelajaran, Tugas Kelas, Rekap Nilai */}
+      <Tabs defaultValue="modul" className="space-y-4">
+        <TabsList className="bg-muted/60 p-1">
+          <TabsTrigger value="modul" className="gap-2 text-xs font-medium">
+            <BookOpen className="h-3.5 w-3.5" />
+            Modul Pembelajaran ({classModuls.length})
+          </TabsTrigger>
+          <TabsTrigger value="tugas" className="gap-2 text-xs font-medium">
+            <FileQuestion className="h-3.5 w-3.5" />
+            Tugas & Soal ({classAssignments.length})
+          </TabsTrigger>
+          <TabsTrigger value="nilai" className="gap-2 text-xs font-medium">
+            <Award className="h-3.5 w-3.5" />
+            Capaian Nilai
+          </TabsTrigger>
+        </TabsList>
+
+        {/* TAB 1: MODUL PEMBELAJARAN */}
+        <TabsContent value="modul" className="space-y-4">
+          {loadingModuls ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
+              <p className="mt-2">Memuat modul materi kelas…</p>
+            </div>
+          ) : classModuls.length === 0 ? (
+            <Card className="py-10 text-center">
+              <CardContent className="space-y-2">
+                <BookOpen className="mx-auto h-8 w-8 text-muted-foreground/30" />
+                <h3 className="font-display text-base font-semibold text-navy">
+                  Belum Ada Modul Ajar
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  Guru pengampu belum membagikan modul untuk kelas ini. Materi baru akan otomatis tampil di sini saat dirilis.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {classModuls.map((m) => (
+                <Card key={m.id} className="flex flex-col justify-between transition-all hover:shadow-xs hover:border-primary/40">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span className="font-semibold text-primary">{m.mapel}</span>
+                      <span>{m.sections?.length || 0} Bagian</span>
+                    </div>
+                    <CardTitle className="font-display text-base text-navy line-clamp-2 pt-1">
+                      {m.judul}
+                    </CardTitle>
+                    {m.ringkasan && (
+                      <CardDescription className="text-xs line-clamp-3 pt-1">
+                        {m.ringkasan}
+                      </CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardFooter className="pt-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full gap-2 text-xs font-medium"
+                      onClick={() => setActiveModul(m)}
+                    >
+                      <Eye className="h-3.5 w-3.5 text-primary" />
+                      Baca Modul
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* TAB 2: TUGAS & SOAL */}
+        <TabsContent value="tugas" className="space-y-4">
+          {loadingPenugasan ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
+              <p className="mt-2">Memuat tugas kelas…</p>
+            </div>
+          ) : classAssignments.length === 0 ? (
+            <Card className="py-10 text-center">
+              <CardContent className="space-y-2">
+                <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600/40" />
+                <h3 className="font-display text-base font-semibold text-navy">
+                  Tidak Ada Tugas Aktif
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  Semua latihan telah selesai dikerjakan atau guru belum memberikan penugasan baru untuk kelas ini.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {classAssignments.map((item) => {
+                const sub = submissionsMap[item.id];
+                const isSubmitted = sub && sub.status === "submitted";
+                const score = sub?.nilaiAkhir ?? sub?.nilaiPg ?? null;
+                const isTuntas = score !== null && score >= item.kkm;
+
+                return (
+                  <Card key={item.id} className="transition-all hover:border-primary/40">
+                    <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isSubmitted ? (
+                            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1 text-[11px]">
+                              <CheckCircle2 className="h-3 w-3" /> Terkumpul &bull; Dinilai AI
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300 gap-1 text-[11px]">
+                              <Clock className="h-3 w-3" /> Belum Dikerjakan
+                            </Badge>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            KKM: <strong className="text-foreground">{item.kkm}</strong>
+                          </span>
+                          {item.deadline && (
+                            <span className="text-xs text-muted-foreground">
+                              &bull; Batas: {new Date(item.deadline).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="font-display text-base font-semibold text-navy truncate">
+                          {item.judul}
+                        </h3>
+
+                        {item.instruksi && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {item.instruksi}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0 pt-2 sm:pt-0">
+                        {isSubmitted ? (
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="font-mono text-lg font-bold text-navy">
+                                {score !== null ? score : "—"}
+                              </p>
+                              <p className={`text-[11px] font-semibold ${isTuntas ? "text-emerald-700" : "text-amber-700"}`}>
+                                {isTuntas ? "Tuntas" : "Perlu Remedial"}
+                              </p>
+                            </div>
+                            <Button asChild size="sm" variant="outline" className="text-xs gap-1.5">
+                              <Link to="/penugasan" search={{ penugasanId: item.id }}>
+                                <Award className="h-3.5 w-3.5 text-emerald-600" />
+                                Lihat Nilai
+                              </Link>
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button asChild size="sm" className="text-xs gap-1.5 font-medium shadow-xs">
+                            <Link to="/penugasan" search={{ penugasanId: item.id }}>
+                              Kerjakan Soal
+                              <ArrowRight className="h-3.5 w-3.5" />
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* TAB 3: CAPAIAN NILAI */}
+        <TabsContent value="nilai" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="font-display text-base text-navy">
+                Rekapitulasi Nilai Kelas
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Nilai capaian dari seluruh tugas yang telah kamu kumpulkan pada kelas ini.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-0 pb-2 sm:px-6 sm:pb-6">
+              {classAssignments.length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">
+                  Belum ada penugasan di kelas ini.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tugas</TableHead>
+                        <TableHead>KKM</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Nilai Akhir</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {classAssignments.map((a) => {
+                        const sub = submissionsMap[a.id];
+                        const isSubmitted = sub && sub.status === "submitted";
+                        const score = sub?.nilaiAkhir ?? sub?.nilaiPg ?? null;
+                        const isTuntas = score !== null && score >= a.kkm;
+
+                        return (
+                          <TableRow key={a.id}>
+                            <TableCell className="font-medium text-navy">{a.judul}</TableCell>
+                            <TableCell>{a.kkm}</TableCell>
+                            <TableCell>
+                              {isSubmitted ? (
+                                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[11px]">
+                                  Terkumpul
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-[11px]">
+                                  Belum Selesai
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-bold text-navy">
+                              {score !== null ? (
+                                <span className={isTuntas ? "text-emerald-700" : "text-amber-700"}>
+                                  {score} {isTuntas ? "✓" : ""}
+                                </span>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Reader Dialog untuk Modul Ajar yang dipilih */}
+      {activeModul && (
+        <Dialog open={Boolean(activeModul)} onOpenChange={(open) => !open && setActiveModul(null)}>
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-semibold text-primary">{activeModul.mapel}</span>
+                <span>&bull;</span>
+                <span>{activeModul.kelas}</span>
+              </div>
+              <DialogTitle className="font-display text-xl sm:text-2xl text-navy">
+                {activeModul.judul}
+              </DialogTitle>
+              {activeModul.ringkasan && (
+                <div className="rounded-lg bg-primary-soft/30 border border-primary/20 p-3 text-xs leading-relaxed text-foreground mt-2">
+                  <p className="font-semibold text-primary mb-0.5">Ringkasan Materi:</p>
+                  {activeModul.ringkasan}
+                </div>
+              )}
+            </DialogHeader>
+
+            <div className="space-y-5 py-4">
+              {activeModul.sections.map((sec, idx) => (
+                <div key={sec.id || idx} className="rounded-xl border p-4 sm:p-5 space-y-3 bg-card">
+                  <h4 className="font-display text-base font-semibold text-navy">
+                    {idx + 1}. {sec.judul}
+                  </h4>
+                  {sec.poin && sec.poin.length > 0 && (
+                    <ul className="list-disc pl-5 text-xs sm:text-sm space-y-1 text-muted-foreground">
+                      {sec.poin.map((p, pIdx) => (
+                        <li key={pIdx}>{p}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {sec.isi && (
+                    <div className="prose prose-sm max-w-none text-foreground leading-relaxed whitespace-pre-wrap text-xs sm:text-sm">
+                      {sec.isi}
+                    </div>
+                  )}
+                  {sec.ilustrasi && (
+                    <div className="rounded-lg overflow-hidden border">
+                      <img
+                        src={sec.ilustrasi}
+                        alt={sec.judul}
+                        className="max-h-72 w-full object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setActiveModul(null)}>
+                Tutup Modul
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

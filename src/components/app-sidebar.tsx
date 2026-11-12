@@ -70,18 +70,13 @@ export function AppSidebar() {
   const visibleMainItems = isTeacher
     ? mainItems
     : isStudent
-      ? mainItems
-          .filter(
-            (item) =>
-              item.url === "/dashboard" ||
-              item.url === "/" ||
-              item.url === "/modul-ajar" ||
-              item.url === "/penugasan" ||
-              item.url === "/penilaian",
-          )
-          .map((item) =>
-            item.url === "/penilaian" ? { ...item, title: "Nilai" } : item,
-          )
+      ? [
+          { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+          { title: "Kelas Diikuti", url: "/kelas", icon: School },
+          { title: "Modul Ajar", url: "/modul-ajar", icon: BookOpen },
+          { title: "Penugasan", url: "/penugasan", icon: ClipboardList },
+          { title: "Nilai", url: "/penilaian", icon: GraduationCap },
+        ]
       : mainItems.filter((item) => item.url === "/dashboard" || item.url === "/");
 
   const visibleSecondaryItems = isTeacher

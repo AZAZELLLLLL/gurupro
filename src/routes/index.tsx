@@ -495,22 +495,24 @@ function StudentDashboard() {
       {/* Stats Cards untuk Siswa (100% Real Supabase Data) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="transition-shadow hover:shadow-lift">
-          <CardContent className="flex items-start gap-3 p-5">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
-              <School className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="font-display text-2xl font-bold leading-tight text-navy">
-                {activeClasses.length}
-              </p>
-              <p className="text-sm font-medium">Kelas Diikuti</p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {pendingClasses.length > 0
-                  ? `${pendingClasses.length} menunggu persetujuan`
-                  : "Status aktif"}
-              </p>
-            </div>
-          </CardContent>
+          <Link to="/kelas" className="block">
+            <CardContent className="flex items-start gap-3 p-5">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+                <School className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="font-display text-2xl font-bold leading-tight text-navy">
+                  {activeClasses.length}
+                </p>
+                <p className="text-sm font-medium">Kelas Diikuti</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {pendingClasses.length > 0
+                    ? `${pendingClasses.length} menunggu persetujuan`
+                    : "Status aktif"}
+                </p>
+              </div>
+            </CardContent>
+          </Link>
         </Card>
 
         <Card className="transition-shadow hover:shadow-lift">
@@ -787,7 +789,8 @@ function StudentDashboard() {
                     <TableHead>Tingkat</TableHead>
                     <TableHead>Mata Pelajaran</TableHead>
                     <TableHead>Tahun Ajaran</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -797,7 +800,7 @@ function StudentDashboard() {
                       <TableCell>{k.tingkat}</TableCell>
                       <TableCell>{k.mapel}</TableCell>
                       <TableCell>{k.tahunAjaran}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell>
                         {k.status === "aktif" ? (
                           <Badge className="bg-emerald-600 hover:bg-emerald-700">Aktif</Badge>
                         ) : k.status === "menunggu" ? (
@@ -806,6 +809,18 @@ function StudentDashboard() {
                           </Badge>
                         ) : (
                           <Badge variant="destructive">Ditolak</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {k.status === "aktif" ? (
+                          <Button asChild size="sm" variant="outline" className="h-8 text-xs font-medium gap-1">
+                            <Link to="/kelas/$kelasId" params={{ kelasId: k.kelasId }}>
+                              Buka Kelas
+                              <ArrowRight className="h-3.5 w-3.5" />
+                            </Link>
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Menunggu verifikasi</span>
                         )}
                       </TableCell>
                     </TableRow>
