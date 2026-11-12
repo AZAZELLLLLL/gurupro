@@ -898,21 +898,45 @@ function SoalPage() {
                 {saveState === "saving" ? "Menyimpan Draf..." : "Simpan Draf"}
               </Button>
 
-              {paketId ? (
-                <Button asChild size="sm" variant="default" className="gap-1.5 text-xs bg-navy text-white hover:bg-navy/90">
-                  <Link
-                    to="/penugasan"
-                    search={{
-                      paketSoalId: paketId,
-                      judul: `Tugas: ${judul || "Paket Soal"}`,
-                      action: "create",
+              {paketId ? (() => {
+                const curP = pakets.find((p) => p.id === paketId);
+                const isCurDraft = !curP || curP.status === "Draft";
+
+                return isCurDraft ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="gap-1.5 text-xs font-semibold"
+                    onClick={async () => {
+                      try {
+                        await publishPaket(paketId);
+                        toast.success("Paket soal berhasil diterbitkan ke Bank Soal!");
+                        await reloadPaketSoal();
+                      } catch (err: any) {
+                        toast.error(err?.message || "Gagal menerbitkan paket soal.");
+                      }
+                    }}
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Terbitkan ke Bank Soal
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="gap-1.5 text-xs bg-navy text-white hover:bg-navy/90 font-semibold shadow-xs"
+                    onClick={() => {
+                      if (curP) {
+                        setTerbitTarget(curP);
+                        setKelasPilihan(curP.kelas || []);
+                      }
                     }}
                   >
                     <ClipboardList className="h-3.5 w-3.5" />
                     Tugaskan ke Kelas
-                  </Link>
-                </Button>
-              ) : null}
+                  </Button>
+                );
+              })() : null}
             </div>
           }
         />
@@ -1563,76 +1587,165 @@ function SoalPage() {
           }
         }}
       >
-        <DialogContent className="max-h-[90dvh] w-[calc(100vw-2rem)] sm:max-w-lg overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+        <DialogContent className="max-h-[92dvh] w-[calc(100vw-2rem)] sm:max-w-lg overflow-y-auto overflow-x-hidden p-4 sm:p-6 rounded-2xl">
           <DialogHeader className="min-w-0">
+            <div className="flex items-center gap-2 text-primary mb-1">
+              <Send className="h-4 w-4" />
+              <span className="text-[11px] font-bold uppercase tracking-wider">Kirim Tugas</span>
+            </div>
             <DialogTitle className="font-display text-navy break-words text-lg font-bold">
-              Terbitkan sebagai Tugas Kelas
+              Tugaskan Paket Soal ke Kelas
             </DialogTitle>
-            <DialogDescription className="break-words text-xs">
-              Kirim paket soal &ldquo;{terbitTarget?.judul}&rdquo; ke kelas tujuan. Tugas yang diterbitkan akan otomatis aktif di kelas siswa dan muncul di menu Penugasan untuk pemantauan.
+            <DialogDescription className="break-words text-xs text-muted-foreground">
+              Paket: <strong>{terbitTarget?.judul}</strong> ({terbitTarget?.soal?.length || 0} butir soal). Setelah dikirim, tugas langsung aktif untuk siswa dan dapat dipantau di menu <strong>Penugasan</strong>.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* 1. Pilih Kelas */}
+            {/* 1. Pilih Kelas Tujuan */}
             <div>
-              <Label className="text-xs font-semibold text-foreground flex items-center justify-between mb-2">
-                <span>Pilih Kelas Tujuan</span>
-                <span className="text-[11px] text-muted-foreground font-normal">
-                  {kelasPilihan.length} kelas dipilih
-                </span>
-              </Label>
-              <div className="grid gap-2 max-h-44 overflow-y-auto p-1 border rounded-lg bg-muted/20">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs font-semibold text-foreground">
+                  Pilih Kelas Tujuan <span className="text-destructive">*</span>
+                </Label>
+                {myKelas.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (kelasPilihan.length === myKelas.length) {
+                        setKelasPilihan([]);
+                      } else {
+                        setKelasPilihan(myKelas.map((k) => `${k.tingkat} ${k.namaKelas}`.trim()));
+                      }
+                    }}
+                    className="text-[11px] text-primary hover:underline font-medium"
+                  >
+                    {kelasPilihan.length === myKelas.length ? "Batal Pilih Semua" : "Pilih Semua Kelas"}
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto p-1">
                 {myKelas.length > 0 ? (
                   myKelas.map((k) => {
-                    const labelKelas = `${k.tingkat} ${k.namaKelas}`;
+                    const labelKelas = `${k.tingkat} ${k.namaKelas}`.trim();
+                    const isSelected = kelasPilihan.includes(labelKelas);
                     return (
                       <label
                         key={k.id}
-                        className="flex items-center gap-3 rounded-lg border p-2.5 text-xs sm:text-sm min-w-0 cursor-pointer bg-card hover:bg-muted/50 transition-colors"
+                        className={`flex items-center gap-2.5 rounded-xl border p-2.5 text-xs cursor-pointer transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/5 text-primary font-semibold shadow-2xs"
+                            : "border-border bg-card hover:bg-muted/40 text-foreground"
+                        }`}
                       >
                         <Checkbox
-                          checked={kelasPilihan.includes(labelKelas)}
+                          checked={isSelected}
                           onCheckedChange={(v) =>
                             setKelasPilihan((prev) =>
                               v ? [...prev, labelKelas] : prev.filter((x) => x !== labelKelas),
                             )
                           }
                         />
-                        <span className="truncate font-medium">{labelKelas}</span>
-                        {k.mapel ? (
-                          <span className="text-xs text-muted-foreground ml-auto">{k.mapel}</span>
-                        ) : null}
+                        <div className="min-w-0 flex-1 truncate">
+                          <p className="truncate text-xs font-semibold">{labelKelas}</p>
+                          {k.mapel ? (
+                            <p className="text-[10px] text-muted-foreground truncate">{k.mapel}</p>
+                          ) : null}
+                        </div>
                       </label>
                     );
                   })
                 ) : (
-                  <p className="text-xs text-muted-foreground p-3">
-                    Anda belum memiliki kelas. Buat kelas di menu Kelas Saya terlebih dahulu.
+                  <p className="text-xs text-muted-foreground p-3 col-span-2 text-center">
+                    Belum ada kelas aktif. Buat kelas di menu <strong>Kelas Saya</strong> terlebih dahulu.
                   </p>
                 )}
               </div>
+              {kelasPilihan.length > 0 && (
+                <p className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {kelasPilihan.length} kelas dipilih
+                </p>
+              )}
             </div>
 
-            {/* 2. Pengaturan Deadline & KKM */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="deadlineInput" className="text-xs font-semibold text-foreground">
-                  Batas Waktu (Deadline)
+            {/* 2. Pengaturan Batas Waktu (Deadline) */}
+            <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="deadlineInput" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-primary" />
+                  Batas Waktu Pengumpulan (Deadline)
                 </Label>
-                <Input
-                  id="deadlineInput"
-                  type="datetime-local"
-                  value={deadlineTugas}
-                  onChange={(e) => setDeadlineTugas(e.target.value)}
-                  className="text-xs h-9"
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Kosongkan jika tidak ada batas waktu.
-                </p>
+                {deadlineTugas && (
+                  <button
+                    type="button"
+                    onClick={() => setDeadlineTugas("")}
+                    className="text-[10px] text-destructive hover:underline"
+                  >
+                    Reset Waktu
+                  </button>
+                )}
               </div>
+              <Input
+                id="deadlineInput"
+                type="datetime-local"
+                value={deadlineTugas}
+                onChange={(e) => setDeadlineTugas(e.target.value)}
+                className="text-xs h-9 bg-card"
+              />
+              {/* Preset buttons */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="text-[10px] text-muted-foreground">Pilihan Cepat:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 1);
+                    d.setHours(23, 59, 0, 0);
+                    setDeadlineTugas(d.toISOString().slice(0, 16));
+                  }}
+                  className="rounded-lg border px-2 py-0.5 text-[10px] bg-card hover:bg-muted font-medium"
+                >
+                  Besok Malam
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 3);
+                    d.setHours(23, 59, 0, 0);
+                    setDeadlineTugas(d.toISOString().slice(0, 16));
+                  }}
+                  className="rounded-lg border px-2 py-0.5 text-[10px] bg-card hover:bg-muted font-medium"
+                >
+                  3 Hari
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 7);
+                    d.setHours(23, 59, 0, 0);
+                    setDeadlineTugas(d.toISOString().slice(0, 16));
+                  }}
+                  className="rounded-lg border px-2 py-0.5 text-[10px] bg-card hover:bg-muted font-medium"
+                >
+                  1 Minggu
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeadlineTugas("")}
+                  className="rounded-lg border px-2 py-0.5 text-[10px] bg-card hover:bg-muted text-muted-foreground"
+                >
+                  Tanpa Batas
+                </button>
+              </div>
+            </div>
 
-              <div className="space-y-1.5">
+            {/* 3. Pengaturan Tambahan (KKM & Instruksi) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
                 <Label htmlFor="kkmInput" className="text-xs font-semibold text-foreground">
                   Nilai KKM (Ketuntasan)
                 </Label>
@@ -1643,28 +1756,25 @@ function SoalPage() {
                   max={100}
                   value={kkmTugas}
                   onChange={(e) => setKkmTugas(Number(e.target.value) || 75)}
-                  className="text-xs h-9"
+                  className="text-xs h-9 bg-card"
                   placeholder="75"
                 />
-                <p className="text-[10px] text-muted-foreground">
-                  Standar nilai minimal kelulusan tugas.
-                </p>
+                <p className="text-[10px] text-muted-foreground">Minimal kelulusan.</p>
               </div>
-            </div>
 
-            {/* 3. Instruksi Pengerjaan */}
-            <div className="space-y-1.5">
-              <Label htmlFor="instruksiInput" className="text-xs font-semibold text-foreground">
-                Instruksi Pengerjaan (Opsional)
-              </Label>
-              <Textarea
-                id="instruksiInput"
-                rows={2}
-                placeholder="Contoh: Kerjakan secara mandiri dan teliti sebelum batas waktu berakhir..."
-                value={instruksiTugas}
-                onChange={(e) => setInstruksiTugas(e.target.value)}
-                className="text-xs resize-none"
-              />
+              <div className="space-y-1">
+                <Label htmlFor="instruksiInput" className="text-xs font-semibold text-foreground">
+                  Catatan Guru (Opsional)
+                </Label>
+                <Input
+                  id="instruksiInput"
+                  placeholder="Pesan untuk siswa..."
+                  value={instruksiTugas}
+                  onChange={(e) => setInstruksiTugas(e.target.value)}
+                  className="text-xs h-9 bg-card"
+                />
+                <p className="text-[10px] text-muted-foreground">Petunjuk pengerjaan.</p>
+              </div>
             </div>
           </div>
 
@@ -1868,13 +1978,16 @@ function PaketActions({
   onHapus: () => void;
   align?: "start" | "end";
 }) {
+  const isDraft = paket.status === "Draft";
+
   return (
-    <div className={`flex flex-wrap gap-2 ${align === "end" ? "justify-end" : ""}`}>
+    <div className={`flex flex-wrap items-center gap-2 ${align === "end" ? "justify-end" : ""}`}>
       <Button size="sm" variant="outline" onClick={onOpen}>
         <Pencil className="h-4 w-4" />
         Tinjau
       </Button>
-      {paket.status === "Draft" ? (
+
+      {isDraft ? (
         <Button
           size="sm"
           variant="secondary"
@@ -1899,25 +2012,36 @@ function PaketActions({
           <Send className="h-4 w-4" />
           Terbitkan
         </Button>
-      ) : (
-        <Button size="sm" variant="secondary" onClick={onTerbitTugas}>
-          <Send className="h-4 w-4" />
-          Terbitkan sebagai Tugas
-        </Button>
-      )}
-      <Button asChild size="sm" variant="default" className="gap-1.5 text-xs bg-navy text-white hover:bg-navy/90">
-        <Link
-          to="/penugasan"
-          search={{
-            paketSoalId: paket.id,
-            judul: `Tugas: ${paket.judul}`,
-            action: "create",
-          }}
-        >
-          <ClipboardList className="h-3.5 w-3.5" />
-          Tugaskan ke Kelas
-        </Link>
+      ) : null}
+
+      <Button
+        size="sm"
+        variant={isDraft ? "secondary" : "default"}
+        className={`gap-1.5 text-xs font-semibold ${
+          isDraft
+            ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted"
+            : "bg-navy text-white hover:bg-navy/90 shadow-xs"
+        }`}
+        disabled={isDraft}
+        title={
+          isDraft
+            ? "Terbitkan paket soal terlebih dahulu sebelum menugaskan ke kelas"
+            : "Kirim dan tugaskan paket soal ini ke kelas siswa"
+        }
+        onClick={() => {
+          if (isDraft) {
+            toast.info(
+              "Paket soal masih berupa Draft. Silakan klik tombol 'Terbitkan' terlebih dahulu sebelum mengirimkannya ke kelas."
+            );
+            return;
+          }
+          onTerbitTugas();
+        }}
+      >
+        <ClipboardList className="h-3.5 w-3.5" />
+        Tugaskan ke Kelas
       </Button>
+
       <Button
         size="sm"
         variant="ghost"
@@ -1943,6 +2067,7 @@ function PaketActions({
         size="sm"
         variant="ghost"
         aria-label="Hapus paket soal"
+        title="Hapus paket soal"
         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
         onClick={onHapus}
       >

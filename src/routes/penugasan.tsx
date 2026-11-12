@@ -5,6 +5,7 @@ import {
   Archive,
   ArrowLeft,
   Award,
+  BookOpen,
   Calendar,
   Check,
   CheckCircle2,
@@ -253,23 +254,13 @@ function GuruPenugasanView() {
 
   // Context carryover from navigation (e.g. Bank Soal -> Penugasan)
   useEffect(() => {
-    if (search.paketSoalId || search.action === "create") {
-      if (search.paketSoalId) {
-        setSelectedPaketSoalId(search.paketSoalId);
-        const found = paketSoalList.find((p) => p.id === search.paketSoalId);
-        if (found) {
-          setJudulInput((prev) => prev || search.judul || `Tugas: ${found.judul}`);
-        }
-      }
-      if (search.kelasId) {
-        setSelectedKelasId(search.kelasId);
-      }
-      if (search.judul) {
-        setJudulInput((prev) => prev || search.judul || "");
-      }
-      setOpenCreateModal(true);
+    if (search.paketSoalId) {
+      setSelectedPaketSoalId(search.paketSoalId);
     }
-  }, [search.paketSoalId, search.kelasId, search.judul, search.action, paketSoalList]);
+    if (search.kelasId) {
+      setSelectedKelasId(search.kelasId);
+    }
+  }, [search.paketSoalId, search.kelasId]);
 
   // Deep-link to open submissions modal for a specific assignment
   const [dismissedDeepLinkId, setDismissedDeepLinkId] = useState<string | null>(null);
@@ -466,15 +457,13 @@ function GuruPenugasanView() {
     <div className="grid gap-6">
       <PageHeader
         title="Penugasan Siswa"
-        subtitle={
-          selectedYear
-            ? `Hubungkan paket soal dengan kelas siswa untuk Tahun Ajaran ${selectedYear}, atur tenggat, dan pantau pengumpulan tugas siswa.`
-            : "Hubungkan paket soal dengan kelas siswa, atur tenggat pengumpulan, dan pantau pengumpulan tugas siswa."
-        }
+        subtitle="Pantau status pengerjaan soal siswa secara real-time, periksa rekap penilaian, dan pantau tugas aktif yang telah dikirimkan dari Bank Soal."
         actions={
-          <Button onClick={openCreateDialog} className="gap-2 shadow-sm font-medium">
-            <Plus className="h-4 w-4" />
-            Buat Penugasan
+          <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs font-semibold shadow-2xs">
+            <Link to="/soal">
+              <BookOpen className="h-4 w-4 text-primary" />
+              Kelola di Bank Soal
+            </Link>
           </Button>
         }
       />
@@ -559,17 +548,18 @@ function GuruPenugasanView() {
               <ClipboardList className="mx-auto h-10 w-10 text-muted-foreground/40" />
               <p className="mt-2 font-display text-base font-semibold text-navy">
                 {filterTab === "semua"
-                  ? "Belum ada penugasan yang dibuat"
+                  ? "Belum ada penugasan aktif"
                   : `Tidak ada penugasan dengan status "${filterTab}"`}
               </p>
               <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                Buat penugasan pertama Anda dengan memilih kelas siswa dan paket soal yang sudah
-                disiapkan.
+                Tugas dibuat dan dikirimkan langsung dari menu <strong>Bank Soal</strong>. Silakan pilih paket soal yang sudah berstatus <strong>Terbit</strong>, lalu klik <strong>Tugaskan ke Kelas</strong>.
               </p>
               {filterTab === "semua" && (
-                <Button onClick={openCreateDialog} size="sm" className="mt-4 gap-1.5 font-medium">
-                  <Plus className="h-4 w-4" />
-                  Buat Penugasan Sekarang
+                <Button asChild size="sm" className="mt-4 gap-1.5 font-semibold bg-navy text-white hover:bg-navy/90 shadow-xs">
+                  <Link to="/soal">
+                    <BookOpen className="h-4 w-4" />
+                    Buka Bank Soal
+                  </Link>
                 </Button>
               )}
             </div>
@@ -734,16 +724,6 @@ function GuruPenugasanView() {
                         onClick={() => setTargetArsip(item)}
                       >
                         <Archive className="h-4 w-4" />
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0"
-                        title="Edit Penugasan"
-                        onClick={() => openEditDialog(item)}
-                      >
-                        <Edit3 className="h-4 w-4 text-muted-foreground" />
                       </Button>
 
                       <Button
