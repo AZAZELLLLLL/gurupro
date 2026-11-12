@@ -19,7 +19,6 @@ import {
   Loader2,
   Lock,
   MessageSquare,
-  Pencil,
   Plus,
   RefreshCw,
   Save,
@@ -630,13 +629,7 @@ function GuruPenugasanView() {
                           <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium">
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             {summary.submitted} siswa mengumpulkan
-                            {summary.dinilai > 0 ? ` (${summary.dinilai} dinilai)` : ""}
-                          </span>
-                        )}
-                        {summary.perluDinilai > 0 && (
-                          <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold">
-                            <Clock className="h-3.5 w-3.5" />
-                            {summary.perluDinilai} perlu dinilai
+                            {summary.dinilai > 0 ? ` (${summary.dinilai} dinilai AI)` : ""}
                           </span>
                         )}
                       </div>
@@ -650,18 +643,6 @@ function GuruPenugasanView() {
 
                     {/* Aksi Guru */}
                     <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 sm:pt-0">
-                      {summary.perluDinilai > 0 && (
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="gap-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-xs"
-                          onClick={() => setViewingSubmissionsFor(item)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Periksa ({summary.perluDinilai})
-                        </Button>
-                      )}
-
                       {/* Tombol Tinjau Pengumpulan Siswa */}
                       <Button
                         size="sm"
@@ -1984,7 +1965,7 @@ function GuruSubmissionsModal({
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="text-[11px]">
-                              {needsGrading ? "Perlu Dinilai" : "Murni: —"}
+                              {needsGrading ? "Sedang Dinilai AI" : "Murni: —"}
                             </Badge>
                           )}
 
@@ -1993,7 +1974,7 @@ function GuruSubmissionsModal({
                             <>
                               {hasRemedial ? (
                                 <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 border border-purple-300 text-[11px]">
-                                  Remedial: {nilaiRemedial !== null ? nilaiRemedial : isRemedialSubmitted ? "Perlu Dinilai" : "Draf"}
+                                  Remedial: {nilaiRemedial !== null ? nilaiRemedial : isRemedialSubmitted ? "Sedang Dinilai AI" : "Draf"}
                                 </Badge>
                               ) : isTuntasMurni ? (
                                 <Badge variant="outline" className="border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 text-[10px]">

@@ -620,9 +620,9 @@ function GuruRekapNilaiView() {
                                     >
                                       <Badge
                                         variant="outline"
-                                        className="border-amber-300 bg-amber-50 text-[11px] font-medium text-amber-800 hover:bg-amber-100 cursor-pointer gap-1 transition-colors"
+                                        className="border-indigo-300 bg-indigo-50 text-[11px] font-medium text-indigo-800 hover:bg-indigo-100 cursor-pointer gap-1 transition-colors"
                                       >
-                                        Perlu Koreksi
+                                        Diproses AI
                                         <ArrowRight className="h-2.5 w-2.5 inline" />
                                       </Badge>
                                     </Link>
@@ -956,9 +956,9 @@ function SiswaRiwayatNilaiView() {
                               ) : isReview ? (
                                 <Badge
                                   variant="outline"
-                                  className="border-amber-300 bg-amber-50 text-[11px] text-amber-800"
+                                  className="border-indigo-300 bg-indigo-50 text-[11px] text-indigo-800"
                                 >
-                                  Sedang Dikoreksi
+                                  Diproses AI
                                 </Badge>
                               ) : (
                                 <Badge variant="secondary" className="text-[11px]">

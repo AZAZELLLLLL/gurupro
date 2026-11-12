@@ -1381,9 +1381,9 @@ function DetailKelasMonitoringPage() {
                                         <TableCell key={tugas.id} className="text-center">
                                           <Badge
                                             variant="outline"
-                                            className="border-amber-300 bg-amber-50 text-[10px] text-amber-800"
+                                            className="border-indigo-300 bg-indigo-50 text-[10px] text-indigo-800"
                                           >
-                                            Perlu Koreksi
+                                            Diproses AI
                                           </Badge>
                                         </TableCell>
                                       );

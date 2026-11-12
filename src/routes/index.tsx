@@ -919,11 +919,11 @@ function TeacherDashboard() {
       ? Math.round((yearSudahDinilai / yearTotalSubmitted) * 100)
       : 0;
 
-  // Tugas yang membutuhkan penilaian manual
-  const needGradingAssignments = useMemo(() => {
+  // Penugasan aktif yang memiliki pengumpulan siswa untuk dipantau
+  const assignmentsWithSubmissions = useMemo(() => {
     return assignmentList.filter((a) => {
       const stats = submissionSummary.submissionsPerPenugasan[a.id];
-      return (stats?.perluDinilai ?? 0) > 0;
+      return (stats?.submitted ?? 0) > 0;
     });
   }, [assignmentList, submissionSummary]);
 
@@ -944,12 +944,12 @@ function TeacherDashboard() {
       });
     }
 
-    // 2. Tugas perlu dinilai
-    if (yearPerluDinilai > 0) {
+    // 2. Tugas dinilai otomatis oleh AI
+    if (yearSudahDinilai > 0 || yearTotalSubmitted > 0) {
       notifs.push({
-        id: "notif-need-grading",
-        judul: `${yearPerluDinilai} tugas siswa menunggu penilaian`,
-        detail: "Pilihan ganda telah diauto-grade, periksa jawaban esai siswa.",
+        id: "notif-ai-graded",
+        judul: `${yearSudahDinilai || yearTotalSubmitted} pengumpulan dinilai otomatis AI`,
+        detail: "Hasil koreksi objektif dan esai siap dipantau dan diunduh di menu Penilaian.",
         tipe: "tugas",
       });
     }
@@ -965,7 +965,7 @@ function TeacherDashboard() {
     }
 
     return notifs;
-  }, [myClassIds, anggotaList, yearPerluDinilai, modulAktif]);
+  }, [myClassIds, anggotaList, yearSudahDinilai, yearTotalSubmitted, modulAktif]);
 
   const stats = [
     {
@@ -976,17 +976,20 @@ function TeacherDashboard() {
       to: "/modul-ajar" as const,
     },
     {
-      label: "Tugas Masuk",
-      value: String(yearTotalSubmitted),
+      label: "Tugas Aktif",
+      value: String(assignmentList.length),
       icon: ClipboardList,
-      hint: `${assignmentList.length} penugasan (${selectedYear || "Semua"})`,
+      hint: `${yearTotalSubmitted} pengumpulan siswa (${selectedYear || "Semua"})`,
       to: "/penugasan" as const,
     },
     {
-      label: "Perlu Dinilai",
-      value: String(yearPerluDinilai),
+      label: "Penilaian",
+      value: String(yearSudahDinilai),
       icon: CheckCircle2,
-      hint: `${yearSudahDinilai} tugas selesai (${gradingProgress}%)`,
+      hint:
+        yearTotalSubmitted > 0
+          ? `${yearSudahDinilai} dari ${yearTotalSubmitted} dinilai AI (${gradingProgress}%)`
+          : "Koreksi otomatis oleh AI",
       to: "/penilaian" as const,
     },
     {
@@ -1051,15 +1054,15 @@ function TeacherDashboard() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        {/* Tugas Perlu Dikoreksi (Real Data) */}
+        {/* Status Penilaian AI */}
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
             <div>
               <CardTitle className="font-display text-base text-navy">
-                Tugas Perlu Dikoreksi
+                Penilaian Otomatis AI
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Tugas siswa yang mengumpulkan dan membutuhkan penilaian esai Anda.
+                Koreksi jawaban pilihan ganda & esai siswa diproses penuh otomatis oleh GuruPro AI.
               </p>
             </div>
             <Button asChild variant="ghost" size="sm">
@@ -1075,18 +1078,17 @@ function TeacherDashboard() {
                 <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
                 <p className="mt-2">Memeriksa pengumpulan tugas…</p>
               </div>
-            ) : needGradingAssignments.length === 0 ? (
+            ) : assignmentsWithSubmissions.length === 0 ? (
               <div className="py-10 text-center">
-                <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500/60" />
+                <Sparkles className="mx-auto h-8 w-8 text-primary/70" />
                 <p className="mt-2 font-display text-sm font-semibold text-navy">
-                  Tidak Ada Tugas Menunggu Koreksi
+                  Penilaian Otomatis AI Aktif
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                  Semua pengumpulan tugas siswa telah dinilai atau belum ada pengumpulan baru yang
-                  memerlukan koreksi manual.
+                  Seluruh jawaban siswa dikoreksi secara otomatis dan instan oleh AI saat dikumpulkan. Pantau hasil rekapan capaian siswa di menu Penilaian.
                 </p>
                 <Button asChild variant="outline" size="sm" className="mt-4 text-xs">
-                  <Link to="/penugasan">Buka Menu Penugasan</Link>
+                  <Link to="/penilaian">Buka Menu Penilaian</Link>
                 </Button>
               </div>
             ) : (
@@ -1096,25 +1098,30 @@ function TeacherDashboard() {
                     <TableRow>
                       <TableHead>Kelas</TableHead>
                       <TableHead>Tugas</TableHead>
-                      <TableHead>Perlu Nilai</TableHead>
+                      <TableHead>Status Koreksi AI</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {needGradingAssignments.map((t) => {
+                    {assignmentsWithSubmissions.map((t) => {
                       const stats = submissionSummary.submissionsPerPenugasan[t.id];
+                      const submitted = stats?.submitted ?? 0;
+                      const graded = stats?.dinilai ?? 0;
                       return (
                         <TableRow key={t.id}>
                           <TableCell className="font-medium">{t.kelasNama || "Kelas"}</TableCell>
                           <TableCell className="max-w-[14rem] truncate">{t.judul}</TableCell>
                           <TableCell>
-                            <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                              {stats?.perluDinilai ?? 0} siswa
+                            <Badge variant="secondary" className="bg-emerald-50 text-emerald-800 border-emerald-200 gap-1 font-medium text-xs">
+                              <Sparkles className="h-3 w-3 text-emerald-600" />
+                              {graded}/{submitted} Dinilai AI
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <Button asChild size="sm" variant="outline" className="h-8 text-xs font-medium">
-                              <Link to="/penugasan" search={{ penugasanId: t.id }}>Beri Nilai</Link>
+                              <Link to="/penilaian" search={{ kelasId: t.kelasId, penugasanId: t.id }}>
+                                Rekap Nilai
+                              </Link>
                             </Button>
                           </TableCell>
                         </TableRow>
