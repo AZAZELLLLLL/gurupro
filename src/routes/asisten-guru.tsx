@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BookOpen,
   Bot,
+  Camera,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -15,8 +16,11 @@ import {
   Eye,
   FileQuestion,
   FileText,
+  FileUp,
+  Image as ImageIcon,
   Layers,
   Lightbulb,
+  Loader2,
   Menu,
   MessageSquare,
   Palette,
@@ -32,11 +36,17 @@ import {
   Trash,
   Trash2,
   Undo2,
+  UploadCloud,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { chatWithGuruAiServerFn, generateChatImageServerFn } from "@/lib/asisten-guru.functions";
+import {
+  chatWithGuruAiServerFn,
+  generateChatImageServerFn,
+  analisisLampiranMateriServerFn,
+  type AnalisisLampiranResponse,
+} from "@/lib/asisten-guru.functions";
 import { Button } from "@/components/ui/button";
 import { ChatMarkdownRenderer } from "@/components/chat-markdown-renderer";
 import {
@@ -67,6 +77,9 @@ interface ChatMessage {
   imageUrl?: string;
   imagePrompt?: string;
   imageProvider?: string;
+  attachedFileName?: string;
+  attachedFileType?: "document" | "image" | "text";
+  attachedImageUrl?: string;
 }
 
 interface ChatSession {
@@ -96,12 +109,11 @@ export interface ParsedSlideItem {
   num: number;
   title: string;
   subtitle?: string;
-  paragraphs?: string[];
   description?: string;
   bullets: string[];
   highlight?: string;
   codeSnippet?: string;
-  layoutType?: "narrative" | "hybrid" | "bullets" | "code" | "cover";
+  reflection?: string;
   isCover: boolean;
 }
 
@@ -242,6 +254,12 @@ export function AsistenGuruPage() {
   const [inputMessage, setInputMessage] = useState("");
   const [contextMateri, setContextMateri] = useState("");
   const [showContextModal, setShowContextModal] = useState(false);
+  const [activeLampiran, setActiveLampiran] = useState<AnalisisLampiranResponse | null>(null);
+  const [lampiranTab, setLampiranTab] = useState<"file" | "photo" | "text">("file");
+  const [isProcessingLampiran, setIsProcessingLampiran] = useState(false);
+  const [lampiranStatusText, setLampiranStatusText] = useState("");
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -464,6 +482,142 @@ export function AsistenGuruPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [currentMessages.length, isLoading]);
 
+  const handleDocumentSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Ukuran berkas maksimal 15 MB.");
+      return;
+    }
+    setIsProcessingLampiran(true);
+    setLampiranStatusText(`Membaca berkas "${file.name}"...`);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        setLampiranStatusText("Mengekstrak dan menganalisis struktur materi dokumen...");
+        const res = await analisisLampiranMateriServerFn({
+          data: {
+            type: "document",
+            fileName: file.name,
+            fileType: file.type,
+            base64Data: String(reader.result || ""),
+          },
+        });
+        setActiveLampiran(res);
+        setContextMateri(res.extractedText);
+        toast.success(`Dokumen "${res.title}" berhasil dianalisis (${res.wordCount} kata)!`);
+      } catch (err: any) {
+        toast.error(err?.message || "Gagal menganalisis dokumen.");
+      } finally {
+        setIsProcessingLampiran(false);
+        setLampiranStatusText("");
+      }
+    };
+    reader.onerror = () => {
+      setIsProcessingLampiran(false);
+      toast.error("Gagal membaca berkas dari perangkat.");
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handlePhotoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Ukuran foto maksimal 15 MB.");
+      return;
+    }
+    setIsProcessingLampiran(true);
+    setLampiranStatusText(`Memuat foto "${file.name}"...`);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const dataUrl = String(reader.result || "");
+        setLampiranStatusText("AI Vision sedang membaca dan mentranskripsikan materi pada foto...");
+        const res = await analisisLampiranMateriServerFn({
+          data: {
+            type: "image",
+            fileName: file.name,
+            fileType: file.type,
+            base64Data: dataUrl,
+          },
+        });
+        setActiveLampiran({
+          ...res,
+          imageUrl: dataUrl,
+        });
+        setContextMateri(res.extractedText);
+        toast.success(`Foto materi berhasil ditranskripsikan (${res.wordCount} kata)!`);
+      } catch (err: any) {
+        toast.error(err?.message || "Gagal menganalisis foto.");
+      } finally {
+        setIsProcessingLampiran(false);
+        setLampiranStatusText("");
+      }
+    };
+    reader.onerror = () => {
+      setIsProcessingLampiran(false);
+      toast.error("Gagal membaca foto dari perangkat.");
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleManualTextSaved = async () => {
+    if (!contextMateri.trim()) {
+      setActiveLampiran(null);
+      setShowContextModal(false);
+      return;
+    }
+    setIsProcessingLampiran(true);
+    try {
+      const res = await analisisLampiranMateriServerFn({
+        data: {
+          type: "text",
+          rawText: contextMateri,
+        },
+      });
+      setActiveLampiran(res);
+      setShowContextModal(false);
+      toast.success("Catatan materi disimpan sebagai rujukan.");
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal menyimpan catatan.");
+    } finally {
+      setIsProcessingLampiran(false);
+    }
+  };
+
+  const handleApplyLampiranAction = (action: "modul" | "ppt" | "ilustrasi" | "soal") => {
+    const title = activeLampiran?.title || "Materi Terlampir";
+    setShowContextModal(false);
+
+    if (action === "modul") {
+      setInputMessage(
+        `@generate_modul buatkan Modul Ajar Kurikulum Merdeka yang lengkap, mendalam, dan terstruktur berdasarkan materi terlampir "${title}"`
+      );
+    } else if (action === "ppt") {
+      setInputMessage(
+        `@generate_ppt susun presentasi PPT komprehensif tema ${outlineSettings.pptStyleName} dengan pembahasan materi super detail berdasarkan materi terlampir "${title}"`
+      );
+    } else if (action === "ilustrasi") {
+      setInputMessage(
+        `@generate_ilustrasi buatkan konsep ilustrasi edukatif gaya ${outlineSettings.illustrationStyleName} (rasio ${outlineSettings.illustrationAspect}) berdasarkan materi terlampir "${title}"`
+      );
+    } else if (action === "soal") {
+      setInputMessage(
+        `Buatkan 5 soal HOTS pilihan ganda lengkap dengan stimulus kasus kontekstual, kunci jawaban, dan pembahasan mendalam berdasarkan materi terlampir "${title}"`
+      );
+    }
+
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length);
+      }
+    }, 120);
+  };
+
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputMessage).trim();
     if (!text || isLoading) return;
@@ -473,6 +627,15 @@ export function AsistenGuruPage() {
       role: "user",
       content: text,
       createdAt: new Date().toISOString(),
+      attachedFileName:
+        activeLampiran?.fileName ||
+        (activeLampiran?.type === "image"
+          ? "Foto Materi"
+          : activeLampiran?.type === "document"
+          ? "Dokumen Materi"
+          : undefined),
+      attachedFileType: activeLampiran?.type,
+      attachedImageUrl: activeLampiran?.imageUrl,
     };
 
     const updatedTitle =
@@ -521,6 +684,7 @@ export function AsistenGuruPage() {
         data: {
           messages: historyPayload,
           contextMateri: contextMateri.trim() ? contextMateri : undefined,
+          attachedImage: activeLampiran?.imageUrl || undefined,
           outlineSettings: {
             pptStyle: outlineSettings.pptStyleName,
             slideCount: outlineSettings.slideCount,
@@ -868,58 +1032,50 @@ export function AsistenGuruPage() {
         }
       }
 
+      // Reflection / Classroom discussion question
+      let reflection: string | undefined = undefined;
+      const reflRegex = /(?:Refleksi Kelas|Pertanyaan Refleksi|Diskusi Pemantik|Refleksi Siswa|Pertanyaan Diskusi)\s*[:\-–]?\s*([^\n]+)/i;
+      const reflMatch = bodyText.match(reflRegex);
+      if (reflMatch && !isMetaPromptLine(reflMatch[1])) {
+        reflection = cleanSlideText(reflMatch[1]);
+      }
+
       let textWithoutCode = bodyText.replace(/```[\s\S]*?```/g, "");
       if (highlightMatch) {
         textWithoutCode = textWithoutCode.replace(highlightMatch[0], "");
       }
 
-      // Block-based parser for seamless paragraphs and bullets
-      const rawBlocks = textWithoutCode.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+      const lines = textWithoutCode.split("\n").map((l) => l.trim()).filter(Boolean);
       const narrativeParagraphs: string[] = [];
       const bullets: string[] = [];
 
-      for (const block of rawBlocks) {
-        if (isMetaPromptLine(block)) continue;
-        if (/^(?:###|##|#)\s+/i.test(block)) continue;
-        if (/^(?:Sub-?Judul|Tagline|Sasaran|Sub-TeKS|Sub-Teks)\s*[:\-–]/i.test(block)) continue;
-        if (/^(?:Poin Kunci|Poin Inti|Rangkuman Poin|Karakteristik|Prinsip Operasional|Uraian Materi)\s*[:\-–]?$/i.test(block)) continue;
+      for (const line of lines) {
+        if (isMetaPromptLine(line)) continue;
+        if (/^(?:Sub-?Judul|Tagline|Sasaran|Sub-TeKS|Sub-Teks)\s*[:\-–]/i.test(line)) continue;
+        if (/^(?:###|##|#)\s+/i.test(line)) continue;
+        if (/^(?:Poin Kunci|Poin Inti|Rangkuman Poin|Karakteristik|Prinsip Operasional|Uraian Materi)\s*[:\-–]?$/i.test(line)) continue;
 
-        const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
-        const hasBullet = lines.some((l) => /^[\s\t]*[•\-\*✓✔]\s+/.test(l));
+        const isBulletLine = /^[\s\t]*[•\-\*✓✔]\s+/.test(line);
+        const cleanedLine = cleanSlideText(line);
+        if (!cleanedLine || cleanedLine.length < 4) continue;
 
-        if (hasBullet) {
-          for (const line of lines) {
-            if (isMetaPromptLine(line)) continue;
-            if (/^(?:Sub-?Judul|Tagline|Sasaran|Sub-TeKS|Sub-Teks)\s*[:\-–]/i.test(line)) continue;
-            if (/^(?:Poin Kunci|Poin Inti|Rangkuman Poin|Karakteristik|Prinsip Operasional|Uraian Materi)\s*[:\-–]?$/i.test(line)) continue;
+        if (subtitle && cleanedLine.toLowerCase() === subtitle.toLowerCase()) continue;
 
-            const isBulletLine = /^[\s\t]*[•\-\*✓✔]\s+/.test(line);
-            const cleaned = cleanSlideText(line);
-            if (!cleaned || cleaned.length < 4) continue;
-            if (subtitle && cleaned.toLowerCase() === subtitle.toLowerCase()) continue;
-
-            if (isBulletLine) {
-              if (/^(?:studi kasus|kasus riil|contoh penerapan|tips)\s*[:\-–]/i.test(cleaned)) {
-                if (!highlight) {
-                  highlight = cleaned.replace(/^(?:studi kasus|kasus riil|contoh penerapan|tips)\s*[:\-–]\s*/i, "").trim();
-                }
-              } else {
-                bullets.push(cleaned);
-              }
-            } else if (cleaned.length > 25 && !cleaned.endsWith(":")) {
-              narrativeParagraphs.push(cleaned);
+        if (isBulletLine) {
+          if (/^(?:studi kasus|kasus riil|contoh penerapan|tips)\s*[:\-–]/i.test(cleanedLine)) {
+            if (!highlight) {
+              highlight = cleanedLine.replace(/^(?:studi kasus|kasus riil|contoh penerapan|tips)\s*[:\-–]\s*/i, "").trim();
             }
+          } else {
+            bullets.push(cleanedLine);
           }
         } else {
-          // Entire block is a natural narrative paragraph! Join soft wraps into one smooth paragraph string.
-          const cleanLines = lines.map((l) => cleanSlideText(l)).filter((l) => !isMetaPromptLine(l));
-          const joinedPara = cleanLines.join(" ").replace(/\s+/g, " ").trim();
-          if (
-            joinedPara.length > 25 &&
-            !joinedPara.endsWith(":") &&
-            !(subtitle && joinedPara.toLowerCase() === subtitle.toLowerCase())
-          ) {
-            narrativeParagraphs.push(joinedPara);
+          // Non-bullet line: narrative paragraph
+          if (cleanedLine.endsWith(":")) {
+            continue;
+          }
+          if (cleanedLine.length > 25) {
+            narrativeParagraphs.push(cleanedLine);
           }
         }
       }
@@ -927,19 +1083,6 @@ export function AsistenGuruPage() {
       const description = narrativeParagraphs.length > 0 ? narrativeParagraphs.join("\n\n") : undefined;
 
       const isCover = cur.slideNum === 1 || cleanTitle.toLowerCase().includes("cover");
-
-      let layoutType: "narrative" | "hybrid" | "bullets" | "code" | "cover" = "bullets";
-      if (isCover) {
-        layoutType = "cover";
-      } else if (codeSnippet) {
-        layoutType = "code";
-      } else if (narrativeParagraphs.length >= 1 && bullets.length === 0) {
-        layoutType = "narrative";
-      } else if (narrativeParagraphs.length >= 1 && bullets.length > 0) {
-        layoutType = "hybrid";
-      } else {
-        layoutType = "bullets";
-      }
 
       if (isCover) {
         if (cleanTitle && !cleanTitle.toLowerCase().includes("cover")) {
@@ -955,17 +1098,16 @@ export function AsistenGuruPage() {
         num: cur.slideNum || i + 1,
         title: cleanTitle,
         subtitle,
-        paragraphs: narrativeParagraphs,
         description,
         bullets:
           bullets.length > 0
             ? bullets
-            : narrativeParagraphs.length > 0
+            : description
             ? []
             : [cleanSlideText(bodyText.slice(0, 150))].filter(Boolean),
         highlight,
         codeSnippet,
-        layoutType,
+        reflection,
         isCover,
       });
     }
@@ -1203,50 +1345,38 @@ export function AsistenGuruPage() {
           currentY += 0.4;
         }
 
-        // 1. Dynamic Slide Body Layout based on layoutType
-        if (s.layoutType === "narrative" || (s.paragraphs && s.paragraphs.length > 0 && s.bullets.length === 0)) {
-          // Pure in-depth narrative paragraphs
-          const paras = s.paragraphs && s.paragraphs.length > 0 ? s.paragraphs : [s.description || ""];
-          const textItems = paras.map((p, pIdx) => ({
-            text: pIdx > 0 ? `\n\n${p}` : p,
-            options: {
-              fontSize: 12,
-              color: "1E293B",
-              fontFace: "Arial",
-              lineSpacing: 19,
-              bullet: false,
-            },
-          }));
-
-          const maxH = s.highlight ? 2.9 : 3.5;
-          slide.addText(textItems as any, {
+        // Narrative Description Paragraph (if available)
+        if (s.description) {
+          const hasBulletsOrHighlight = s.bullets.length > 0 || !!s.highlight;
+          const descHeight = hasBulletsOrHighlight ? 1.35 : 2.9;
+          slide.addShape(pptx.ShapeType.roundRect, {
             x: 0.8,
             y: currentY,
             w: 8.4,
-            h: maxH,
-            fontFace: "Arial",
-            valign: "top",
+            h: descHeight,
+            fill: { color: "F1F5F9" },
+            line: { color: "CBD5E1", width: 1 },
           });
-          currentY += maxH + 0.15;
-        } else if (s.layoutType === "hybrid" || (s.description && s.bullets.length > 0)) {
-          // Hybrid: Narrative intro + Key point bullets
-          slide.addText(s.description || "", {
-            x: 0.8,
-            y: currentY,
-            w: 8.4,
-            h: 1.3,
-            fontSize: 11,
-            color: "1E293B",
+          slide.addText(s.description, {
+            x: 0.95,
+            y: currentY + 0.08,
+            w: 8.1,
+            h: descHeight - 0.16,
+            fontSize: 10.5,
+            color: "0F172A",
             fontFace: "Arial",
             lineSpacing: 16,
             valign: "top",
           });
-          currentY += 1.4;
+          currentY += descHeight + 0.15;
+        }
 
+        // Body Content Bullets (if available)
+        if (s.bullets.length > 0) {
           const textItems = s.bullets.map((b) => ({
             text: `${b}\n`,
             options: {
-              fontSize: 10.5,
+              fontSize: 11,
               color: "1E293B",
               bullet: true,
               breakLine: true,
@@ -1260,35 +1390,12 @@ export function AsistenGuruPage() {
             w: 8.4,
             h: remainingHeight,
             fontFace: "Arial",
-            lineSpacing: 16,
+            lineSpacing: 17,
             valign: "top",
           });
           currentY += remainingHeight + 0.1;
-        } else if (s.bullets.length > 0) {
-          // Structured bullet list
-          const textItems = s.bullets.map((b) => ({
-            text: `${b}\n`,
-            options: {
-              fontSize: 11.5,
-              color: "1E293B",
-              bullet: true,
-              breakLine: true,
-            },
-          }));
-
-          const remainingHeight = Math.max(1.0, 5.0 - currentY - (s.highlight ? 0.85 : 0.2));
-          slide.addText(textItems as any, {
-            x: 0.8,
-            y: currentY,
-            w: 8.4,
-            h: remainingHeight,
-            fontFace: "Arial",
-            lineSpacing: 18,
-            valign: "top",
-          });
-          currentY += remainingHeight + 0.1;
-        } else {
-          // Fallback if neither was detected
+        } else if (!s.description) {
+          // Fallback if neither description nor bullets were parsed
           slide.addText(
             `Pembahasan mendalam dan terstruktur mengenai ${cleanTitle} untuk memfasilitasi ketercapaian tujuan pembelajaran peserta didik secara komprehensif.`,
             {
@@ -1324,6 +1431,30 @@ export function AsistenGuruPage() {
             fontSize: 9.5,
             color: "92400E",
             bold: false,
+            fontFace: "Arial",
+            valign: "top",
+          });
+          currentY += 0.85;
+        }
+
+        // Classroom Discussion / Reflection (if available)
+        if (s.reflection && currentY < 4.85) {
+          const reflY = Math.min(currentY, 4.4);
+          slide.addShape(pptx.ShapeType.roundRect, {
+            x: 0.8,
+            y: reflY,
+            w: 8.4,
+            h: 0.65,
+            fill: { color: "EEF2FF" },
+            line: { color: "6366F1", width: 1 },
+          });
+          slide.addText(`💬 Refleksi Kelas: ${s.reflection}`, {
+            x: 0.95,
+            y: reflY + 0.08,
+            w: 8.1,
+            h: 0.5,
+            fontSize: 9,
+            color: "3730A3",
             fontFace: "Arial",
             valign: "top",
           });
@@ -1855,16 +1986,31 @@ export function AsistenGuruPage() {
               size="sm"
               onClick={() => setShowContextModal(true)}
               className={`rounded-xl text-[11px] sm:text-xs gap-1 sm:gap-1.5 px-2.5 sm:px-3 h-8 ${
-                contextMateri.trim() ? "border-primary text-primary bg-primary/5 font-medium" : ""
+                activeLampiran || contextMateri.trim()
+                  ? "border-primary text-primary bg-primary/5 font-semibold"
+                  : ""
               }`}
             >
-              <Paperclip className="h-3.5 w-3.5" />
+              {activeLampiran?.type === "image" ? (
+                <Camera className="h-3.5 w-3.5" />
+              ) : (
+                <Paperclip className="h-3.5 w-3.5" />
+              )}
               <span className="hidden sm:inline">
-                {contextMateri.trim() ? "Materi Terlampir" : "Lampirkan Bahan"}
+                {activeLampiran
+                  ? activeLampiran.type === "image"
+                    ? "Foto Terlampir"
+                    : "Dokumen Terlampir"
+                  : contextMateri.trim()
+                  ? "Materi Terlampir"
+                  : "Lampirkan Bahan"}
               </span>
               <span className="sm:hidden">
-                {contextMateri.trim() ? "Rujukan" : "Lampir"}
+                {activeLampiran || contextMateri.trim() ? "Lampiran" : "Lampir"}
               </span>
+              {(activeLampiran || contextMateri.trim()) && (
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
+              )}
             </Button>
 
             <Button
@@ -2027,7 +2173,29 @@ export function AsistenGuruPage() {
                       }`}
                     >
                       {isUser ? (
-                        m.content
+                        <div className="space-y-1.5">
+                          {m.attachedFileName && (
+                            <div className="inline-flex items-center gap-1.5 rounded-lg bg-black/25 px-2.5 py-1 text-[11px] font-semibold text-white/95 backdrop-blur-xs">
+                              {m.attachedFileType === "image" ? (
+                                <Camera className="h-3.5 w-3.5" />
+                              ) : (
+                                <FileText className="h-3.5 w-3.5" />
+                              )}
+                              <span>Rujukan: {m.attachedFileName}</span>
+                            </div>
+                          )}
+                          {m.attachedImageUrl && (
+                            <div className="max-w-[180px] sm:max-w-[220px] overflow-hidden rounded-xl border border-white/30 shadow-xs">
+                              <img
+                                src={m.attachedImageUrl}
+                                alt="Foto Lampiran"
+                                className="h-28 w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                onClick={() => setPreviewZoomImage(m.attachedImageUrl || null)}
+                              />
+                            </div>
+                          )}
+                          <p>{m.content}</p>
+                        </div>
                       ) : (
                         <ChatMarkdownRenderer content={m.content} />
                       )}
@@ -2142,13 +2310,7 @@ export function AsistenGuruPage() {
                                   {s.title}
                                 </p>
                                 <span className="text-[8.5px] text-muted-foreground line-clamp-1">
-                                  {s.layoutType === "narrative"
-                                    ? "Uraian Narasi"
-                                    : s.layoutType === "hybrid"
-                                    ? "Narasi & Poin"
-                                    : s.layoutType === "code"
-                                    ? "Kode & Analisis"
-                                    : `${s.bullets.length} butir materi`}
+                                  {s.description ? "Paragraf & Poin" : `${s.bullets.length} butir materi`}
                                 </span>
                               </button>
                             ))}
@@ -2428,6 +2590,72 @@ export function AsistenGuruPage() {
               </button>
             </div>
 
+            {/* Active Attachment Pill / Banner */}
+            {activeLampiran && (
+              <div className="mb-2 flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-2 sm:p-2.5 text-xs shadow-2xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  {activeLampiran.type === "image" && activeLampiran.imageUrl ? (
+                    <img
+                      src={activeLampiran.imageUrl}
+                      alt="Thumbnail"
+                      className="h-9 w-9 rounded-lg object-cover border border-primary/20 shrink-0"
+                    />
+                  ) : activeLampiran.type === "image" ? (
+                    <div className="flex h-9 w-9 rounded-lg bg-primary/10 text-primary items-center justify-center shrink-0">
+                      <Camera className="h-4 w-4" />
+                    </div>
+                  ) : activeLampiran.type === "document" ? (
+                    <div className="flex h-9 w-9 rounded-lg bg-primary/10 text-primary items-center justify-center shrink-0">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                  ) : (
+                    <div className="flex h-9 w-9 rounded-lg bg-primary/10 text-primary items-center justify-center shrink-0">
+                      <BookOpen className="h-4 w-4" />
+                    </div>
+                  )}
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-foreground truncate max-w-[200px] sm:max-w-xs">
+                        {activeLampiran.title}
+                      </span>
+                      <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full font-semibold shrink-0">
+                        {activeLampiran.type === "image"
+                          ? "Foto Materi"
+                          : activeLampiran.type === "document"
+                          ? "Dokumen File"
+                          : "Catatan Teks"}{" "}
+                        • {activeLampiran.wordCount} kata
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-muted-foreground truncate max-w-[280px] sm:max-w-md">
+                      {activeLampiran.summary}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                  <button
+                    onClick={() => setShowContextModal(true)}
+                    className="text-[11px] font-semibold text-primary hover:underline px-1.5 py-1"
+                  >
+                    Kelola
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveLampiran(null);
+                      setContextMateri("");
+                      toast.info("Lampiran bahan ajar dilepas.");
+                    }}
+                    className="p-1 text-muted-foreground hover:text-destructive rounded-md"
+                    title="Lepas lampiran"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Textarea Input Card */}
             <div className="relative flex flex-col rounded-2xl border border-border bg-background shadow-xs focus-within:border-primary focus-within:ring-1 focus-within:ring-primary w-full max-w-full overflow-hidden">
               {/* Active Mode Indicator Banners */}
@@ -2477,10 +2705,18 @@ export function AsistenGuruPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setShowContextModal(true)}
-                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-                    title="Lampirkan Bahan Ajar / Catatan Guru"
+                    className={`h-8 w-8 rounded-lg ${
+                      activeLampiran || contextMateri.trim()
+                        ? "text-primary bg-primary/10 hover:bg-primary/20"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    title="Lampirkan Dokumen atau Foto Materi"
                   >
-                    <Paperclip className="h-4 w-4" />
+                    {activeLampiran?.type === "image" ? (
+                      <Camera className="h-4 w-4" />
+                    ) : (
+                      <Paperclip className="h-4 w-4" />
+                    )}
                   </Button>
 
                   <Button
@@ -2801,56 +3037,316 @@ export function AsistenGuruPage() {
       )}
 
       {/* ============================================================================== */}
-      {/* MODAL 2: LAMPIRKAN BAHAN AJAR RUJUKAN                                          */}
+      {/* MODAL 2: LAMPIRKAN BAHAN AJAR RUJUKAN (DOKUMEN FILE / FOTO GAMBAR / TEKS)      */}
       {/* ============================================================================== */}
       {showContextModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2">
-                <Paperclip className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-bold">Lampirkan Bahan Ajar Guru</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-xl max-h-[92vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border px-4 sm:px-6 py-3.5 bg-muted/30 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shadow-2xs">
+                  <Paperclip className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-foreground">
+                    Lampirkan Bahan Ajar Guru
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Pilih dokumen berkas, foto buku cetak/papan tulis, atau tempel teks rujukan
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setShowContextModal(false)}
-                className="text-muted-foreground hover:text-foreground p-1 rounded-md"
+                className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <p className="mt-2 text-xs text-muted-foreground">
-              Tempelkan teks Capaian Pembelajaran (CP), silabus, ringkasan materi, atau catatan guru. AI akan menjawab berdasarkan rujukan ini.
-            </p>
-
-            <textarea
-              rows={6}
-              value={contextMateri}
-              onChange={(e) => setContextMateri(e.target.value)}
-              placeholder="Tempelkan teks materi atau silabus di sini..."
-              className="mt-3 w-full rounded-xl border border-border bg-background p-3 text-xs focus:border-primary focus:outline-none"
+            {/* Hidden File Inputs */}
+            <input
+              type="file"
+              ref={docInputRef}
+              accept=".pdf,.docx,.doc,.txt,.md,.html"
+              className="hidden"
+              onChange={handleDocumentSelected}
+            />
+            <input
+              type="file"
+              ref={photoInputRef}
+              accept="image/jpeg,image/png,image/webp,image/jpg"
+              capture="environment"
+              className="hidden"
+              onChange={handlePhotoSelected}
             />
 
-            <div className="mt-4 flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              {/* Tab Selector */}
+              <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-muted/60 p-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setLampiranTab("file")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 font-medium transition-all ${
+                    lampiranTab === "file"
+                      ? "bg-card text-foreground shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <FileUp className="h-3.5 w-3.5" />
+                  <span>Berkas File</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLampiranTab("photo")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 font-medium transition-all ${
+                    lampiranTab === "photo"
+                      ? "bg-card text-foreground shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  <span>Foto / Gambar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLampiranTab("text")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 font-medium transition-all ${
+                    lampiranTab === "text"
+                      ? "bg-card text-foreground shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span>Teks CP/ATP</span>
+                </button>
+              </div>
+
+              {/* Processing Spinner State */}
+              {isProcessingLampiran && (
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-6 text-center space-y-3">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-foreground">
+                      {lampiranStatusText || "Sedang memproses lampiran..."}
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      AI sedang mengekstrak teks dan materi untuk diserap sebagai rujukan pembelajaran.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 1: File Dokumen */}
+              {!isProcessingLampiran && lampiranTab === "file" && (
+                <div className="space-y-3">
+                  <div
+                    onClick={() => docInputRef.current?.click()}
+                    className="group border-2 border-dashed border-border hover:border-primary/60 hover:bg-muted/30 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3 group-hover:scale-105 transition-transform">
+                      <FileUp className="h-6 w-6" />
+                    </div>
+                    <h4 className="text-xs sm:text-sm font-bold text-foreground">
+                      Pilih Berkas Dokumen Ajar
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground mt-1 max-w-sm">
+                      Mendukung format <strong>PDF, Word (.docx), TXT, atau Markdown (.md)</strong> hingga 15 MB.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-3.5 gap-1.5 rounded-xl pointer-events-none"
+                    >
+                      <UploadCloud className="h-4 w-4" />
+                      <span>Jelajahi Berkas</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Foto / Kamera */}
+              {!isProcessingLampiran && lampiranTab === "photo" && (
+                <div className="space-y-3">
+                  <div
+                    onClick={() => photoInputRef.current?.click()}
+                    className="group border-2 border-dashed border-border hover:border-primary/60 hover:bg-muted/30 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 mb-3 group-hover:scale-105 transition-transform">
+                      <Camera className="h-6 w-6" />
+                    </div>
+                    <h4 className="text-xs sm:text-sm font-bold text-foreground">
+                      Ambil Foto atau Pilih Gambar
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground mt-1 max-w-sm">
+                      Foto halaman buku cetak, catatan papan tulis, diagram, atau lembar kerja. AI Vision otomatis membaca teksnya.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-3.5 gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white pointer-events-none"
+                    >
+                      <ImageIcon className="h-4 w-4" />
+                      <span>Buka Galeri / Kamera</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 3: Teks Manual */}
+              {!isProcessingLampiran && lampiranTab === "text" && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-foreground block">
+                    Salin & Tempel Materi / CP-ATP:
+                  </label>
+                  <textarea
+                    rows={6}
+                    value={contextMateri}
+                    onChange={(e) => setContextMateri(e.target.value)}
+                    placeholder="Tempelkan silabus, materi inti, atau instruksi rujukan guru di sini..."
+                    className="w-full rounded-xl border border-border bg-background p-3 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>{contextMateri.split(/\s+/).filter(Boolean).length} kata diketik</span>
+                    <Button
+                      size="sm"
+                      onClick={handleManualTextSaved}
+                      disabled={!contextMateri.trim()}
+                      className="rounded-xl h-7 text-xs"
+                    >
+                      Simpan Teks Rujukan
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Active Lampiran Summary & Conversion Actions Card */}
+              {activeLampiran && (
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-3.5 sm:p-4 space-y-3 animate-in fade-in">
+                  <div className="flex items-start gap-3">
+                    {activeLampiran.type === "image" && activeLampiran.imageUrl ? (
+                      <img
+                        src={activeLampiran.imageUrl}
+                        alt="Foto Lampiran"
+                        className="h-16 w-16 rounded-xl object-cover border border-primary/20 shrink-0 shadow-xs"
+                      />
+                    ) : activeLampiran.type === "image" ? (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600">
+                        <Camera className="h-6 w-6" />
+                      </div>
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <FileText className="h-6 w-6" />
+                      </div>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                          {activeLampiran.type === "image"
+                            ? "Foto Berhasil Ditranskripsi"
+                            : activeLampiran.type === "document"
+                            ? "Dokumen Berhasil Diserap"
+                            : "Teks Rujukan Aktif"}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {activeLampiran.wordCount} kata materi
+                        </span>
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-bold text-foreground mt-1 line-clamp-1">
+                        {activeLampiran.title}
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
+                        {activeLampiran.summary}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* One-click Action Buttons for the Attached Material */}
+                  <div className="pt-2 border-t border-primary/20">
+                    <span className="text-[11px] font-bold text-foreground block mb-1.5">
+                      Pilih Hasil AI yang Ingin Dibuat dari Bahan Ini:
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleApplyLampiranAction("modul")}
+                        className="flex flex-col items-center justify-center p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-center transition-colors group shadow-2xs"
+                      >
+                        <BookOpen className="h-4 w-4 mb-1 group-hover:scale-110 transition-transform" />
+                        <span className="text-[10.5px] font-bold">Modul Ajar</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleApplyLampiranAction("ppt")}
+                        className="flex flex-col items-center justify-center p-2 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-center transition-colors group shadow-2xs"
+                      >
+                        <Presentation className="h-4 w-4 mb-1 group-hover:scale-110 transition-transform" />
+                        <span className="text-[10.5px] font-bold">Slide PPT</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleApplyLampiranAction("ilustrasi")}
+                        className="flex flex-col items-center justify-center p-2 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 text-center transition-colors group shadow-2xs"
+                      >
+                        <Palette className="h-4 w-4 mb-1 group-hover:scale-110 transition-transform" />
+                        <span className="text-[10.5px] font-bold">Ilustrasi</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleApplyLampiranAction("soal")}
+                        className="flex flex-col items-center justify-center p-2 rounded-xl border border-border bg-card hover:bg-muted/60 text-foreground text-center transition-colors group shadow-2xs"
+                      >
+                        <FileQuestion className="h-4 w-4 mb-1 text-primary group-hover:scale-110 transition-transform" />
+                        <span className="text-[10.5px] font-bold">Soal HOTS</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-border px-4 sm:px-6 py-3 bg-muted/20 flex items-center justify-between shrink-0">
+              <button
+                type="button"
                 onClick={() => {
+                  setActiveLampiran(null);
                   setContextMateri("");
                   setShowContextModal(false);
+                  toast.info("Semua lampiran rujukan telah dihapus.");
                 }}
+                className="text-[11px] text-destructive hover:underline font-medium"
               >
-                Hapus
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setShowContextModal(false);
-                  toast.success("Bahan ajar berhasil dilampirkan sebagai rujukan.");
-                }}
-              >
-                Simpan Rujukan
-              </Button>
+                Hapus Semua Lampiran
+              </button>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowContextModal(false)}
+                >
+                  Tutup
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setShowContextModal(false);
+                    toast.success("Bahan rujukan berhasil disimpan untuk percakapan ini.");
+                  }}
+                  className="bg-primary text-primary-foreground font-semibold shadow-xs"
+                >
+                  Gunakan di Chat
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -3214,135 +3710,32 @@ export function AsistenGuruPage() {
                       )}
                     </div>
 
-                    {/* Slide Body: Dynamic & Flexible Presentation Layout */}
-                    <div className="flex-1 my-2.5 sm:my-3.5 overflow-y-auto pr-1 sm:pr-2 flex flex-col justify-between">
-                      {/* ARCHETYPE 1: PURE NARRATIVE DEEP EXPLANATION SLIDE */}
-                      {currentSlide.layoutType === "narrative" && (
-                        <div className="space-y-3.5 sm:space-y-4 my-auto py-1">
-                          <div className="space-y-3 sm:space-y-3.5">
-                            {(currentSlide.paragraphs && currentSlide.paragraphs.length > 0
-                              ? currentSlide.paragraphs
-                              : [currentSlide.description || ""]
-                            ).map((para, pIdx) => (
-                              <p
-                                key={pIdx}
-                                className="text-xs sm:text-[14px] md:text-[14.5px] lg:text-[15px] text-foreground/90 leading-relaxed font-normal text-left tracking-normal"
-                              >
-                                {para}
-                              </p>
-                            ))}
+                    {/* Slide Body: Narrative Paragraphs + Structured Key Points + Case Study Callout */}
+                    <div className="flex-1 my-2.5 sm:my-3.5 overflow-y-auto pr-1.5 space-y-2.5 sm:space-y-3">
+                      {/* 1. Narrative Description Paragraph */}
+                      {currentSlide.description && (
+                        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 dark:bg-blue-950/20 p-3 sm:p-4 text-xs sm:text-[13px] leading-relaxed shadow-2xs">
+                          <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 mb-1.5 uppercase tracking-wider">
+                            <BookOpen className="h-3.5 w-3.5" />
+                            <span>Uraian & Penjelasan Komprehensif</span>
                           </div>
-
-                          {currentSlide.highlight && (
-                            <div className="mt-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/20 p-2.5 sm:p-3 flex items-start gap-2.5 shadow-2xs">
-                              <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                              <div className="space-y-0.5 min-w-0 flex-1">
-                                <span className="text-[10px] uppercase tracking-wider font-bold text-amber-700 dark:text-amber-300 block">
-                                  Studi Kasus & Penerapan Kontekstual
-                                </span>
-                                <p className="text-xs sm:text-[12.5px] text-foreground/90 leading-relaxed font-normal">
-                                  {currentSlide.highlight}
-                                </p>
-                              </div>
-                            </div>
-                          )}
+                          <div className="text-foreground/90 leading-relaxed font-normal whitespace-pre-line space-y-2">
+                            {currentSlide.description}
+                          </div>
                         </div>
                       )}
 
-                      {/* ARCHETYPE 2: HYBRID SLIDE (NARRATIVE INTRO + KEY POINTS) */}
-                      {currentSlide.layoutType === "hybrid" && (
-                        <div className="space-y-3 my-auto py-1">
+                      {/* 2. Structured Bullets / Key Points */}
+                      {currentSlide.bullets.length > 0 && (
+                        <div className="space-y-2">
                           {currentSlide.description && (
-                            <p className="text-xs sm:text-[13.5px] md:text-[14px] text-foreground/90 leading-relaxed font-normal">
-                              {currentSlide.description}
-                            </p>
-                          )}
-
-                          {currentSlide.bullets.length > 0 && (
-                            <div
-                              className={
-                                currentSlide.bullets.length >= 3
-                                  ? "grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1"
-                                  : "space-y-2 pt-1"
-                              }
-                            >
-                              {currentSlide.bullets.map((bullet, bIdx) => {
-                                const colonIdx = bullet.indexOf(":");
-                                const hasLabel = colonIdx > 0 && colonIdx < 35;
-                                const label = hasLabel ? bullet.slice(0, colonIdx).trim() : null;
-                                const value = hasLabel ? bullet.slice(colonIdx + 1).trim() : bullet;
-
-                                return (
-                                  <div
-                                    key={bIdx}
-                                    className="flex items-start gap-2 rounded-xl border border-border/70 bg-card/90 p-2.5 transition-all hover:bg-muted/30 hover:border-blue-500/30 shadow-2xs"
-                                  >
-                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-bold mt-0.5">
-                                      •
-                                    </span>
-                                    <div className="flex-1 min-w-0">
-                                      {label ? (
-                                        <p className="text-xs sm:text-[13px] text-foreground/90 leading-relaxed">
-                                          <strong className="text-foreground font-semibold mr-1">
-                                            {label}:
-                                          </strong>
-                                          {value}
-                                        </p>
-                                      ) : (
-                                        <p className="text-xs sm:text-[13px] text-foreground/90 leading-relaxed font-normal">
-                                          {value}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider px-1">
+                              <span>Poin Kunci & Karakteristik:</span>
                             </div>
                           )}
-
-                          {currentSlide.highlight && (
-                            <div className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/20 p-2.5 flex items-start gap-2 shadow-2xs">
-                              <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                              <div className="space-y-0.5 min-w-0 flex-1">
-                                <span className="text-[10px] uppercase tracking-wider font-bold text-amber-700 dark:text-amber-300 block">
-                                  Studi Kasus & Penerapan Kontekstual
-                                </span>
-                                <p className="text-xs sm:text-[12px] text-foreground/90 leading-relaxed font-normal">
-                                  {currentSlide.highlight}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* ARCHETYPE 3: CODE SNIPPET SLIDE */}
-                      {currentSlide.layoutType === "code" && (
-                        <div className="space-y-2.5 my-auto py-1">
-                          {currentSlide.description && (
-                            <p className="text-xs sm:text-[13px] text-foreground/90 leading-relaxed font-normal">
-                              {currentSlide.description}
-                            </p>
-                          )}
-                          {currentSlide.codeSnippet && (
-                            <div className="rounded-xl border border-slate-700/80 bg-slate-900 text-slate-100 p-3 sm:p-3.5 font-mono text-[11px] sm:text-xs overflow-x-auto shadow-md">
-                              <pre className="leading-relaxed">{currentSlide.codeSnippet}</pre>
-                            </div>
-                          )}
-                          {currentSlide.highlight && (
-                            <p className="text-[11.5px] sm:text-xs text-muted-foreground italic">
-                              💡 {currentSlide.highlight}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* ARCHETYPE 4: STRUCTURED BULLETS / COMPARISON SLIDE */}
-                      {(currentSlide.layoutType === "bullets" || (!currentSlide.layoutType && currentSlide.bullets.length > 0)) && (
-                        <div className="space-y-2.5 my-auto py-1">
                           <div
                             className={
-                              currentSlide.bullets.length >= 4
+                              currentSlide.bullets.length >= 4 && !currentSlide.description
                                 ? "grid grid-cols-1 sm:grid-cols-2 gap-2"
                                 : "space-y-2"
                             }
@@ -3379,20 +3772,43 @@ export function AsistenGuruPage() {
                               );
                             })}
                           </div>
+                        </div>
+                      )}
 
-                          {currentSlide.highlight && (
-                            <div className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/20 p-2.5 sm:p-3 flex items-start gap-2.5 shadow-2xs">
-                              <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                              <div className="space-y-0.5 min-w-0 flex-1">
-                                <span className="text-[10px] uppercase tracking-wider font-bold text-amber-700 dark:text-amber-300 block">
-                                  Studi Kasus & Penerapan Kontekstual
-                                </span>
-                                <p className="text-xs sm:text-[12px] text-foreground/90 leading-relaxed font-normal">
-                                  {currentSlide.highlight}
-                                </p>
-                              </div>
-                            </div>
-                          )}
+                      {/* 3. Code Snippet Block (if any) */}
+                      {currentSlide.codeSnippet && (
+                        <div className="rounded-xl border border-slate-700/80 bg-slate-900 text-slate-100 p-3 font-mono text-[11px] sm:text-xs overflow-x-auto shadow-md">
+                          <pre className="leading-relaxed">{currentSlide.codeSnippet}</pre>
+                        </div>
+                      )}
+
+                      {/* 4. Highlight Callout (Case Study / Concrete Example / Teaching Tip) */}
+                      {currentSlide.highlight && (
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/20 p-2.5 sm:p-3 flex items-start gap-2.5 shadow-2xs">
+                          <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-amber-700 dark:text-amber-300 block">
+                              Studi Kasus & Penerapan Kontekstual
+                            </span>
+                            <p className="text-xs sm:text-[12.5px] text-foreground/90 leading-relaxed font-normal">
+                              {currentSlide.highlight}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 5. Reflection / Classroom Discussion Prompt */}
+                      {currentSlide.reflection && (
+                        <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 dark:bg-indigo-950/20 p-2.5 sm:p-3 flex items-start gap-2.5 shadow-2xs">
+                          <MessageSquare className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-indigo-700 dark:text-indigo-300 block">
+                              Refleksi & Diskusi Pemantik Siswa
+                            </span>
+                            <p className="text-xs sm:text-[12.5px] text-foreground/90 leading-relaxed font-normal">
+                              {currentSlide.reflection}
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -3440,13 +3856,7 @@ export function AsistenGuruPage() {
                         {s.title}
                       </p>
                       <span className="text-[8px] text-muted-foreground truncate">
-                        {s.layoutType === "narrative"
-                          ? "Uraian Narasi"
-                          : s.layoutType === "hybrid"
-                          ? "Narasi & Poin"
-                          : s.layoutType === "code"
-                          ? "Kode & Analisis"
-                          : `${s.bullets.length} butir`}
+                        {s.description ? "Paragraf & Poin" : `${s.bullets.length} butir`}
                       </span>
                     </button>
                   );

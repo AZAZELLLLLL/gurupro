@@ -10,6 +10,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { resolveServerAiConfig } from "./ai/ai-service";
+import { extractDocumentText } from "./ai/document-parser";
 
 const ChatMessageSchema = z.object({
   role: z.enum(["user", "assistant", "system"]),
@@ -28,8 +29,27 @@ const OutlineSettingsSchema = z.object({
 const ChatInputSchema = z.object({
   messages: z.array(ChatMessageSchema),
   contextMateri: z.string().optional(),
+  attachedImage: z.string().optional(),
   outlineSettings: OutlineSettingsSchema,
 });
+
+const AnalisisLampiranInputSchema = z.object({
+  type: z.enum(["document", "image", "text"]),
+  fileName: z.string().optional(),
+  fileType: z.string().optional(),
+  base64Data: z.string().optional(),
+  rawText: z.string().optional(),
+});
+
+export interface AnalisisLampiranResponse {
+  title: string;
+  summary: string;
+  extractedText: string;
+  wordCount: number;
+  type: "document" | "image" | "text";
+  fileName?: string;
+  imageUrl?: string;
+}
 
 export interface ChatResponse {
   reply: string;
@@ -120,76 +140,53 @@ CATATAN PENTING:
 ATURAN KHUSUS PERANCANGAN PRESENTASI SLIDE PPT SUPER DETAIL (@generate_ppt / rancang presentasi):
 Bila guru meminta slide presentasi (misal: "rancang slide presentasi...", "buatkan ppt...", tag @generate_ppt, atau kebutuhan tayangan proyektor kelas):
 1. DILARANG KERAS MENULISKAN CATATAN META-LAYOUT / PROMPT DESAINER / INSTRUKSI PROMPT:
-   - Dilarang menulis "Visual:", "Visual Ilustrasi (3D):", "Judul Slide:", "Sub-TeKS:", "Isi Poin:", "Footer:", "Poin Rangkuman:", "Gaya Visual:", "Elemen Visual:", "Catatan Visual:", "Catatan Presenter:", atau instruksi desainer grafis. Tulisan tersebut BUKAN materi pelajaran dan DILARANG KERAS muncul dalam teks slide! Tuliskan langsung materi ajar nyata yang siap dipelajari siswa!
-2. DEDIKASIKAN BEBERAPA SLIDE KHUSUS UNTUK PENJELASAN MATERI SECARA MENDALAM DENGAN SISTEM PARAGRAF DETAIL:
-   - DILARANG membuat presentasi yang hanya berisi ringkasan dangkal atau tumpukan butir bullet points kaku!
-   - Pembahasan materi pembelajaran menggunakan sistem paragraf lengkap sangat penting agar siswa dan guru mendapatkan pemahaman konsep yang utuh, komprehensif, dan bernas.
-   - OLEH KARENA ITU, WAJIB DEDIKASIKAN BEBERAPA SLIDE BERURUTAN (minimal 3 sampai 6 slide khusus) yang isinya adalah URAIAN PENJELASAN MATERI MENGGUNAKAN PARAGRAF LENGKAP & DETAIL (2 hingga 3 paragraf per slide penjelasan):
-     * Setiap paragraf penjelasan harus memaparkan materi secara mengalir (3-5 kalimat komprehensif berbobot akademis per paragraf), mengupas tuntas definisi ilmiah, asal-usul/latar belakang, prinsip kerja, mekanisme operasional, rumus/kaidah, analogi kontekstual, hingga bedah logika sebab-akibat.
-     * TULISKAN LANGSUNG SEBAGAI PARAGRAF TEKS BIASA TANPA BULLET DASH (-).
-   - Susun setiap slide secara fleksibel, alami, dan bervariasi sesuai peruntukan materinya (tidak monoton kaku):
-     a) **Slide Penjelasan Materi Mendalam (Full Paragraf Detail)**: Fokus memaparkan teori, konsep, dan mekanisme secara naratif dan detail tanpa terpecah-pecah menjadi poin.
-     b) **Slide Kombinasi (Paragraf Narasi + Poin Kunci/Komparasi)**: Paragraf pengantar konsep yang dipertegas oleh 2-3 poin karakteristik atau pembeda.
-     c) **Slide Studi Kasus & Penerapan Konkret**: Paragraf bedah kasus nyata di industri/kehidupan sehari-hari disertai solusi aplikatif. Jika pelajaran pemrograman, sertakan blok kode rapi (\`\`\`python ... \`\`\`).
-     d) **Slide Poin Kunci & Komparasi**: Rangkuman butir penting terstruktur \`- **[Label Kunci]**: [Uraian]\`.
-     e) **Slide Rangkuman & Refleksi**: Butir emas pembelajaran dan pertanyaan pemantik kritis.
-3. JUMLAH SLIDE FLEKSIBEL & MENUNTASKAN SELURUH POKOK BAHASAN:
-   - Jumlah slide tidak dibatasi kaku (jangan dibatasi hanya 5 slide; buatlah 8 hingga 12+ slide jika materi luas) agar seluruh materi dari pengantar, penjelasan detail tiap sub-bab, studi kasus, hingga penutup dapat tersampaikan secara komprehensif dari awal sampai akhir.
+   - Dilarang menulis "Visual:", "Visual Ilustrasi (3D):", "Judul Slide:", "Sub-TeKS:", "Isi Poin:", "Footer:", "Poin Rangkuman:", "Gaya Visual:", "Elemen Visual:", "Catatan Visual:", "Catatan Presenter:", atau arahan desainer grafis. Tulisan tersebut BUKAN materi pelajaran dan DILARANG KERAS muncul dalam teks slide! Tuliskan langsung materi ajar nyata yang siap dipelajari siswa!
+2. KOMBINASI METODE PENJELASAN LENGKAP: BUKAN HANYA POIN-POIN, TAPI WAJIB MEMUAT PARAGRAF DESKRIPSI & NARASI LENGKAP:
+   - DILARANG membuat slide yang isinya hanya tumpukan butir poin/bullet centang ringkas!
+   - Setiap slide wajib mengombinasikan:
+     a) **Paragraf Deskripsi & Uraian Mendalam (Metode Narasi Teks Lengkap)**: Tuliskan 1 hingga 2 paragraf deskriptif utuh (3-5 kalimat komprehensif, akademis, dan bernas) yang menjelaskan latar belakang, teori dasar, logika konsep, dan signifikansinya secara menyeluruh. TULIS LANGSUNG DALAM BENTUK PARAGRAF TEKS BIASA TANPA TANDA BULLET.
+     b) **Poin Kunci & Karakteristik (Key Takeaways)**: 2-3 poin penting terstruktur menggunakan format \`- **[Label Kunci]**: [Penjelasan spesifik]\`.
+     c) **Studi Kasus / Penerapan Riil / Contoh Konkret**: 1 blok contoh aplikatif dunia nyata atau studi kasus industri. Jika materi pemrograman/IT, sertakan blok kode rapi (\`\`\`python ... \`\`\`).
+3. JUMLAH SLIDE FLEKSIBEL & WAJIB TUNTAS:
+   - Jumlah slide TIDAK DIBATASI KAKU (jangan dibatasi hanya 1-2 slide atau 5 slide). Wajib membuat seluruh rangkaian slide dari awal sampai akhir secara komprehensif (minimal 6 hingga 10+ slide terstruktur) sehingga mencakup seluruh pokok bahasan tuntas dari pengantar, konsep inti, prinsip kerja/sintaks, studi kasus kontekstual, hingga rangkuman dan refleksi penutup.
    - DILARANG BERHENTI DI TENGAH JALAN: Seluruh slide wajib dituliskan tuntas sampai bagian penutup dan apresiasi akhir.
-4. STRUKTUR HEADING DI BARIS BARU:
-   Setiap slide WAJIB diawali dengan heading: \`### Slide [Nomor]: [Judul Slide Lengkap]\` di baris baru agar sistem parser mengenali setiap slide secara sempurna. Contoh alur struktur ideal:
+   - Tuliskan REAL PEMBAHASAN MATERI SECARA MENDALAM yang siap dibaca, dipahami, dan dipelajari oleh siswa di proyektor kelas.
+4. STRUKTUR FORMAT SLIDE WAJIB MENGGUNAKAN HEADING RESMI DI BARIS BARU:
+   Setiap slide WAJIB diawali dengan heading: \`### Slide [Nomor]: [Judul Slide Lengkap]\` di baris baru agar sistem parser mengenali setiap slide secara sempurna. Contoh struktur format ideal:
 
    ### Slide 1: [Judul Topik Pembelajaran yang Lengkap & Formal]
    Subjudul: [Tagline Pembelajaran Kontekstual yang Jelas]
 
-   [Uraian pengantar komprehensif 1-2 paragraf mengenai fokus materi yang akan dipelajari pada presentasi ini, peta jalan pembahasan, serta pemahaman bermakna bagi peserta didik.]
+   [Uraian pengantar komprehensif 1-2 paragraf mengenai fokus materi yang akan dipelajari pada presentasi ini, relevansinya bagi peserta didik, serta peta jalan pembahasan.]
 
-   ### Slide 2: [Latar Belakang & Landasan Teori Konseptual]
+   Poin Kunci:
+   - **Tujuan Pembelajaran**: [Target kompetensi esensial yang akan dikuasai peserta didik.]
+   - **Peta Konsep**: [Ringkasan cakupan materi dari awal hingga akhir.]
+
+   ### Slide 2: [Latar Belakang & Definisi Konsep Inti]
    Subjudul: [Tagline Konseptual yang Menarik]
 
-   [Paragraf 1: Uraian narasi mendalam 3-5 kalimat mengenai sejarah lahirnya konsep, permasalahan mendasar yang memicu penemuannya, serta mengapa konsep ini menjadi revolusioner di era modern.]
+   [Uraian paragraf narasi mendalam 1-2 paragraf (3-5 kalimat) yang menjelaskan sejarah lahirnya konsep, permasalahan awal yang memicu penemuannya, dan bagaimana konsep ini berevolusi menjadi standar penting di dunia modern.]
 
-   [Paragraf 2: Penjelasan definisi ilmiah formal, terminologi kunci, serta landasan filosofis di balik materi yang wajib dikuasai peserta didik.]
-
-   ### Slide 3: [Prinsip Kerja & Anatomi Struktur Materi]
-   Subjudul: [Tagline Cara Kerja Sistematis]
-
-   [Paragraf 1: Penjelasan deskriptif lengkap mengenai komponen-komponen pembentuk materi, bagaimana setiap komponen saling berinteraksi, dan kaidah baku yang mengatur sistem tersebut.]
-
-   [Paragraf 2: Alur logika langkah-demi-langkah dari proses input, pemrosesan internal, hingga output yang dihasilkan, disertai analogi kontekstual yang mudah dicerna peserta didik.]
-
-   ### Slide 4: [Mekanisme Lanjutan & Logika Sebab-Akibat]
-   Subjudul: [Tagline Eksplorasi Mendalam]
-
-   [Paragraf 1: Pembahasan mendalam mengenai variasi kondisi, aturan percabangan, atau faktor-faktor eksternal yang memengaruhi keberhasilan penerapan materi.]
-
-   [Paragraf 2: Analisis kritis mengenai kesalahan umum (misconceptions) yang sering terjadi di kalangan pemula dan bagaimana cara tepat mengantisipasinya.]
-
-   ### Slide 5: [Penerapan Konkret & Bedah Studi Kasus Industri]
-   Subjudul: [Tagline Implementasi Nyata di Lapangan]
-
-   [Paragraf penjelasan skenario masalah riil di dunia industri atau kehidupan nyata yang dipecahkan menggunakan materi ini.]
+   Poin Kunci:
+   - **Landasan Teori**: [Penjelasan rinci mengenai terminologi kunci dan prinsip dasar.]
+   - **Karakteristik Kunci**: [Faktor pembeda utama konsep ini dibandingkan metode konvensional.]
 
    Studi Kasus:
-   [Uraian konkret implementasi langkah demi langkah beserta analisis hasil pemecahan masalah.]
-   (Jika pemrograman, sertakan blok kode contoh implementasi)
+   [Uraian contoh konkret penerapan nyata di industri atau kehidupan sehari-hari, bagaimana konsep ini memecahkan masalah nyata.]
 
-   ### Slide 6: [Poin-Poin Kunci & Komparasi Karakteristik]
-   Subjudul: [Tagline Ringkasan Butir Emas]
+   ### Slide 3: [Prinsip Kerja & Mekanisme Operasional]
+   Subjudul: [Tagline Cara Kerja Sistematis]
 
-   Poin Kunci:
-   - **[Pilar/Aspek 1]**: [Uraian penegasan karakteristik esensial.]
-   - **[Pilar/Aspek 2]**: [Uraian penegasan karakteristik esensial.]
-   - **[Pilar/Aspek 3]**: [Uraian penegasan karakteristik esensial.]
-
-   ### Slide 7: [Rangkuman Esensial & Refleksi Pembelajaran]
-   Subjudul: [Tagline Evaluasi Diri & Tindak Lanjut]
-
-   [Paragraf rangkuman komprehensif mengenai benang merah seluruh konsep yang telah dipelajari hari ini.]
+   [Uraian paragraf deskriptif lengkap mengenai alur mekanisme kerja, logika langkah-demi-langkah, dan korelasi antar komponen saat konsep dijalankan.]
 
    Poin Kunci:
-   - **Refleksi Diri**: [Pertanyaan pemantik untuk menguji nalar kritis siswa.]
-   - **Tantangan Mandiri**: [Aktivitas eksplorasi lanjutan untuk pertemuan mendatang.]
+   - **Komponen Utama**: [Penjabaran elemen atau variabel pembangun sistem.]
+   - **Alur Eksekusi**: [Tahapan sistematis dari input, proses pemrosesan, hingga output.]
+
+   Studi Kasus:
+   [Contoh nyata implementasi atau skenario pemecahan masalah praktis.]
+   (Lanjutkan ke Slide 4, 5, 6, 7 dst. hingga seluruh materi tuntas dibahas secara mendalam)
 
 ATURAN KHUSUS PERINTAH @generate_ilustrasi:
 Jika pengguna menyertakan tag "@generate_ilustrasi" atau meminta pembuatan ilustrasi/gambar/diagram materi:
@@ -418,6 +415,153 @@ export async function executeDirectImageRender(
   };
 }
 
+export const analisisLampiranMateriServerFn = createServerFn({
+  method: "POST",
+})
+  .validator((input: unknown) => {
+    const parsed = AnalisisLampiranInputSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new Error("Format data lampiran tidak valid.");
+    }
+    return parsed.data;
+  })
+  .handler(async ({ data }): Promise<AnalisisLampiranResponse> => {
+    // 1. Handling for image/photo (Gemini Vision)
+    if (data.type === "image") {
+      if (!data.base64Data) {
+        throw new Error("Berkas foto atau gambar kosong.");
+      }
+      const config = resolveServerAiConfig();
+      const visionPayload = {
+        model: config.model || "gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Anda adalah GuruPro AI Vision & Analis Bahan Ajar. Tugas Anda adalah membaca, mentranskripsikan, dan menganalisis secara detail seluruh materi pembelajaran, ringkasan buku paket, tulisan papan tulis, catatan guru, rumus, diagram alur, tabel, atau butir soal yang tampak pada foto/gambar yang dilampirkan guru. Tuliskan transkripsi lengkap dan terstruktur dalam bahasa Indonesia yang siap diolah menjadi Modul Ajar Kurikulum Merdeka, Slide Presentasi PPT, maupun Media Ilustrasi.",
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Tolong baca, transkripsikan, dan ekstrak seluruh materi pembelajaran yang ada pada foto/gambar ini secara mendalam, rinci, dan terstruktur:",
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: data.base64Data,
+                },
+              },
+            ],
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 4000,
+      };
+
+      const res = await fetch(config.endpoint, {
+        method: "POST",
+        headers: config.headers,
+        body: JSON.stringify(visionPayload),
+        signal: AbortSignal.timeout(60000),
+      });
+
+      if (!res.ok) {
+        let errDesc = "";
+        try {
+          const eb = await res.json();
+          errDesc = eb?.error?.message || "";
+        } catch {}
+        throw new Error(
+          `Gagal menganalisis foto/gambar dengan AI Vision (${res.status}): ${errDesc || res.statusText}`
+        );
+      }
+
+      const json = (await res.json()) as any;
+      const extractedText = json.choices?.[0]?.message?.content?.trim() || "";
+      if (!extractedText) {
+        throw new Error("AI tidak mendeteksi teks atau konten pembelajaran yang jelas pada foto tersebut.");
+      }
+
+      const lines = extractedText.split("\n").map((l: string) => l.trim()).filter(Boolean);
+      const firstLine = lines[0]?.replace(/^[#*\s\-–—:]+/, "").slice(0, 50).trim();
+      const title = firstLine || data.fileName?.replace(/\.[^/.]+$/, "") || "Materi dari Foto Lampiran";
+      const words = extractedText.split(/\s+/).filter(Boolean).length;
+      const summary = extractedText.slice(0, 220).replace(/\n+/g, " ") + "...";
+
+      return {
+        title,
+        summary,
+        extractedText,
+        wordCount: words,
+        type: "image",
+        fileName: data.fileName || "foto-materi.jpg",
+        imageUrl: data.base64Data,
+      };
+    }
+
+    // 2. Handling for document (.pdf, .docx, .txt, .md, .html)
+    if (data.type === "document") {
+      if (!data.base64Data) {
+        throw new Error("Berkas dokumen kosong.");
+      }
+      const cleanB64 = data.base64Data.replace(/^data:[^;]+;base64,/, "");
+      const buffer = Buffer.from(cleanB64, "base64");
+      const lowerName = (data.fileName || "").toLowerCase();
+
+      let extractedText = "";
+      let title = data.fileName?.replace(/\.[^/.]+$/, "") || "Dokumen Materi";
+
+      if (lowerName.endsWith(".txt") || lowerName.endsWith(".md")) {
+        extractedText = buffer.toString("utf-8");
+      } else {
+        const docRes = await extractDocumentText({
+          buffer,
+          fileName: data.fileName || "dokumen",
+          mimeType: data.fileType,
+        });
+        extractedText = docRes.text;
+        if (docRes.suggestedTopic) title = docRes.suggestedTopic;
+        else if (docRes.title) title = docRes.title;
+      }
+
+      if (!extractedText || extractedText.trim().length < 20) {
+        throw new Error("Dokumen tidak memuat teks yang dapat diekstrak atau dokumen terlindungi kata sandi.");
+      }
+
+      const words = extractedText.split(/\s+/).filter(Boolean).length;
+      const summary = extractedText.slice(0, 220).replace(/\n+/g, " ") + "...";
+
+      return {
+        title,
+        summary,
+        extractedText,
+        wordCount: words,
+        type: "document",
+        fileName: data.fileName,
+      };
+    }
+
+    // 3. Handling for manual text
+    const raw = (data.rawText || "").trim();
+    if (!raw || raw.length < 20) {
+      throw new Error("Teks rujukan terlalu pendek (minimal 20 karakter).");
+    }
+    const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+    const title = lines[0]?.replace(/^[#*\s\-–—:]+/, "").slice(0, 50).trim() || "Catatan Rujukan Guru";
+    const words = raw.split(/\s+/).filter(Boolean).length;
+    const summary = raw.slice(0, 220).replace(/\n+/g, " ") + "...";
+
+    return {
+      title,
+      summary,
+      extractedText: raw,
+      wordCount: words,
+      type: "text",
+    };
+  });
+
 export const chatWithGuruAiServerFn = createServerFn({
   method: "POST",
 })
@@ -458,9 +602,28 @@ export const chatWithGuruAiServerFn = createServerFn({
       }
     }
 
-    // Append last 10 messages for context
+    // Append last 10 messages for context, attaching visual multimodal payload if present
     const recentMessages = data.messages.slice(-10);
-    conversationMessages.push(...recentMessages);
+    if (data.attachedImage && recentMessages.length > 0) {
+      const cloned = [...recentMessages];
+      const lastUserIdx = cloned.length - 1;
+      const lastMsg = cloned[lastUserIdx];
+      if (lastMsg && lastMsg.role === "user") {
+        cloned[lastUserIdx] = {
+          role: "user",
+          content: [
+            { type: "text", text: String(lastMsg.content) },
+            {
+              type: "image_url",
+              image_url: { url: data.attachedImage },
+            },
+          ] as any,
+        };
+      }
+      conversationMessages.push(...cloned);
+    } else {
+      conversationMessages.push(...recentMessages);
+    }
 
     // Multi-model resilient cascade
     const candidateModels =
