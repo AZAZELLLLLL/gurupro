@@ -162,10 +162,11 @@ export async function deletePaket(id: string) {
 export async function publishPaket(id: string) {
   const { publishQuestionPackageServerFn } = await import("./ai.functions");
   const result = (await publishQuestionPackageServerFn({ data: { paketId: id } })) as any;
-  if (result.status === "success" && result.publishedPackage) {
+  const pkg = result.publishedPackage || result.persistedPackage;
+  if (result.status === "success" && pkg) {
     const previous = store.get();
-    store.set(previous.map((p) => (p.id === id ? result.publishedPackage : p)));
-    return result.publishedPackage as PaketSoal;
+    store.set(previous.map((p) => (p.id === id ? pkg : p)));
+    return pkg as PaketSoal;
   }
   throw new Error("Gagal menerbitkan paket soal.");
 }

@@ -1720,7 +1720,7 @@ export const publishQuestionPackageServerFn = createServerFn({ method: "POST" })
       );
     }
 
-    const persistedPackage: PaketSoal = {
+    const publishedPackage: PaketSoal = {
       id: updated.id,
       judul: updated.judul,
       topik: updated.topik,
@@ -1738,6 +1738,7 @@ export const publishQuestionPackageServerFn = createServerFn({ method: "POST" })
       publishedAt: updatedAiMetadata.publishedAt,
       publishedBy: updatedAiMetadata.publishedBy,
     };
+    const persistedPackage = publishedPackage;
 
     const studentSafeQuestions = validatedPackage.questions.map(toStudentSafeQuestion);
 
