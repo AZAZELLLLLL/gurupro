@@ -213,9 +213,9 @@ export async function extractPdfText(
     throw new AiServiceError(AI_ERROR_CODES.SOURCE_EMPTY, "File PDF kosong (0 byte).");
   }
 
-  // Verify %PDF- signature
-  const header = String.fromCharCode(...uint8.slice(0, 5));
-  if (!header.startsWith("%PDF")) {
+  // Verify %PDF- signature (standard ISO 32000-1 allows header anywhere in first 1024 bytes)
+  const headerSlice = String.fromCharCode(...uint8.slice(0, Math.min(1024, uint8.byteLength)));
+  if (!headerSlice.includes("%PDF")) {
     throw new AiServiceError(
       AI_ERROR_CODES.SOURCE_PARSE_ERROR,
       "Format file bukan dokumen PDF yang valid (%PDF signature tidak ditemukan).",
@@ -235,13 +235,39 @@ export async function extractPdfText(
       textPages = [res.text];
     }
   } catch (err: any) {
-    throw new AiServiceError(
-      AI_ERROR_CODES.SOURCE_PARSE_ERROR,
-      `Gagal mengekstrak teks dari PDF: dokumen rusak atau dilindungi kata sandi (${err?.message || "pdf error"}).`,
-    );
+    // If standard unpdf parser throws, attempt raw stream extraction as a fallback
+    const rawLatin = String.fromCharCode(...uint8);
+    const tjMatches = rawLatin.match(/\(([^)]{2,})\)\s*(?:Tj|'|")/g);
+    if (tjMatches && tjMatches.length > 5) {
+      const recovered = tjMatches
+        .map((m) => m.replace(/^[('"]+|[)'"]+$/g, "").trim())
+        .filter((w) => w.length > 1)
+        .join(" ");
+      if (recovered.length > 30) {
+        textPages = [recovered];
+      }
+    }
+    if (textPages.length === 0) {
+      throw new AiServiceError(
+        AI_ERROR_CODES.SOURCE_PARSE_ERROR,
+        `Gagal mengekstrak teks dari PDF: dokumen rusak atau dilindungi kata sandi (${err?.message || "pdf error"}).`,
+      );
+    }
   }
 
-  const rawExtracted = textPages.join("\n\n").trim();
+  let rawExtracted = textPages.join("\n\n").trim();
+  if (!rawExtracted) {
+    // Attempt raw PDF stream string recovery before giving up
+    const rawLatin = String.fromCharCode(...uint8);
+    const tjMatches = rawLatin.match(/\(([^)]{2,})\)\s*(?:Tj|'|")/g);
+    if (tjMatches && tjMatches.length > 5) {
+      rawExtracted = tjMatches
+        .map((m) => m.replace(/^[('"]+|[)'"]+$/g, "").trim())
+        .filter((w) => w.length > 1)
+        .join(" ");
+    }
+  }
+
   if (!rawExtracted) {
     throw new AiServiceError(
       AI_ERROR_CODES.SOURCE_PARSE_ERROR,

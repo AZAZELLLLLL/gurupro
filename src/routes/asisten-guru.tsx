@@ -258,6 +258,7 @@ export function AsistenGuruPage() {
   const [lampiranTab, setLampiranTab] = useState<"file" | "photo" | "text">("file");
   const [isProcessingLampiran, setIsProcessingLampiran] = useState(false);
   const [lampiranStatusText, setLampiranStatusText] = useState("");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const docInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -482,24 +483,73 @@ export function AsistenGuruPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [currentMessages.length, isLoading]);
 
-  const handleDocumentSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const processDocumentFile = async (file: File) => {
     if (!file) return;
-    if (file.size > 15 * 1024 * 1024) {
-      toast.error("Ukuran berkas maksimal 15 MB.");
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("Ukuran berkas maksimal 25 MB.");
       return;
     }
     setIsProcessingLampiran(true);
     setLampiranStatusText(`Membaca berkas "${file.name}"...`);
+
+    const lowerName = file.name.toLowerCase();
+    const isPdf = lowerName.endsWith(".pdf") || file.type === "application/pdf";
+
+    // 1. Client-side extraction for PDF to bypass server body limits and parse instantly
+    if (isPdf) {
+      try {
+        setLampiranStatusText("Mengekstrak teks halaman PDF secara langsung...");
+        const arrayBuf = await file.arrayBuffer();
+        const uint8 = new Uint8Array(arrayBuf);
+
+        let clientExtractedText = "";
+        try {
+          const { extractText } = await import("unpdf");
+          const res = await extractText(uint8);
+          if (Array.isArray(res.text)) {
+            clientExtractedText = res.text.join("\n\n").trim();
+          } else if (typeof res.text === "string") {
+            clientExtractedText = res.text.trim();
+          }
+        } catch (clientErr) {
+          console.warn("Client unpdf extraction fallback:", clientErr);
+        }
+
+        if (clientExtractedText && clientExtractedText.length > 30) {
+          setLampiranStatusText("Menganalisis konten materi pembelajaran...");
+          const res = await analisisLampiranMateriServerFn({
+            data: {
+              type: "text",
+              fileName: file.name,
+              rawText: clientExtractedText,
+            },
+          });
+          setActiveLampiran({
+            ...res,
+            type: "document",
+            fileName: file.name,
+          });
+          setContextMateri(res.extractedText);
+          toast.success(`Dokumen PDF "${res.title}" berhasil diserap (${res.wordCount} kata)!`);
+          setIsProcessingLampiran(false);
+          setLampiranStatusText("");
+          return;
+        }
+      } catch (err) {
+        console.warn("Client PDF error, falling back to server:", err);
+      }
+    }
+
+    // 2. Server-side extraction fallback
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        setLampiranStatusText("Mengekstrak dan menganalisis struktur materi dokumen...");
+        setLampiranStatusText("Mengekstrak dan menganalisis struktur materi dokumen di server...");
         const res = await analisisLampiranMateriServerFn({
           data: {
             type: "document",
             fileName: file.name,
-            fileType: file.type,
+            fileType: file.type || (isPdf ? "application/pdf" : undefined),
             base64Data: String(reader.result || ""),
           },
         });
@@ -507,7 +557,7 @@ export function AsistenGuruPage() {
         setContextMateri(res.extractedText);
         toast.success(`Dokumen "${res.title}" berhasil dianalisis (${res.wordCount} kata)!`);
       } catch (err: any) {
-        toast.error(err?.message || "Gagal menganalisis dokumen.");
+        toast.error(err?.message || "Gagal menganalisis dokumen PDF.");
       } finally {
         setIsProcessingLampiran(false);
         setLampiranStatusText("");
@@ -518,6 +568,13 @@ export function AsistenGuruPage() {
       toast.error("Gagal membaca berkas dari perangkat.");
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDocumentSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processDocumentFile(file);
+    }
     e.target.value = "";
   };
 
@@ -3068,13 +3125,15 @@ export function AsistenGuruPage() {
             {/* Hidden File Inputs */}
             <input
               type="file"
+              id="gurupro-doc-input"
               ref={docInputRef}
-              accept=".pdf,.docx,.doc,.txt,.md,.html"
+              accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.doc,application/msword,.txt,text/plain,.md,text/markdown,.html,text/html"
               className="hidden"
               onChange={handleDocumentSelected}
             />
             <input
               type="file"
+              id="gurupro-photo-input"
               ref={photoInputRef}
               accept="image/jpeg,image/png,image/webp,image/jpg"
               capture="environment"
@@ -3144,28 +3203,44 @@ export function AsistenGuruPage() {
               {/* Tab 1: File Dokumen */}
               {!isProcessingLampiran && lampiranTab === "file" && (
                 <div className="space-y-3">
-                  <div
-                    onClick={() => docInputRef.current?.click()}
-                    className="group border-2 border-dashed border-border hover:border-primary/60 hover:bg-muted/30 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center"
+                  <label
+                    htmlFor="gurupro-doc-input"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDraggingFile(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      setIsDraggingFile(false);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDraggingFile(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) {
+                        processDocumentFile(file);
+                      }
+                    }}
+                    className={`group border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center ${
+                      isDraggingFile
+                        ? "border-primary bg-primary/10 scale-[1.01]"
+                        : "border-border hover:border-primary/60 hover:bg-muted/30"
+                    }`}
                   >
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3 group-hover:scale-105 transition-transform">
                       <FileUp className="h-6 w-6" />
                     </div>
                     <h4 className="text-xs sm:text-sm font-bold text-foreground">
-                      Pilih Berkas Dokumen Ajar
+                      Pilih atau Tarik Berkas Dokumen Ajar
                     </h4>
                     <p className="text-[11px] text-muted-foreground mt-1 max-w-sm">
-                      Mendukung format <strong>PDF, Word (.docx), TXT, atau Markdown (.md)</strong> hingga 15 MB.
+                      Mendukung format <strong>PDF (.pdf), Word (.docx), TXT, atau Markdown (.md)</strong> hingga 25 MB.
                     </p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="mt-3.5 gap-1.5 rounded-xl pointer-events-none"
-                    >
-                      <UploadCloud className="h-4 w-4" />
-                      <span>Jelajahi Berkas</span>
-                    </Button>
-                  </div>
+                    <div className="mt-3.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold shadow-xs group-hover:bg-primary/90 transition-colors">
+                      <UploadCloud className="h-3.5 w-3.5" />
+                      <span>Jelajahi Berkas Dokumen</span>
+                    </div>
+                  </label>
                 </div>
               )}
 

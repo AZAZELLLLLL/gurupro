@@ -689,7 +689,7 @@ export function ModulGeneratorDialog({
                   <input
                     type="file"
                     className="hidden"
-                    accept=".pdf,.docx,.txt,.html"
+                    accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain,.html,text/html"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) {

@@ -516,14 +516,73 @@ export const analisisLampiranMateriServerFn = createServerFn({
       if (lowerName.endsWith(".txt") || lowerName.endsWith(".md")) {
         extractedText = buffer.toString("utf-8");
       } else {
-        const docRes = await extractDocumentText({
-          buffer,
-          fileName: data.fileName || "dokumen",
-          mimeType: data.fileType,
-        });
-        extractedText = docRes.text;
-        if (docRes.suggestedTopic) title = docRes.suggestedTopic;
-        else if (docRes.title) title = docRes.title;
+        try {
+          const docRes = await extractDocumentText({
+            buffer,
+            fileName: data.fileName || "dokumen",
+            mimeType: data.fileType,
+          });
+          extractedText = docRes.text;
+          if (docRes.suggestedTopic) title = docRes.suggestedTopic;
+          else if (docRes.title) title = docRes.title;
+        } catch (docErr: any) {
+          // If it is a PDF, attempt image extraction for scanned PDF pages
+          if (lowerName.endsWith(".pdf") || data.fileType === "application/pdf") {
+            try {
+              const { extractImages } = await import("unpdf");
+              const uint8 = buffer.buffer
+                ? new Uint8Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
+                : new Uint8Array(buffer);
+              const images = await extractImages(uint8, 1);
+              if (images && images.length > 0) {
+                const imgBuf = Buffer.from(images[0]);
+                const imgB64 = `data:image/jpeg;base64,${imgBuf.toString("base64")}`;
+                const config = resolveServerAiConfig();
+                const visionRes = await fetch(config.endpoint, {
+                  method: "POST",
+                  headers: config.headers,
+                  body: JSON.stringify({
+                    model: config.model || "gemini-2.5-flash",
+                    messages: [
+                      {
+                        role: "system",
+                        content:
+                          "Anda adalah GuruPro AI Vision. Baca, transkripsikan, dan ekstrak seluruh materi pembelajaran, ringkasan bab, atau lembar tugas dari halaman dokumen hasil scan ini secara mendalam dan terstruktur.",
+                      },
+                      {
+                        role: "user",
+                        content: [
+                          {
+                            type: "text",
+                            text: "Tolong transkripsikan seluruh isi materi teks yang ada pada halaman scan PDF ini:",
+                          },
+                          {
+                            type: "image_url",
+                            image_url: { url: imgB64 },
+                          },
+                        ],
+                      },
+                    ],
+                    max_tokens: 3000,
+                  }),
+                  signal: AbortSignal.timeout(60000),
+                });
+                if (visionRes.ok) {
+                  const vj = (await visionRes.json()) as any;
+                  const vContent = vj.choices?.[0]?.message?.content?.trim();
+                  if (vContent && vContent.length > 30) {
+                    extractedText = vContent;
+                  }
+                }
+              }
+            } catch (vErr) {
+              console.warn("PDF scanned image vision fallback failed:", vErr);
+            }
+          }
+          if (!extractedText || extractedText.trim().length < 20) {
+            throw docErr;
+          }
+        }
       }
 
       if (!extractedText || extractedText.trim().length < 20) {
