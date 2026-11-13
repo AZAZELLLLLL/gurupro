@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   School,
+  ShieldCheck,
   Sparkles,
   UserRound,
 } from "lucide-react";
@@ -77,7 +78,12 @@ export function AppSidebar() {
           { title: "Penugasan", url: "/penugasan", icon: ClipboardList },
           { title: "Nilai", url: "/penilaian", icon: GraduationCap },
         ]
-      : mainItems.filter((item) => item.url === "/dashboard" || item.url === "/");
+      : isAdminUser
+        ? [
+            { title: "Dashboard Admin", url: "/dashboard", icon: LayoutDashboard },
+            { title: "Panel Admin", url: "/admin", icon: ShieldCheck },
+          ]
+        : mainItems.filter((item) => item.url === "/dashboard" || item.url === "/");
 
   const visibleSecondaryItems = isTeacher
     ? secondaryItems

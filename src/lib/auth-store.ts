@@ -127,8 +127,18 @@ export function isSiswa(profile: GuruProfile): boolean {
   return profile?.role === "siswa";
 }
 
+export const ADMIN_EMAILS: readonly string[] = [
+  "admin@gurupro.id",
+  "novaragroup67@gmail.com",
+];
+
+export function isSystemAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase().trim());
+}
+
 export function isAdmin(profile: GuruProfile): boolean {
-  return profile?.role === "admin";
+  return profile?.role === "admin" || isSystemAdminEmail(profile?.email);
 }
 
 export type FetchProfileResult =
@@ -137,18 +147,19 @@ export type FetchProfileResult =
   | { status: "error"; message: string; profile: GuruProfile };
 
 export async function fetchProfileForUser(user: User): Promise<FetchProfileResult> {
+  const isSysAdmin = isSystemAdminEmail(user.email);
   const fallbackProfile: GuruProfile = {
     id: user.id,
-    nama: user.email?.split("@")[0] || "Pengguna",
+    nama: isSysAdmin ? "Administrator GuruPro" : user.email?.split("@")[0] || "Pengguna",
     email: user.email || "",
-    nip: "",
+    nip: isSysAdmin ? "ADMIN-001" : "",
     nisn: "",
-    sekolah: "",
-    mapel: "",
+    sekolah: isSysAdmin ? "GuruPro Command Center" : "",
+    mapel: isSysAdmin ? "Manajemen Sistem" : "",
     kelas: "",
     telepon: "",
-    bio: "",
-    role: "",
+    bio: isSysAdmin ? "Akun Khusus Administrator GuruPro" : "",
+    role: isSysAdmin ? "admin" : "",
     status_verifikasi: "terverifikasi",
   };
 
@@ -161,6 +172,12 @@ export async function fetchProfileForUser(user: User): Promise<FetchProfileResul
 
     if (error) {
       console.error("[Auth] Real DB/RLS query error during fetchProfileForUser:", error.message, error);
+      if (isSysAdmin) {
+        return {
+          status: "loaded",
+          profile: fallbackProfile,
+        };
+      }
       return {
         status: "error",
         message: error.message || "Gagal memuat profil akun dari basis data.",
@@ -170,6 +187,12 @@ export async function fetchProfileForUser(user: User): Promise<FetchProfileResul
 
     if (!data) {
       console.warn("[Auth] No profile row found in DB for auth.uid():", user.id);
+      if (isSysAdmin) {
+        return {
+          status: "loaded",
+          profile: fallbackProfile,
+        };
+      }
       return {
         status: "missing",
         profile: fallbackProfile,
@@ -178,36 +201,46 @@ export async function fetchProfileForUser(user: User): Promise<FetchProfileResul
 
     // Fail-safe role validation: strictly from DB, never trust client user_metadata for role elevation
     const rawRole = data.role || "";
-    const validatedRole =
+    let validatedRole =
       rawRole === "guru" || rawRole === "siswa" || rawRole === "admin" ? rawRole : "";
+
+    if (isSysAdmin) {
+      validatedRole = "admin";
+    }
 
     const resolvedNisn =
       data.nisn ||
       (validatedRole === "siswa" ? data.nip : "") ||
       "";
     const resolvedNip =
-      validatedRole === "siswa" ? "" : data.nip || "";
+      validatedRole === "siswa" ? "" : data.nip || (isSysAdmin ? "ADMIN-001" : "");
 
     return {
       status: "loaded",
       profile: {
         id: data.id,
-        nama: data.nama || "Pengguna",
+        nama: data.nama || (isSysAdmin ? "Administrator GuruPro" : "Pengguna"),
         email: data.email || user.email || "",
         nip: resolvedNip,
         nisn: resolvedNisn,
-        sekolah: data.sekolah || "",
-        mapel: data.mapel || "",
+        sekolah: data.sekolah || (isSysAdmin ? "GuruPro Command Center" : ""),
+        mapel: data.mapel || (isSysAdmin ? "Manajemen Sistem" : ""),
         kelas: data.kelas || "",
         telepon: data.telepon || "",
-        bio: data.bio || "",
+        bio: data.bio || (isSysAdmin ? "Akun Khusus Administrator GuruPro" : ""),
         role: validatedRole,
-        status_verifikasi: data.status_verifikasi || "terverifikasi",
+        status_verifikasi: isSysAdmin ? "terverifikasi" : (data.status_verifikasi || "terverifikasi"),
       },
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Terjadi kesalahan saat memuat data profil.";
     console.error("[Auth] Exception in fetchProfileForUser:", msg);
+    if (isSysAdmin) {
+      return {
+        status: "loaded",
+        profile: fallbackProfile,
+      };
+    }
     return {
       status: "error",
       message: msg,

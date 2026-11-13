@@ -1208,7 +1208,7 @@ function TeacherDashboard() {
 
 // ==================== DASHBOARD ADMIN (OPERATIONAL CONTROL CENTER) ====================
 
-function AdminDashboard() {
+export function AdminDashboard() {
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalTeachers: 0,
