@@ -916,7 +916,7 @@ export function ModulEditor({
           <div className="flex items-center gap-3">
             <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
             <div>
-              <p className="font-semibold">Modul Ajar ini Telah Terbit</p>
+              <p className="font-semibold">Materi Ajar ini Telah Terbit</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Materi pembelajaran telah resmi dipublikasikan dan dapat diakses siswa dari kelas terdaftar secara mandiri.
               </p>
@@ -927,14 +927,14 @@ export function ModulEditor({
               to="/soal"
               search={{
                 modulId: modul.id,
-                topik: modul.judul.replace(/^Modul Ajar:\s*/i, ""),
+                topik: modul.judul.replace(/^Modul Ajar:\s*|^Materi Ajar:\s*/i, ""),
                 mapel: modul.mapel || undefined,
                 kelasId: modul.kelasId || undefined,
                 mode: "buat",
               }}
             >
               <FileQuestion className="h-3.5 w-3.5" />
-              Lanjut Buat Soal dari Modul
+              Lanjut Buat Soal dari Materi
             </Link>
           </Button>
         </div>
@@ -1192,7 +1192,7 @@ export function ModulEditor({
               variant="outline"
               onClick={async () => {
                 try {
-                  toast.info("Menyiapkan dokumen PDF Modul Ajar…");
+                  toast.info("Menyiapkan dokumen PDF Materi Ajar…");
                   await exportModulAjarPdf(modul, { withIlustrasi: false });
                   toast.success("Dokumen PDF berhasil diunduh.");
                 } catch {
@@ -1885,11 +1885,11 @@ export function ModulEditor({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 font-display text-navy text-lg">
               <Send className="h-5 w-5 text-primary" />
-              Konfirmasi Publikasi Modul Ajar
+              Konfirmasi Publikasi Materi Ajar
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 pt-2 text-left text-sm">
               <p>
-                Apakah Anda yakin ingin mempublikasikan modul ajar{" "}
+                Apakah Anda yakin ingin mempublikasikan materi ajar{" "}
                 <span className="font-semibold text-foreground">"{modul.judul}"</span>?
               </p>
               <div className="rounded-lg border bg-muted/40 p-3 text-xs space-y-1.5 text-muted-foreground">

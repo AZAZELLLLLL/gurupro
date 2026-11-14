@@ -674,7 +674,7 @@ function SiswaKelasListView() {
                     <CardContent className="pt-0 text-xs text-muted-foreground space-y-2">
                       <div className="rounded-lg bg-muted/50 p-2.5 flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
-                          <BookOpen className="h-3.5 w-3.5 text-primary" /> Modul & Materi
+                          <BookOpen className="h-3.5 w-3.5 text-primary" /> Materi Ajar
                         </span>
                         <span className="flex items-center gap-1.5">
                           <GraduationCap className="h-3.5 w-3.5 text-emerald-600" /> Tugas & Nilai

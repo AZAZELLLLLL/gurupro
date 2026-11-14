@@ -251,8 +251,37 @@ export function parseAiQuestionResponse(
     questionsArray = [parsed.question];
   }
 
-  // 3B. Item-level sanitization & normalization (keys, prefixes, IDs)
-  const normalizedQuestions = questionsArray.map((q: any, qIdx: number) => {
+  // 3B. Unbundle composite questions if subsequent question numbers were merged
+  const unbundledQuestions: any[] = [];
+  for (const q of questionsArray) {
+    if (!q || typeof q !== "object") {
+      unbundledQuestions.push(q);
+      continue;
+    }
+    const rawPertanyaan = String(q.pertanyaan || q.question || "").trim();
+    const embeddedSplit = rawPertanyaan.split(/\n+(?=(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*)/i);
+    if (embeddedSplit.length > 1) {
+      unbundledQuestions.push({
+        ...q,
+        pertanyaan: embeddedSplit[0].replace(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*/i, "").trim(),
+      });
+      for (let k = 1; k < embeddedSplit.length; k++) {
+        const extraP = embeddedSplit[k].replace(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*/i, "").trim();
+        if (extraP.length >= 5) {
+          unbundledQuestions.push({
+            ...q,
+            id: undefined,
+            pertanyaan: extraP,
+          });
+        }
+      }
+    } else {
+      unbundledQuestions.push(q);
+    }
+  }
+
+  // 3C. Item-level sanitization & normalization (keys, prefixes, IDs)
+  const normalizedQuestions = unbundledQuestions.map((q: any, qIdx: number) => {
     if (!q || typeof q !== "object") return q;
     const cleanQ = { ...q };
 

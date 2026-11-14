@@ -936,10 +936,10 @@ export function AsistenGuruPage() {
       await reloadModuls();
 
       toast.success(
-        `Modul Ajar "${saved.judul}" (${finalSections.length} Bab) berhasil disimpan ke Penyimpanan Modul!`,
+        `Materi Ajar "${saved.judul}" (${finalSections.length} Bab) berhasil disimpan ke Penyimpanan Materi!`,
         {
           action: {
-            label: "Buka Modul Ajar",
+            label: "Buka Materi Ajar",
             onClick: () => navigate({ to: "/modul-ajar" }),
           },
         }
@@ -1230,9 +1230,9 @@ export function AsistenGuruPage() {
 
       await reloadModuls();
 
-      toast.success(`Berhasil menyimpan ${parsedSlides.length} slide PPT ke Modul Ajar!`, {
+      toast.success(`Berhasil menyimpan ${parsedSlides.length} slide PPT ke Materi Ajar!`, {
         action: {
-          label: "Buka di Modul Ajar",
+          label: "Buka di Materi Ajar",
           onClick: () => navigate({ to: "/modul-ajar" }),
         },
       });
@@ -1544,68 +1544,110 @@ export function AsistenGuruPage() {
   const handleSaveToSoal = async (content: string, msgId: string) => {
     setSavingAction(msgId + "-soal");
     try {
-      const questionBlocks = content.split(/\n(?=\d+\.\s+)/);
+      const normalizedContent = content.replace(/\r\n/g, "\n");
+
+      // Robust question boundary detection:
+      // Matches standard "1. ", bolded "**2. ", headers "### 3. ", "4) ", "Soal 5:", "Nomor 6."
+      const questionHeaderRegex = /(?:^|\n)[ \t]*(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?(\d+)[\.\)]\s*(?:[*_]{1,3})?\s*/gi;
+      const matches: { index: number; num: number; matchStr: string }[] = [];
+      let m: RegExpExecArray | null;
+
+      while ((m = questionHeaderRegex.exec(normalizedContent)) !== null) {
+        matches.push({
+          index: m.index + (m[0].startsWith("\n") ? 1 : 0),
+          num: parseInt(m[1], 10),
+          matchStr: m[0],
+        });
+      }
+
+      const questionBlocks: string[] = [];
+      if (matches.length > 0) {
+        for (let i = 0; i < matches.length; i++) {
+          const start = matches[i].index;
+          const end = i < matches.length - 1 ? matches[i + 1].index : normalizedContent.length;
+          const block = normalizedContent.slice(start, end).trim();
+          if (block) {
+            questionBlocks.push(block);
+          }
+        }
+      } else {
+        // Fallback split on newline followed by digit
+        questionBlocks.push(...normalizedContent.split(/\n(?=\d+\.\s+)/).map(b => b.trim()).filter(Boolean));
+      }
+
       const parsedSoal: Soal[] = [];
 
       for (const qBlock of questionBlocks) {
-        const qMatch = qBlock.match(/^(\d+)\.\s+([\s\S]+?)(?=\n[A-E]\.|\n[a-e]\.|$)/);
+        // Ekstrak teks pertanyaan sebelum daftar opsi
+        const qMatch = qBlock.match(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*(?:[*_]{1,3})?\s*([\s\S]+?)(?=\n[ \t]*[A-Ea-e][.):\-]\s*|\n[ \t]*Kunci|\n[ \t]*Pembahasan|$)/i);
+
+        let rawPertanyaan = "";
         if (qMatch) {
-          const rawPertanyaan = qMatch[2].trim();
-          const cleanPertanyaan = cleanSlideText(rawPertanyaan);
-          const opsiMatches = Array.from(qBlock.matchAll(/^[A-E]\.\s*(.+)$/gmi));
+          rawPertanyaan = qMatch[1].trim();
+        } else {
+          const firstLine = qBlock.split("\n")[0] || "";
+          rawPertanyaan = firstLine.replace(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*/i, "").trim();
+        }
 
-          let cleanOpsi = opsiMatches.map((o) => cleanSlideText(o[1])).filter(Boolean);
-          if (cleanOpsi.length === 0) {
-            cleanOpsi = ["Opsi A", "Opsi B", "Opsi C", "Opsi D"];
-          } else if (cleanOpsi.length < 4) {
-            const defaults = [
-              "Pernyataan alternatif A",
-              "Pernyataan alternatif B",
-              "Pernyataan alternatif C",
-              "Pernyataan alternatif D",
-            ];
-            while (cleanOpsi.length < 4) {
-              cleanOpsi.push(defaults[cleanOpsi.length]);
-            }
-          } else if (cleanOpsi.length > 4) {
-            cleanOpsi = cleanOpsi.slice(0, 4);
+        // Antisipasi: jika di dalam teks pertanyaan masih terdapat nomor soal berikutnya (misal soal 3 tergabung ke soal 2)
+        const embeddedSplit = rawPertanyaan.split(/\n+(?=(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*)/i);
+        const cleanPertanyaan = cleanSlideText(embeddedSplit[0] || rawPertanyaan);
+
+        // Ekstrak opsi A, B, C, D
+        const opsiMatches = Array.from(qBlock.matchAll(/^[ \t]*[A-Ea-e][.):\-]\s*(.+)$/gmi));
+
+        let cleanOpsi = opsiMatches.map((o) => cleanSlideText(o[1])).filter(Boolean);
+        if (cleanOpsi.length === 0) {
+          cleanOpsi = ["Opsi A", "Opsi B", "Opsi C", "Opsi D"];
+        } else if (cleanOpsi.length < 4) {
+          const defaults = [
+            "Pernyataan alternatif A",
+            "Pernyataan alternatif B",
+            "Pernyataan alternatif C",
+            "Pernyataan alternatif D",
+          ];
+          while (cleanOpsi.length < 4) {
+            cleanOpsi.push(defaults[cleanOpsi.length]);
           }
+        } else if (cleanOpsi.length > 4) {
+          cleanOpsi = cleanOpsi.slice(0, 4);
+        }
 
-          // Ensure distinct options
-          const seen = new Set<string>();
-          const distinctOpsi = cleanOpsi.map((opt, idx) => {
-            const lower = opt.toLowerCase();
-            if (seen.has(lower)) {
-              const unique = `${opt} (${String.fromCharCode(65 + idx)})`;
-              seen.add(unique.toLowerCase());
-              return unique;
-            }
-            seen.add(lower);
-            return opt;
-          });
-
-          const kunciMatch = qBlock.match(/Kunci(?:\s+Jawaban)?\s*[:\-–]?\s*([A-E])/i);
-          let validKunci = "A";
-          if (kunciMatch) {
-            const char = kunciMatch[1].toUpperCase();
-            if (["A", "B", "C", "D"].includes(char)) {
-              validKunci = char;
-            } else if (char === "E") {
-              validKunci = "D";
-            }
+        // Pastikan opsi unik
+        const seen = new Set<string>();
+        const distinctOpsi = cleanOpsi.map((opt, idx) => {
+          const lower = opt.toLowerCase();
+          if (seen.has(lower)) {
+            const unique = `${opt} (${String.fromCharCode(65 + idx)})`;
+            seen.add(unique.toLowerCase());
+            return unique;
           }
+          seen.add(lower);
+          return opt;
+        });
 
-          const pembMatch = qBlock.match(/Pembahasan\s*[:\-–]?\s*([^\n]+(?:\n[^\n]+)*)/i);
-          const pembahasan = pembMatch
-            ? cleanSlideText(pembMatch[1])
-            : "Pertanyaan asesmen pemahaman konsep materi.";
+        // Ekstrak kunci jawaban
+        const kunciMatch = qBlock.match(/Kunci(?:\s+Jawaban)?\s*[:\-–]?\s*([A-Ea-e])/i);
+        let validKunci = "A";
+        if (kunciMatch) {
+          const char = kunciMatch[1].toUpperCase();
+          if (["A", "B", "C", "D"].includes(char)) {
+            validKunci = char;
+          } else if (char === "E") {
+            validKunci = "D";
+          }
+        }
 
+        // Ekstrak pembahasan
+        const pembMatch = qBlock.match(/Pembahasan\s*[:\-–]?\s*([^\n]+(?:\n[^\n]+)*)/i);
+        const pembahasan = pembMatch
+          ? cleanSlideText(pembMatch[1])
+          : "Pertanyaan asesmen pemahaman konsep materi.";
+
+        if (cleanPertanyaan.length >= 5) {
           parsedSoal.push({
             id: uid(),
-            pertanyaan:
-              cleanPertanyaan.length >= 5
-                ? cleanPertanyaan
-                : "Pertanyaan evaluasi pemahaman materi pembelajaran.",
+            pertanyaan: cleanPertanyaan,
             jenis: "Pilihan Ganda",
             opsi: distinctOpsi,
             kunci: validKunci,
@@ -1613,6 +1655,32 @@ export function AsistenGuruPage() {
             tingkat: "Sedang",
             evidenceIds: ["ev_chat_assistant"],
           });
+        }
+
+        // Jika ada soal tambahan yang terlanjur menempel di teks pertanyaan, jadikan kartu soal tersendiri
+        if (embeddedSplit.length > 1) {
+          for (let k = 1; k < embeddedSplit.length; k++) {
+            const extraQText = cleanSlideText(
+              embeddedSplit[k].replace(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*/i, "").trim()
+            );
+            if (extraQText.length >= 5) {
+              parsedSoal.push({
+                id: uid(),
+                pertanyaan: extraQText,
+                jenis: "Pilihan Ganda",
+                opsi: [
+                  "Pernyataan analisis konsep pertama",
+                  "Pernyataan analisis konsep kedua",
+                  "Pernyataan analisis konsep ketiga",
+                  "Pernyataan analisis konsep keempat",
+                ],
+                kunci: "A",
+                penjelasan: "Asesmen tindak lanjut konsep materi.",
+                tingkat: "Sedang",
+                evidenceIds: ["ev_chat_assistant"],
+              });
+            }
+          }
         }
       }
 
@@ -1770,14 +1838,14 @@ export function AsistenGuruPage() {
         sumberTipe: "Teks",
         sumberInput: promptTitle || "Ilustrasi Media Pembelajaran",
       });
-      toast.success("Gambar berhasil dipasang ke Modul Ajar!", {
+      toast.success("Gambar berhasil dipasang ke Materi Ajar!", {
         action: {
-          label: "Buka Modul Ajar",
+          label: "Buka Materi Ajar",
           onClick: () => navigate({ to: "/modul-ajar" }),
         },
       });
     } catch (err: any) {
-      toast.error(err?.message || "Gagal memasang gambar ke modul.");
+      toast.error(err?.message || "Gagal memasang gambar ke materi ajar.");
     }
   };
 
@@ -2111,12 +2179,12 @@ export function AsistenGuruPage() {
                     <div className="flex items-center justify-between mb-1.5 sm:mb-2">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                         <BookOpen className="h-3 w-3" />
-                        Modul Ajar
+                        Materi Ajar
                       </span>
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </div>
                     <h3 className="text-xs sm:text-sm font-bold text-foreground">
-                      Buat Modul Ajar Lengkap
+                      Buat Materi Ajar Lengkap
                     </h3>
                     <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
                       Format Kurikulum Merdeka lengkap dengan skenario kegiatan PBL & asesmen siap pakai.
@@ -2396,15 +2464,15 @@ export function AsistenGuruPage() {
 
                           {/* ACTION BUTTONS (Tahap 3: Simpan Otomatis & Generate Media) */}
                           <div className="flex flex-wrap items-center gap-1.5">
-                            {/* 1. Save to Modul Ajar Button */}
+                            {/* 1. Save to Materi Ajar Button */}
                             <button
                               onClick={() => handleSaveToModul(m.content, m.id)}
                               disabled={savingAction === m.id + "-modul"}
                               className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[10.5px] font-medium text-foreground hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
-                              title="Simpan rancangan ini ke Modul Ajar"
+                              title="Simpan rancangan ini ke Materi Ajar"
                             >
                               <BookOpen className="h-3 w-3 text-primary" />
-                              <span>{savingAction === m.id + "-modul" ? "Menyimpan..." : "Simpan ke Modul"}</span>
+                              <span>{savingAction === m.id + "-modul" ? "Menyimpan..." : "Simpan ke Materi"}</span>
                             </button>
 
                             {/* 2. Save to PPT Button */}
@@ -2412,7 +2480,7 @@ export function AsistenGuruPage() {
                               onClick={() => handleSaveToPPT(m.content, m.id)}
                               disabled={savingAction === m.id + "-ppt"}
                               className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 py-1 text-[10.5px] font-medium text-foreground hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
-                              title="Simpan butir slide presentasi ke Modul Ajar"
+                              title="Simpan butir slide presentasi ke Materi Ajar"
                             >
                               <Presentation className="h-3 w-3 text-primary" />
                               <span>{savingAction === m.id + "-ppt" ? "Menyimpan..." : "Simpan ke PPT"}</span>
@@ -3353,7 +3421,7 @@ export function AsistenGuruPage() {
                         className="flex flex-col items-center justify-center p-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-center transition-colors group shadow-2xs"
                       >
                         <BookOpen className="h-4 w-4 mb-1 group-hover:scale-110 transition-transform" />
-                        <span className="text-[10.5px] font-bold">Modul Ajar</span>
+                        <span className="text-[10.5px] font-bold">Materi Ajar</span>
                       </button>
 
                       <button
@@ -3610,7 +3678,7 @@ export function AsistenGuruPage() {
                 className="gap-1.5"
               >
                 <BookOpen className="h-4 w-4" />
-                <span>Pasang ke Modul Ajar</span>
+                <span>Pasang ke Materi Ajar</span>
               </Button>
             </div>
           </div>

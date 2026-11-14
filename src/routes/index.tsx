@@ -565,9 +565,9 @@ function StudentDashboard() {
                 <p className="font-display text-2xl font-bold leading-tight text-navy">
                   {availableModuls.length}
                 </p>
-                <p className="text-sm font-medium">Modul Belajar</p>
+                <p className="text-sm font-medium">Materi Belajar</p>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {availableModuls.length > 0 ? "Modul siap dipelajari" : "Belum ada modul terbit"}
+                  {availableModuls.length > 0 ? "Materi siap dipelajari" : "Belum ada materi terbit"}
                 </p>
               </div>
             </CardContent>
@@ -670,12 +670,12 @@ function StudentDashboard() {
         </CardContent>
       </Card>
 
-      {/* Bagian Modul Ajar Tersedia untuk Siswa (Read-Only) */}
+      {/* Bagian Materi Ajar Tersedia untuk Siswa (Read-Only) */}
       <Card>
         <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 pb-3">
           <div>
             <CardTitle className="font-display text-base text-navy">
-              Modul Pembelajaran Tersedia
+              Materi Ajar Tersedia
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
               Materi pembelajaran yang telah diterbitkan oleh guru pengampu untuk kelasmu.
@@ -683,7 +683,7 @@ function StudentDashboard() {
           </div>
           <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
             <Link to="/modul-ajar">
-              Lihat Semua Modul
+              Lihat Semua Materi
               <ChevronRight className="h-4 w-4" />
             </Link>
           </Button>
@@ -693,10 +693,10 @@ function StudentDashboard() {
             <div className="py-8 text-center">
               <BookOpen className="mx-auto h-8 w-8 text-muted-foreground/30" />
               <p className="mt-2 text-sm font-medium text-navy">
-                Belum Ada Modul Ajar yang Diterbitkan
+                Belum Ada Materi Ajar yang Diterbitkan
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Bapak/ibu guru di kelasmu belum menerbitkan modul. Modul baru akan muncul otomatis
+                Bapak/ibu guru di kelasmu belum menerbitkan materi ajar. Materi baru akan muncul otomatis
                 di sini saat dirilis.
               </p>
             </div>
@@ -973,8 +973,8 @@ function TeacherDashboard() {
     if (modulAktif > 0) {
       notifs.push({
         id: "notif-active-moduls",
-        judul: `${modulAktif} modul aktif dipublikasikan`,
-        detail: "Siswa di kelasmu dapat mengakses dan mempelajari modul ini.",
+        judul: `${modulAktif} materi aktif dipublikasikan`,
+        detail: "Siswa di kelasmu dapat mengakses dan mempelajari materi ajar ini.",
         tipe: "modul",
       });
     }
@@ -984,10 +984,10 @@ function TeacherDashboard() {
 
   const stats = [
     {
-      label: "Modul Aktif",
+      label: "Materi Aktif",
       value: String(modulAktif),
       icon: BookOpen,
-      hint: `${modulAktif} modul terbit (${selectedYear || "Semua"})`,
+      hint: `${modulAktif} materi terbit (${selectedYear || "Semua"})`,
       to: "/modul-ajar" as const,
     },
     {
@@ -1026,8 +1026,8 @@ function TeacherDashboard() {
         title="Selamat datang kembali 👋"
         subtitle={
           selectedYear
-            ? `Kelola administrasi pembelajaran, modul ajar, dan tugas siswa untuk Tahun Ajaran ${selectedYear}.`
-            : "Kelola administrasi pembelajaran, modul ajar, dan tugas siswa dengan data riil GuruPro."
+            ? `Kelola administrasi pembelajaran, materi ajar, dan tugas siswa untuk Tahun Ajaran ${selectedYear}.`
+            : "Kelola administrasi pembelajaran, materi ajar, dan tugas siswa dengan data riil GuruPro."
         }
         actions={
           <>
@@ -1040,7 +1040,7 @@ function TeacherDashboard() {
             <Button asChild>
               <Link to="/modul-ajar">
                 <Sparkles className="h-4 w-4" />
-                Susun Modul dengan AI
+                Susun Materi dengan AI
               </Link>
             </Button>
           </>
@@ -1179,7 +1179,7 @@ function TeacherDashboard() {
                 GuruPro AI
               </span>
               <p className="font-display text-lg font-semibold">
-                Susun modul dibantu AI dari berbagai sumber, edit, lalu publikasikan.
+                Susun materi ajar dibantu AI dari berbagai sumber, edit, lalu publikasikan.
               </p>
               <p className="text-sm text-navy-foreground/75">
                 {soalTerbit} paket soal siap diterbitkan sebagai penugasan kelas.
@@ -1188,7 +1188,7 @@ function TeacherDashboard() {
                 <Button asChild size="sm" variant="secondary">
                   <Link to="/modul-ajar">
                     <BookOpen className="h-4 w-4" />
-                    Modul Ajar
+                    Materi Ajar
                   </Link>
                 </Button>
                 <Button asChild size="sm" variant="secondary">

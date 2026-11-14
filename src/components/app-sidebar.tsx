@@ -46,7 +46,7 @@ const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "AI Asisten Guru", url: "/asisten-guru", icon: Bot },
   { title: "Kelas Saya", url: "/kelas", icon: School },
-  { title: "Modul Ajar", url: "/modul-ajar", icon: BookOpen },
+  { title: "Materi Ajar", url: "/modul-ajar", icon: BookOpen },
   { title: "Soal", url: "/soal", icon: FileQuestion },
   { title: "Penugasan", url: "/penugasan", icon: ClipboardList },
   { title: "Penilaian", url: "/penilaian", icon: GraduationCap },
@@ -74,7 +74,7 @@ export function AppSidebar() {
       ? [
           { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
           { title: "Kelas Diikuti", url: "/kelas", icon: School },
-          { title: "Modul Ajar", url: "/modul-ajar", icon: BookOpen },
+          { title: "Materi Ajar", url: "/modul-ajar", icon: BookOpen },
           { title: "Penugasan", url: "/penugasan", icon: ClipboardList },
           { title: "Nilai", url: "/penilaian", icon: GraduationCap },
         ]
@@ -171,7 +171,7 @@ export function AppSidebar() {
                 AI Asisten Guru
               </span>
               <span className="mt-1 block text-xs leading-relaxed text-sidebar-foreground/70">
-                Tanya materi, rancang modul, PPT, soal, dan ide ilustrasi.
+                Tanya materi, rancang materi ajar, PPT, soal, dan ide ilustrasi.
               </span>
             </Link>
           </SidebarFooter>

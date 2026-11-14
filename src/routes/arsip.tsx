@@ -4,7 +4,10 @@ import {
   ArrowRight,
   BookOpen,
   Calendar,
+  Check,
   CheckCircle2,
+  Database,
+  Download,
   FileQuestion,
   FileText,
   Loader2,
@@ -12,8 +15,10 @@ import {
   RotateCcw,
   School,
   Search,
+  ShieldCheck,
+  Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
@@ -49,26 +54,31 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth-store";
 import {
+  downloadTeacherBackupJson,
   fetchTeacherArchivedItems,
+  generateTeacherFullBackup,
+  getTeacherBackupSummary,
   restoreAcademicItem,
+  validateTeacherBackupFile,
   type AcademicItemType,
   type ArchivedItem,
+  type TeacherBackupSummary,
 } from "@/lib/archive-store";
 
 export const Route = createFileRoute("/arsip")({
   head: () => ({
     meta: [
-      { title: "Pusat Arsip — GuruPro" },
+      { title: "Pusat Arsip & Cadangan Data — GuruPro" },
       {
         name: "description",
         content:
-          "Kelola dokumen modul ajar, bank soal, dan penugasan yang diarsipkan secara persisten dan aman.",
+          "Kelola dokumen materi ajar, bank soal, dan penugasan yang diarsipkan, serta buat cadangan lengkap (backup) seluruh data guru.",
       },
-      { property: "og:title", content: "Pusat Arsip — GuruPro" },
+      { property: "og:title", content: "Pusat Arsip & Cadangan Data — GuruPro" },
       {
         property: "og:description",
         content:
-          "Kelola dokumen modul ajar, bank soal, dan penugasan yang diarsipkan secara persisten dan aman.",
+          "Kelola dokumen materi ajar, bank soal, dan penugasan yang diarsipkan, serta buat cadangan lengkap (backup) seluruh data guru.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -101,7 +111,7 @@ function getItemTypeBadge(type: AcademicItemType) {
       return (
         <Badge variant="outline" className="border-blue-500/30 bg-blue-50/50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
           <BookOpen className="mr-1 h-3 w-3" />
-          Modul Ajar
+          Materi Ajar
         </Badge>
       );
     case "paket_soal":
@@ -132,6 +142,19 @@ function ArsipPage() {
   const [typeFilter, setTypeFilter] = useState<FilterType>("semua");
   const [yearFilter, setYearFilter] = useState<string>("semua");
 
+  // Backup state
+  const [backupSummary, setBackupSummary] = useState<TeacherBackupSummary | null>(null);
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [auditResult, setAuditResult] = useState<{
+    open: boolean;
+    valid?: boolean;
+    error?: string;
+    summary?: TeacherBackupSummary;
+    teacher?: { nama: string; email?: string };
+    exportedAt?: string;
+  }>({ open: false });
+
   // Restore dialog state
   const [targetRestore, setTargetRestore] = useState<ArchivedItem | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -141,8 +164,12 @@ function ArsipPage() {
     else setLoading(true);
 
     try {
-      const data = await fetchTeacherArchivedItems();
+      const [data, summary] = await Promise.all([
+        fetchTeacherArchivedItems(),
+        profile?.id ? getTeacherBackupSummary(profile.id) : null,
+      ]);
       setItems(data);
+      if (summary) setBackupSummary(summary);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Gagal memuat arsip.";
       toast.error(msg);
@@ -156,7 +183,55 @@ function ArsipPage() {
     if (ready && profile.role === "guru") {
       void loadData();
     }
-  }, [ready, profile.role]);
+  }, [ready, profile.role, profile.id]);
+
+  const handleDownloadBackup = async () => {
+    if (!profile.id) return;
+    setDownloadingBackup(true);
+    try {
+      toast.info("Menyiapkan seluruh data guru untuk cadangan…");
+      const backup = await generateTeacherFullBackup(profile.id, {
+        nama: profile.nama,
+        email: profile.email,
+        sekolah: profile.sekolah,
+      });
+      downloadTeacherBackupJson(backup);
+      toast.success("Cadangan data guru berhasil diunduh ke komputer Anda!");
+
+      const summary = await getTeacherBackupSummary(profile.id);
+      setBackupSummary(summary);
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal membuat berkas cadangan.");
+    } finally {
+      setDownloadingBackup(false);
+    }
+  };
+
+  const handleVerifyBackupFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const res = validateTeacherBackupFile(text);
+      setAuditResult({
+        open: true,
+        valid: res.valid,
+        error: res.error,
+        summary: res.summary,
+        teacher: res.teacher,
+        exportedAt: res.exportedAt,
+      });
+      if (res.valid) {
+        toast.success("Berkas cadangan valid dan siap digunakan sebagai arsip mandiri!");
+      } else {
+        toast.error(res.error || "Berkas cadangan tidak valid.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   // Extract available academic years from archived data
   const availableYears = useMemo(() => {
@@ -244,8 +319,8 @@ function ArsipPage() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        title="Pusat Arsip Administrasi Pembelajaran"
-        subtitle="Dokumen modul ajar, bank soal, dan penugasan yang diarsipkan tetap tersimpan aman di database dan dapat dipulihkan kapan saja."
+        title="Pusat Arsip & Cadangan Data Guru"
+        subtitle="Dokumen materi ajar, bank soal, dan penugasan yang diarsipkan tersimpan aman, serta tersedia fitur cadangan penuh (backup snapshot) sebagai perlindungan data guru."
         actions={
           <Button
             variant="outline"
@@ -260,6 +335,131 @@ function ArsipPage() {
         }
       />
 
+      {/* ========================================================================= */}
+      {/* KARTU CADANGAN DATA GURU LENGKAP (FULL BACKUP ENGINE)                    */}
+      {/* ========================================================================= */}
+      <Card className="border-primary/20 bg-gradient-to-br from-card to-primary-soft/10 shadow-xs">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                <Database className="h-5 w-5" />
+              </span>
+              <div>
+                <CardTitle className="font-display text-base text-navy flex items-center gap-2">
+                  Cadangan Lengkap Data Guru
+                  <Badge variant="outline" className="border-emerald-500/30 bg-emerald-50/60 text-emerald-700 text-[11px] font-semibold gap-1">
+                    <ShieldCheck className="h-3 w-3" />
+                    Backup Snapshot
+                  </Badge>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Simpan seluruh data mengajar (kelas, materi ajar, paket soal, tugas, dan rekap penilaian) ke berkas JSON mandiri.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1 sm:pt-0">
+              <Button
+                size="sm"
+                onClick={handleDownloadBackup}
+                disabled={downloadingBackup}
+                className="gap-1.5 shadow-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                {downloadingBackup ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Menyusun Cadangan…
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Unduh Cadangan Lengkap (JSON)
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-1.5 text-xs"
+                title="Periksa integritas dan isi file cadangan JSON"
+              >
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                Cek File Cadangan
+              </Button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={handleVerifyBackupFile}
+              />
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="pt-0">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6 border-t pt-3">
+            <div className="rounded-lg bg-card/60 border p-2.5 text-center">
+              <p className="text-[11px] text-muted-foreground font-medium flex items-center justify-center gap-1">
+                <School className="h-3 w-3 text-primary" /> Kelas Diampu
+              </p>
+              <p className="text-lg font-bold text-navy mt-0.5">
+                {backupSummary ? backupSummary.totalKelas : "—"}
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-card/60 border p-2.5 text-center">
+              <p className="text-[11px] text-muted-foreground font-medium flex items-center justify-center gap-1">
+                <BookOpen className="h-3 w-3 text-primary" /> Materi Ajar
+              </p>
+              <p className="text-lg font-bold text-navy mt-0.5">
+                {backupSummary ? backupSummary.totalMateriAjar : "—"}
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-card/60 border p-2.5 text-center">
+              <p className="text-[11px] text-muted-foreground font-medium flex items-center justify-center gap-1">
+                <FileQuestion className="h-3 w-3 text-amber-600" /> Bank Soal
+              </p>
+              <p className="text-lg font-bold text-navy mt-0.5">
+                {backupSummary ? backupSummary.totalPaketSoal : "—"}
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-card/60 border p-2.5 text-center">
+              <p className="text-[11px] text-muted-foreground font-medium flex items-center justify-center gap-1">
+                <FileText className="h-3 w-3 text-purple-600" /> Penugasan
+              </p>
+              <p className="text-lg font-bold text-navy mt-0.5">
+                {backupSummary ? backupSummary.totalPenugasan : "—"}
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-card/60 border p-2.5 text-center">
+              <p className="text-[11px] text-muted-foreground font-medium flex items-center justify-center gap-1">
+                <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Jawaban Siswa
+              </p>
+              <p className="text-lg font-bold text-navy mt-0.5">
+                {backupSummary ? backupSummary.totalJawabanSiswa : "—"}
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-card/60 border p-2.5 text-center">
+              <p className="text-[11px] text-muted-foreground font-medium flex items-center justify-center gap-1">
+                <Archive className="h-3 w-3 text-blue-600" /> Dokumen Arsip
+              </p>
+              <p className="text-lg font-bold text-navy mt-0.5">
+                {backupSummary ? backupSummary.totalArsip : "—"}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Filter and Search Bar */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <Tabs
@@ -270,7 +470,7 @@ function ArsipPage() {
           <TabsList className="grid grid-cols-4 w-full sm:w-auto">
             <TabsTrigger value="semua">Semua ({items.length})</TabsTrigger>
             <TabsTrigger value="modul">
-              Modul ({items.filter((i) => i.itemType === "modul").length})
+              Materi ({items.filter((i) => i.itemType === "modul").length})
             </TabsTrigger>
             <TabsTrigger value="paket_soal">
               Soal ({items.filter((i) => i.itemType === "paket_soal").length})
@@ -511,6 +711,68 @@ function ArsipPage() {
               ) : (
                 "Ya, Pulihkan Sekarang"
               )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* Dialog Hasil Audit File Cadangan */}
+      <AlertDialog
+        open={auditResult.open}
+        onOpenChange={(open) => !open && setAuditResult({ open: false })}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 font-display text-base text-navy">
+              {auditResult.valid ? (
+                <>
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                  Berkas Cadangan Valid
+                </>
+              ) : (
+                <>
+                  <Archive className="h-5 w-5 text-destructive" />
+                  Pemeriksaan Berkas Cadangan
+                </>
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 pt-2 text-left text-xs">
+              {auditResult.valid ? (
+                <div className="space-y-2">
+                  <p className="text-foreground text-xs leading-relaxed">
+                    Berkas cadangan terverifikasi asli dari sistem <strong>GuruPro AI</strong>.
+                  </p>
+                  <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5 font-mono text-[11px]">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Pemilik Data:</span>
+                      <span className="font-semibold text-foreground">{auditResult.teacher?.nama || "Guru"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Waktu Ekspor:</span>
+                      <span className="text-foreground">{auditResult.exportedAt ? formatArchiveDate(auditResult.exportedAt) : "—"}</span>
+                    </div>
+                    <div className="border-t pt-1.5 grid grid-cols-2 gap-1 text-[10.5px]">
+                      <div>Kelas: {auditResult.summary?.totalKelas ?? 0}</div>
+                      <div>Materi: {auditResult.summary?.totalMateriAjar ?? 0}</div>
+                      <div>Bank Soal: {auditResult.summary?.totalPaketSoal ?? 0}</div>
+                      <div>Tugas: {auditResult.summary?.totalPenugasan ?? 0}</div>
+                      <div>Jawaban: {auditResult.summary?.totalJawabanSiswa ?? 0}</div>
+                      <div>Arsip: {auditResult.summary?.totalArsip ?? 0}</div>
+                    </div>
+                  </div>
+                  <p className="text-emerald-700 dark:text-emerald-400 font-medium text-[11px]">
+                    ✓ Seluruh relasi data, format JSON, dan struktur entitas dalam kondisi aman.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive">
+                  {auditResult.error || "Berkas tidak dapat dikenali sebagai cadangan GuruPro."}
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setAuditResult({ open: false })}>
+              Tutup
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

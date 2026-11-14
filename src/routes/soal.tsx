@@ -710,10 +710,10 @@ function SoalPage() {
                   <>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="grid gap-2">
-                        <Label>Pilih Modul Sumber (opsional)</Label>
+                        <Label>Pilih Materi Ajar Sumber (opsional)</Label>
                         <Select value={modulId} onValueChange={setModulId}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Tanpa modul sumber" />
+                            <SelectValue placeholder="Tanpa materi sumber" />
                           </SelectTrigger>
                           <SelectContent>
                             {availableModulsInYear.map((m) => (

@@ -63,16 +63,16 @@ import { trackProductEvent, PRODUCT_EVENT_NAMES } from "@/lib/analytics/product-
 export const Route = createFileRoute("/modul-ajar")({
   head: () => ({
     meta: [
-      { title: "Modul Ajar — GuruPro" },
+      { title: "Materi Ajar — GuruPro" },
       {
         name: "description",
         content:
-          "Susun modul dibantu AI dari CP/ATP, eBook, teks, atau link luar. Tambahkan ilustrasi dan PPT otomatis, lalu publikasikan.",
+          "Susun materi ajar dibantu AI dari CP/ATP, eBook, teks, atau link luar. Tambahkan ilustrasi dan PPT otomatis, lalu publikasikan.",
       },
-      { property: "og:title", content: "Modul Ajar — GuruPro" },
+      { property: "og:title", content: "Materi Ajar — GuruPro" },
       {
         property: "og:description",
-        content: "Susun modul dibantu AI, tambahkan ilustrasi dan PPT otomatis, lalu publikasikan.",
+        content: "Susun materi ajar dibantu AI, tambahkan ilustrasi dan PPT otomatis, lalu publikasikan.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -152,16 +152,16 @@ function ModulAjarPage() {
   const handleCreateManualModul = async () => {
     try {
       const newModul = await addModul({
-        judul: "Modul Ajar Baru (Draf Manual)",
+        judul: "Materi Ajar Baru (Draf Manual)",
         kelas: "X",
         mapel: "Umum",
-        ringkasan: "Draf modul pembelajaran baru disusun secara mandiri.",
+        ringkasan: "Draf materi ajar baru disusun secara mandiri.",
         sections: [
           {
             id: uid(),
             judul: "Bab 1: Pendahuluan & Materi",
             poin: ["Tujuan Pembelajaran", "Uraian Pokok"],
-            isi: "Tuliskan materi pembelajaran modul di sini...",
+            isi: "Tuliskan materi pembelajaran di sini...",
           },
         ],
         slides: [],
@@ -171,9 +171,9 @@ function ModulAjarPage() {
       });
       await reloadModuls();
       setEditing(newModul);
-      toast.success("Draf modul ajar baru berhasil dibuat.");
+      toast.success("Draf materi ajar baru berhasil dibuat.");
     } catch (err: any) {
-      toast.error(err?.message || "Gagal membuat draf modul baru.");
+      toast.error(err?.message || "Gagal membuat draf materi ajar baru.");
     }
   };
 
@@ -285,11 +285,11 @@ function ModulAjarPage() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        title="Modul Ajar"
+        title="Materi Ajar"
         subtitle={
           selectedYear
-            ? `Susun dan kelola modul ajar untuk Tahun Ajaran ${selectedYear}, edit, lalu publikasikan.`
-            : "Susun modul dibantu AI dari berbagai sumber, edit, lalu publikasikan."
+            ? `Susun dan kelola materi ajar untuk Tahun Ajaran ${selectedYear}, edit, lalu publikasikan.`
+            : "Susun materi ajar dibantu AI dari berbagai sumber, edit, lalu publikasikan."
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -320,16 +320,16 @@ function ModulAjarPage() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari modul, mapel, kelas…"
+            placeholder="Cari materi, mapel, kelas…"
             className="pl-9"
-            aria-label="Cari modul"
+            aria-label="Cari materi ajar"
           />
         </div>
       </div>
 
       <section className="grid gap-3">
         <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Daftar Modul ({filtered.length})
+          Daftar Materi Ajar ({filtered.length})
         </h2>
 
         {filtered.length === 0 ? (
@@ -340,13 +340,13 @@ function ModulAjarPage() {
               </span>
               <p className="font-display font-semibold text-navy">
                 {selectedYear
-                  ? `Belum Ada Modul di Tahun Ajaran ${selectedYear}`
-                  : "Belum ada modul di tampilan ini"}
+                  ? `Belum Ada Materi Ajar di Tahun Ajaran ${selectedYear}`
+                  : "Belum ada materi ajar di tampilan ini"}
               </p>
               <p className="max-w-sm text-sm text-muted-foreground">
                 {selectedYear
-                  ? `Tidak ada modul pembelajaran yang terhubung dengan kelas pada tahun ajaran ${selectedYear}. Anda dapat menyusun modul baru atau memilih tahun ajaran lain di header.`
-                  : "Susun modul pertama Anda dari CP/ATP, eBook, teks, atau link luar — dibantu GuruPro AI."}
+                  ? `Tidak ada materi pembelajaran yang terhubung dengan kelas pada tahun ajaran ${selectedYear}. Anda dapat menyusun materi baru atau memilih tahun ajaran lain di header.`
+                  : "Susun materi ajar pertama Anda dari CP/ATP, eBook, teks, atau link luar — dibantu GuruPro AI."}
               </p>
               <div className="flex flex-wrap items-center justify-center gap-2.5">
                 <Button asChild className="gap-2 shadow-sm bg-primary text-primary-foreground">
@@ -584,11 +584,11 @@ function ModulAjarPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 font-display text-navy text-lg">
               <Send className="h-5 w-5 text-primary" />
-              Konfirmasi Publikasi Modul Ajar
+              Konfirmasi Publikasi Materi Ajar
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 pt-2 text-left text-sm">
               <p>
-                Apakah Anda yakin ingin mempublikasikan modul ajar{" "}
+                Apakah Anda yakin ingin mempublikasikan materi ajar{" "}
                 <span className="font-semibold text-foreground">"{targetPublish?.judul}"</span>?
               </p>
               {targetPublish && (
@@ -791,15 +791,15 @@ function SiswaModulAjarView() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        title="Modul Pembelajaran Siswa 📚"
-        subtitle="Pelajari modul ajar dan materi pembelajaran yang diterbitkan oleh bapak/ibu guru untuk kelasmu."
+        title="Materi Ajar Pembelajaran Siswa 📚"
+        subtitle="Pelajari materi ajar pembelajaran yang diterbitkan oleh bapak/ibu guru untuk kelasmu."
       />
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Cari judul modul, mata pelajaran, atau kelas…"
+            placeholder="Cari judul materi, mata pelajaran, atau kelas…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="pl-9"
@@ -809,20 +809,20 @@ function SiswaModulAjarView() {
 
       {loading ? (
         <div className="py-16 text-center text-sm text-muted-foreground">
-          Memuat modul pembelajaran…
+          Memuat materi pembelajaran…
         </div>
       ) : filtered.length === 0 ? (
         <Card className="p-12 text-center">
           <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/30" />
           <h3 className="mt-3 font-display text-base font-semibold text-navy">
             {query
-              ? "Tidak ada modul yang cocok dengan pencarian"
-              : "Belum Ada Modul Ajar Terbit"}
+              ? "Tidak ada materi yang cocok dengan pencarian"
+              : "Belum Ada Materi Ajar Terbit"}
           </h3>
           <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto">
             {query
-              ? "Coba gunakan kata kunci lain untuk mencari materi modul."
-              : "Bapak/ibu guru belum menerbitkan modul ajar untuk kelas yang kamu ikuti. Periksa kembali nanti."}
+              ? "Coba gunakan kata kunci lain untuk mencari materi ajar."
+              : "Bapak/ibu guru belum menerbitkan materi ajar untuk kelas yang kamu ikuti. Periksa kembali nanti."}
           </p>
         </Card>
       ) : (
@@ -842,7 +842,7 @@ function SiswaModulAjarView() {
                 <div>
                   <h3 className="font-display font-semibold text-navy line-clamp-2">{m.judul}</h3>
                   <p className="mt-1 text-xs text-muted-foreground line-clamp-3">
-                    {m.ringkasan || "Klik tombol baca modul untuk melihat rangkuman materi lengkap."}
+                    {m.ringkasan || "Klik tombol baca materi untuk melihat rangkuman materi lengkap."}
                   </p>
                 </div>
                 <div className="pt-2 flex items-center justify-between border-t text-[11px] text-muted-foreground">
@@ -853,7 +853,7 @@ function SiswaModulAjarView() {
                     className="gap-1.5 h-8 text-xs font-medium"
                   >
                     <Eye className="h-3.5 w-3.5" />
-                    Baca Modul
+                    Baca Materi
                   </Button>
                 </div>
               </CardContent>

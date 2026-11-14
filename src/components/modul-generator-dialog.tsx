@@ -459,10 +459,10 @@ export function ModulGeneratorDialog({
       <DialogContent className="max-h-[90dvh] w-[calc(100vw-2rem)] sm:max-w-2xl overflow-y-auto overflow-x-hidden p-4 sm:p-6">
         <DialogHeader className="min-w-0">
           <DialogTitle className="font-display text-navy break-words">
-            Susun Modul Ajar Baru (AI Grounded)
+            Susun Materi Ajar Baru (AI Grounded)
           </DialogTitle>
           <DialogDescription className="break-words">
-            GuruPro membaca materi sumber Anda, membangun rujukan faktual, lalu menyusun Modul Ajar
+            GuruPro membaca materi sumber Anda, membangun rujukan faktual, lalu menyusun Materi Ajar
             Kurikulum Merdeka berakar sumber dengan penjaminan mutu AI-2D.
           </DialogDescription>
         </DialogHeader>

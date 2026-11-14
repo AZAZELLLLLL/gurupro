@@ -714,7 +714,7 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
           </TabsTrigger>
           <TabsTrigger value="modul" className="gap-2">
             <BookOpen className="h-4 w-4" />
-            <span>Modul Ajar</span>
+            <span>Materi Ajar</span>
           </TabsTrigger>
           <TabsTrigger value="tugas" className="gap-2">
             <FileQuestion className="h-4 w-4" />
@@ -910,7 +910,7 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="font-display text-base text-navy">
-                    Modul Ajar Aktif ({kelasDetail.namaKelas})
+                    Materi Ajar Aktif ({kelasDetail.namaKelas})
                   </CardTitle>
                   <CardDescription>
                     Perangkat ajar dan materi kurikulum yang telah disusun untuk kelas{" "}
@@ -923,7 +923,7 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
                   onClick={() => setOpenTambahModul(true)}
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Tambah Modul
+                  Tambah Materi
                 </Button>
               </div>
             </CardHeader>
@@ -932,21 +932,21 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
                 <div className="py-12 text-center">
                   <BookOpen className="mx-auto h-10 w-10 text-muted-foreground/30" />
                   <p className="mt-3 font-display text-base font-semibold text-navy">
-                    Belum Ada Modul Khusus untuk Kelas Ini
+                    Belum Ada Materi Ajar Khusus untuk Kelas Ini
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground max-w-md mx-auto">
-                    Kirim modul yang telah dipublikasikan ke kelas ini, atau susun modul baru untuk mata pelajaran{" "}
+                    Kirim materi ajar yang telah dipublikasikan ke kelas ini, atau susun materi baru untuk mata pelajaran{" "}
                     {kelasDetail.mapel}.
                   </p>
                   <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
                     <Button onClick={() => setOpenTambahModul(true)} className="gap-2">
                       <Plus className="h-4 w-4" />
-                      Tambah Modul
+                      Tambah Materi
                     </Button>
                     <Button asChild variant="outline" className="gap-2">
                       <Link to="/modul-ajar">
                         <Sparkles className="h-4 w-4" />
-                        Susun di Modul Ajar
+                        Susun di Materi Ajar
                       </Link>
                     </Button>
                   </div>
@@ -956,7 +956,7 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Judul Modul</TableHead>
+                        <TableHead>Judul Materi Ajar</TableHead>
                         <TableHead>Jumlah Bab / Bagian</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Terakhir Diperbarui</TableHead>
@@ -993,7 +993,7 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
                             <div className="flex items-center justify-end gap-1.5">
                               <Button asChild variant="ghost" size="sm" className="h-8 gap-1 text-xs">
                                 <Link to="/modul-ajar">
-                                  Buka Modul
+                                  Buka Materi
                                   <ArrowRight className="h-3 w-3" />
                                 </Link>
                               </Button>
@@ -1512,15 +1512,15 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-2">
             <DialogTitle className="text-xl font-display font-semibold text-navy">
-              Tambah Modul Ajar ke Kelas {kelasDetail.namaKelas}
+              Tambah Materi Ajar ke Kelas {kelasDetail.namaKelas}
             </DialogTitle>
             <DialogDescription>
-              Pilih modul ajar yang telah berstatus <strong>Terbit</strong> untuk dikirim dan diakses oleh murid kelas {kelasDetail.tingkat} {kelasDetail.namaKelas}.
+              Pilih materi ajar yang telah berstatus <strong>Terbit</strong> untuk dikirim dan diakses oleh murid kelas {kelasDetail.tingkat} {kelasDetail.namaKelas}.
             </DialogDescription>
             <div className="relative mt-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Cari modul ajar berdasarkan judul atau mata pelajaran..."
+                placeholder="Cari materi ajar berdasarkan judul atau mata pelajaran..."
                 value={searchModulQuery}
                 onChange={(e) => setSearchModulQuery(e.target.value)}
                 className="pl-9 h-9"
@@ -1532,9 +1532,9 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
             {publishedModuls.length === 0 ? (
               <div className="py-10 text-center">
                 <BookOpen className="mx-auto h-10 w-10 text-muted-foreground/30 mb-2" />
-                <p className="font-semibold text-navy text-sm">Belum Ada Modul yang Diterbitkan</p>
+                <p className="font-semibold text-navy text-sm">Belum Ada Materi Ajar yang Diterbitkan</p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                  Hanya modul berstatus <strong>Terbit</strong> yang dapat dikirim ke kelas. Silakan publikasikan modul terlebih dahulu di menu Modul Ajar.
+                  Hanya materi ajar berstatus <strong>Terbit</strong> yang dapat dikirim ke kelas. Silakan publikasikan materi terlebih dahulu di menu Materi Ajar.
                 </p>
                 <Button
                   asChild
@@ -1544,13 +1544,13 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
                 >
                   <Link to="/modul-ajar">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Buka Menu Modul Ajar
+                    Buka Menu Materi Ajar
                   </Link>
                 </Button>
               </div>
             ) : filteredPublishedModuls.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground text-sm">
-                Tidak ada modul terbit yang cocok dengan pencarian "{searchModulQuery}".
+                Tidak ada materi ajar terbit yang cocok dengan pencarian "{searchModulQuery}".
               </div>
             ) : (
               filteredPublishedModuls.map((m) => {
@@ -1619,10 +1619,10 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
             <div className="text-xs text-muted-foreground w-full sm:w-auto text-left">
               {selectedModulIds.length > 0 ? (
                 <span>
-                  <strong>{selectedModulIds.length}</strong> modul dipilih untuk dikirim
+                  <strong>{selectedModulIds.length}</strong> materi ajar dipilih untuk dikirim
                 </span>
               ) : (
-                <span>Pilih satu atau beberapa modul terbit</span>
+                <span>Pilih satu atau beberapa materi ajar terbit</span>
               )}
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
@@ -2114,7 +2114,7 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
             </span>
             <div>
               <p className="font-display text-2xl font-bold text-navy">{classModuls.length}</p>
-              <p className="text-sm font-medium">Modul Pembelajaran</p>
+              <p className="text-sm font-medium">Materi Pembelajaran</p>
               <p className="text-xs text-muted-foreground">Siap dipelajari</p>
             </div>
           </CardContent>
@@ -2149,12 +2149,12 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
         </Card>
       </div>
 
-      {/* Tabs Konten: Modul Pembelajaran, Tugas Kelas, Rekap Nilai */}
+      {/* Tabs Konten: Materi Pembelajaran, Tugas Kelas, Rekap Nilai */}
       <Tabs defaultValue="modul" className="space-y-4">
         <TabsList className="bg-muted/60 p-1">
           <TabsTrigger value="modul" className="gap-2 text-xs font-medium">
             <BookOpen className="h-3.5 w-3.5" />
-            Modul Pembelajaran ({classModuls.length})
+            Materi Pembelajaran ({classModuls.length})
           </TabsTrigger>
           <TabsTrigger value="tugas" className="gap-2 text-xs font-medium">
             <FileQuestion className="h-3.5 w-3.5" />
@@ -2166,28 +2166,28 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
           </TabsTrigger>
         </TabsList>
 
-        {/* TAB 1: MODUL PEMBELAJARAN */}
+        {/* TAB 1: MATERI PEMBELAJARAN */}
         <TabsContent value="modul" className="space-y-4">
           {loadingModuls ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
               <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
-              <p className="mt-2">Memuat modul materi kelas…</p>
+              <p className="mt-2">Memuat materi pembelajaran kelas…</p>
             </div>
           ) : classModuls.length === 0 ? (
             <Card className="py-10 text-center">
               <CardContent className="space-y-3">
                 <BookOpen className="mx-auto h-8 w-8 text-muted-foreground/30" />
                 <h3 className="font-display text-base font-semibold text-navy">
-                  Belum Ada Modul Ajar
+                  Belum Ada Materi Ajar
                 </h3>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  Guru pengampu belum membagikan modul untuk kelas ini. Materi baru akan otomatis tampil di sini saat dirilis.
+                  Guru pengampu belum membagikan materi untuk kelas ini. Materi baru akan otomatis tampil di sini saat dirilis.
                 </p>
                 <div className="pt-2">
                   <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
                     <Link to="/modul-ajar">
                       <BookOpen className="h-3.5 w-3.5 text-primary" />
-                      Jelajahi Semua Modul Sekolah
+                      Jelajahi Semua Materi Ajar Sekolah
                     </Link>
                   </Button>
                 </div>
@@ -2219,7 +2219,7 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
                       onClick={() => setActiveModul(m)}
                     >
                       <Eye className="h-3.5 w-3.5 text-primary" />
-                      Baca Modul
+                      Baca Materi
                     </Button>
                   </CardFooter>
                 </Card>
@@ -2480,7 +2480,7 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setActiveModul(null)}>
-                Tutup Modul
+                Tutup Materi
               </Button>
             </DialogFooter>
           </DialogContent>
