@@ -107,7 +107,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "GuruPro membantu guru SMK menyusun jurnal mengajar, modul ajar, dan administrasi pembelajaran lebih cepat.",
+          "GuruPro membantu guru SMK menyusun jurnal mengajar, materi ajar, dan administrasi pembelajaran lebih cepat.",
       },
       { name: "author", content: "GuruPro" },
     ],

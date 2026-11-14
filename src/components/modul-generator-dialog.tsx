@@ -247,7 +247,7 @@ export function ModulGeneratorDialog({
   const handleGenerate = async () => {
     // 1. Authoritative Teacher Verification Guard
     if (profile?.role !== "guru") {
-      toast.error("Hanya akun Guru yang berwenang menyusun modul ajar.");
+      toast.error("Hanya akun Guru yang berwenang menyusun materi ajar.");
       return;
     }
     const verStatus = String(profile?.status_verifikasi || "").toLowerCase().trim();
@@ -346,7 +346,7 @@ export function ModulGeneratorDialog({
 
     // Stage 2: Real AI Generation & Grounding
     setStage("generating");
-    setStageMessage("GuruPro AI sedang menyusun Modul Ajar dan memvalidasi mutu rujukan (AI-2D)...");
+    setStageMessage("GuruPro AI sedang menyusun Materi Ajar dan memvalidasi mutu rujukan (AI-2D)...");
 
     // Automatically resolve Kurikulum Merdeka Target Fase from class tingkat
     let targetFase: "A" | "B" | "C" | "D" | "E" | "F" = "E";
@@ -383,14 +383,14 @@ export function ModulGeneratorDialog({
 
       if (result.status === "success" && (result.persistedModul || result.draftModul)) {
         setStage("saving_draft");
-        setStageMessage("Menyimpan draf Modul Ajar ke basis data...");
+        setStageMessage("Menyimpan draf Materi Ajar ke basis data...");
 
         // Modul is authoritative from server
         const authoritativeModul = result.persistedModul || (result.draftModul as any);
 
         setStage("success");
-        setStageMessage("Modul Ajar berhasil disusun dan disimpan sebagai Draf!");
-        toast.success("Modul Ajar berhasil disusun dan disimpan sebagai Draf.");
+        setStageMessage("Materi Ajar berhasil disusun dan disimpan sebagai Draf!");
+        toast.success("Materi Ajar berhasil disusun dan disimpan sebagai Draf.");
 
         if (authoritativeModul.aiMetadata?.catatanKeterbatasan) {
           toast.warning(`Catatan Keterbatasan: ${authoritativeModul.aiMetadata.catatanKeterbatasan}`);
@@ -401,12 +401,12 @@ export function ModulGeneratorDialog({
         reset();
         onOpenChange(false);
       } else {
-        throw new Error("Penyedia AI gagal menghasilkan draf Modul Ajar yang valid.");
+        throw new Error("Penyedia AI gagal menghasilkan draf Materi Ajar yang valid.");
       }
     } catch (err: any) {
       setStage("error");
       const rawMsg = err?.message || String(err);
-      let userMsg = "Gagal menyusun modul ajar dengan AI.";
+      let userMsg = "Gagal menyusun materi ajar dengan AI.";
 
       if (
         rawMsg.includes("INSUFFICIENT_EVIDENCE") ||

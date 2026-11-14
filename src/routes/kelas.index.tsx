@@ -547,7 +547,7 @@ function SiswaKelasListView() {
     <div className="grid gap-6">
       <PageHeader
         title="Kelas Diikuti"
-        subtitle="Daftar kelas pembelajaran yang kamu ikuti. Pilih kelas untuk melihat materi modul ajar, tugas latihan, dan hasil nilai."
+        subtitle="Daftar kelas pembelajaran yang kamu ikuti. Pilih kelas untuk melihat materi ajar, tugas latihan, dan hasil nilai."
         actions={
           <Dialog open={openModal} onOpenChange={setOpenModal}>
             <DialogTrigger asChild>

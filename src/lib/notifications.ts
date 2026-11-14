@@ -16,8 +16,8 @@ export const NOTIFIKASI: Notifikasi[] = [
   },
   {
     id: "n2",
-    judul: "Modul berhasil dipublikasikan",
-    detail: "Modul Ajar: Trigonometri Dasar kini terbit",
+    judul: "Materi ajar berhasil dipublikasikan",
+    detail: "Materi Ajar: Trigonometri Dasar kini terbit",
     waktu: "1 jam lalu",
     tipe: "modul",
   },

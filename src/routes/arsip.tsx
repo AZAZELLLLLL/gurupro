@@ -533,7 +533,7 @@ function ArsipPage() {
               Belum Ada Data yang Diarsipkan
             </h3>
             <p className="mx-auto max-w-md text-sm text-muted-foreground">
-              Ketika Anda mengarsipkan modul ajar, paket soal, atau penugasan dari menu aktif, dokumen
+              Ketika Anda mengarsipkan materi ajar, paket soal, atau penugasan dari menu aktif, dokumen
               tersebut akan tersimpan rapi di sini dan tidak memadati daftar utama Anda.
             </p>
           </CardContent>
@@ -681,7 +681,7 @@ function ArsipPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display text-navy">
-              Pulihkan {targetRestore?.itemType === "modul" ? "Modul Ajar" : targetRestore?.itemType === "paket_soal" ? "Paket Soal" : "Penugasan"}?
+              Pulihkan {targetRestore?.itemType === "modul" ? "Materi Ajar" : targetRestore?.itemType === "paket_soal" ? "Paket Soal" : "Penugasan"}?
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <span className="block font-medium text-foreground">

@@ -593,8 +593,8 @@ export function generateFallbackModul(
   }
 
   return {
-    judul: `Modul Ajar: ${topik}`,
-    ringkasan: `Modul Ajar Kurikulum Merdeka ${topik}${mapel}${kelas} disusun berdasarkan materi sumber (${data.sumberTipe}${data.sumberJudul ? `: ${data.sumberJudul}` : ""}). Modul ini mencakup ${sections.length} bab pembelajaran terstruktur mulai dari orientasi konseptual hingga asesmen kompetensi.`,
+    judul: `Materi Ajar: ${topik}`,
+    ringkasan: `Materi Ajar Kurikulum Merdeka ${topik}${mapel}${kelas} disusun berdasarkan materi sumber (${data.sumberTipe}${data.sumberJudul ? `: ${data.sumberJudul}` : ""}). Materi ini mencakup ${sections.length} bab pembelajaran terstruktur mulai dari orientasi konseptual hingga asesmen kompetensi.`,
     tujuan: [
       `Peserta didik mampu menguraikan definisi dan prinsip dasar materi ${topik} secara komprehensif.`,
       `Peserta didik mampu menganalisis keterkaitan antarkonsep serta komponen materi ${topik}.`,

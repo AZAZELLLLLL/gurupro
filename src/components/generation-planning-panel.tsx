@@ -1553,7 +1553,7 @@ export function IllustrationPlanningPanel({
                                   <div className="flex items-center justify-between">
                                     <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
                                       <Link2 className="h-3.5 w-3.5 text-primary" />
-                                      Tautan ke Bab Modul Ajar:
+                                      Tautan ke Bab Materi Ajar:
                                     </span>
                                     {currentAsset.lifecycleStatus === "attached" && currentAsset.attachedSectionId ? (
                                       <Badge variant="outline" className="border-emerald-500 text-emerald-700 bg-emerald-50 text-[10px] gap-1">
@@ -1575,7 +1575,7 @@ export function IllustrationPlanningPanel({
                                       onChange={(e) => setSelectedTargetSection(e.target.value)}
                                       className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 py-1 text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
                                     >
-                                      <option value="">-- Pilih Bab Modul Ajar Target --</option>
+                                      <option value="">-- Pilih Bab Materi Ajar Target --</option>
                                       {sections.map((sec, idx) => (
                                         <option key={sec.id} value={sec.id}>
                                           Bab {idx + 1}: {sec.judul} {sec.ilustrasi ? "(Sudah ada gambar aktif)" : ""}
@@ -1817,10 +1817,10 @@ export function IllustrationPlanningPanel({
                                 </AlertDialogTitle>
                                 <AlertDialogDescription className="text-xs space-y-2">
                                   <p>
-                                    Aset ilustrasi ini sedang aktif terpaut di bab modul ajar.
+                                    Aset ilustrasi ini sedang aktif terpaut di bab materi ajar.
                                   </p>
                                   <p className="p-2 rounded bg-rose-50 border border-rose-200 text-rose-800">
-                                    Mengarsipkan aset ini akan secara otomatis melepas tautannya dari bab modul ajar terkait.
+                                    Mengarsipkan aset ini akan secara otomatis melepas tautannya dari bab materi ajar terkait.
                                   </p>
                                   <p>
                                     Aset ini akan tetap tersimpan di arsip dan dapat ditinjau kembali di kemudian hari.

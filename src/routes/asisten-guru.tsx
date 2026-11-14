@@ -651,7 +651,7 @@ export function AsistenGuruPage() {
 
     if (action === "modul") {
       setInputMessage(
-        `@generate_modul buatkan Modul Ajar Kurikulum Merdeka yang lengkap, mendalam, dan terstruktur berdasarkan materi terlampir "${title}"`
+        `@generate_modul buatkan Materi Ajar Kurikulum Merdeka yang lengkap, mendalam, dan terstruktur berdasarkan materi terlampir "${title}"`
       );
     } else if (action === "ppt") {
       setInputMessage(
@@ -800,6 +800,8 @@ export function AsistenGuruPage() {
       const titleMatch = content.match(/^#+\s*(.+)$/m);
       let cleanedTitle = titleMatch
         ? titleMatch[1]
+            .replace(/MATERI AJAR KURIKULUM MERDEKA\s*\(TERRINCI\)?/i, "")
+            .replace(/MATERI AJAR\s*[:\-–]?/i, "")
             .replace(/MODUL AJAR KURIKULUM MERDEKA\s*\(TERRINCI\)?/i, "")
             .replace(/MODUL AJAR\s*[:\-–]?/i, "")
             .replace(/^[:\-–\s]+/, "")
@@ -807,7 +809,7 @@ export function AsistenGuruPage() {
             .trim()
         : "";
       if (!cleanedTitle || cleanedTitle.length < 3) {
-        cleanedTitle = activeSession?.title?.replace(/["“”'‘’]/g, "").trim() || "Modul Ajar Pembelajaran";
+        cleanedTitle = activeSession?.title?.replace(/["“”'‘’]/g, "").trim() || "Materi Ajar Pembelajaran";
       }
 
       // 2. Ekstraksi Mapel & Jenjang/Fase dari isi
@@ -823,7 +825,7 @@ export function AsistenGuruPage() {
         ? "X (SMK)"
         : "X";
 
-      // 3. Ringkasan Modul yang Elegan
+      // 3. Ringkasan Materi yang Elegan
       const cleanContentNoHeaders = content
         .replace(/^#+.*$/gm, "")
         .replace(/```[\s\S]*?```/g, "")
@@ -832,7 +834,7 @@ export function AsistenGuruPage() {
       const firstParagraph = cleanContentNoHeaders.split(/\n\s*\n/)[0] || "";
       const ringkasanVal =
         firstParagraph.slice(0, 250).trim() ||
-        `Modul ajar ${cleanedTitle} terstruktur berbasis Kurikulum Merdeka dengan model ${outlineSettings.modelPembelajaran}.`;
+        `Materi ajar ${cleanedTitle} terstruktur berbasis Kurikulum Merdeka dengan model ${outlineSettings.modelPembelajaran}.`;
 
       // 4. PARSING BAB-BAB SECARA FLEKSIBEL SESUAI DETAIL KONTEN AI
       // Pisahkan berdasarkan header: "## Bagian X", "## Bab X", "## X.", "### X." atau "**X. ...**"
@@ -946,7 +948,7 @@ export function AsistenGuruPage() {
       );
     } catch (err: any) {
       console.error("[handleSaveToModul] Error:", err);
-      toast.error(err?.message || "Gagal menyimpan modul ajar ke database.");
+      toast.error(err?.message || "Gagal menyimpan materi ajar ke database.");
     } finally {
       setSavingAction(null);
     }
@@ -2166,11 +2168,11 @@ export function AsistenGuruPage() {
               </p>
 
               <div className="mt-6 sm:mt-8 grid grid-cols-1 gap-2.5 sm:gap-3 sm:grid-cols-2 text-left">
-                {/* 1. Modul Ajar Card */}
+                {/* 1. Materi Ajar Card */}
                 <button
                   onClick={() =>
                     handleSendMessage(
-                      `Tolong susunkan Modul Ajar Kurikulum Merdeka yang sangat lengkap, mendalam, dan terperinci untuk jenjang ${outlineSettings.jenjang} dengan model ${outlineSettings.modelPembelajaran} mengenai materi Percabangan Logika IF-ELSE. Sajikan secara profesional dan terstruktur mencakup Bagian 1: Informasi Umum & Tujuan Pembelajaran, Bagian 2: Uraian Materi & Konsep Pokok, Bagian 3: Skenario Kegiatan Pembelajaran Rinci (Pendahuluan, Inti PBL per sintaks, Penutup), Bagian 4: Asesmen & Rubrik KKTP, Bagian 5: Lembar Kerja Peserta Didik (LKPD), serta Bagian 6: Pengayaan & Remedial.`
+                      `Tolong susunkan Materi Ajar Kurikulum Merdeka yang sangat lengkap, mendalam, dan terperinci untuk jenjang ${outlineSettings.jenjang} dengan model ${outlineSettings.modelPembelajaran} mengenai materi Percabangan Logika IF-ELSE. Sajikan secara profesional dan terstruktur mencakup Bagian 1: Informasi Umum & Tujuan Pembelajaran, Bagian 2: Uraian Materi & Konsep Pokok, Bagian 3: Skenario Kegiatan Pembelajaran Rinci (Pendahuluan, Inti PBL per sintaks, Penutup), Bagian 4: Asesmen & Rubrik KKTP, Bagian 5: Lembar Kerja Peserta Didik (LKPD), serta Bagian 6: Pengayaan & Remedial.`
                     )
                   }
                   className="group flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 sm:p-4 text-left transition-all hover:border-primary/50 hover:bg-muted/40 hover:shadow-xs active:scale-[0.99]"
@@ -2357,10 +2359,10 @@ export function AsistenGuruPage() {
                               <button
                                 onClick={() => handleAttachImageToModul(m.imageUrl!, m.imagePrompt)}
                                 className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
-                                title="Pasang ke Bab Modul Ajar"
+                                title="Pasang ke Bab Materi Ajar"
                               >
                                 <BookOpen className="h-3 w-3" />
-                                <span>Pasang ke Modul</span>
+                                <span>Pasang ke Materi</span>
                               </button>
                               <button
                                 onClick={() => handleDownloadImage(m.imageUrl!, m.imagePrompt)}
@@ -2690,12 +2692,12 @@ export function AsistenGuruPage() {
               <button
                 onClick={() => {
                   setInputMessage(
-                    `@generate_modul buatkan modul ajar Kurikulum Merdeka yang lengkap, mendalam, dan rinci dengan struktur Capaian Pembelajaran, Alur Tujuan Pembelajaran, Materi Inti, Asesmen & Refleksi tentang `
+                    `@generate_modul buatkan materi ajar Kurikulum Merdeka yang lengkap, mendalam, dan rinci dengan struktur Capaian Pembelajaran, Alur Tujuan Pembelajaran, Materi Inti, Asesmen & Refleksi tentang `
                   );
                   setTimeout(() => textareaRef.current?.focus(), 80);
                 }}
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors font-semibold shadow-2xs"
-                title="Ketik perintah rancang Modul Ajar Kurikulum Merdeka"
+                title="Ketik perintah rancang Materi Ajar Kurikulum Merdeka"
               >
                 <BookOpen className="h-3.5 w-3.5" />
                 <span>@generate_modul</span>
@@ -3737,10 +3739,10 @@ export function AsistenGuruPage() {
                   onClick={() => handleSaveToPPT(slideViewerRawContent, slideViewerMsgId)}
                   disabled={savingAction === slideViewerMsgId + "-ppt"}
                   className="h-8 gap-1 text-xs hidden sm:inline-flex"
-                  title="Simpan slide ke Modul Ajar"
+                  title="Simpan slide ke Materi Ajar"
                 >
                   <BookOpen className="h-3.5 w-3.5 text-primary" />
-                  <span>Simpan ke Modul</span>
+                  <span>Simpan ke Materi</span>
                 </Button>
 
                 <Button

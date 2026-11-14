@@ -260,7 +260,7 @@ export function ProductAnalyticsView() {
               Corong Konversi Alur Kerja (Workflow Funnels)
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {renderFunnelCards("Modul Ajar AI", report.funnels.modulAjar)}
+              {renderFunnelCards("Materi Ajar AI", report.funnels.modulAjar)}
               {renderFunnelCards("Generator Soal", report.funnels.generatorSoal)}
               {renderFunnelCards("Penugasan Siswa", report.funnels.penugasan)}
               {renderFunnelCards("Penilaian & Rekap", report.funnels.penilaian)}

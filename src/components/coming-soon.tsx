@@ -38,7 +38,7 @@ export function ComingSoon({
             </Link>
           </Button>
           <Button asChild>
-            <Link to="/modul-ajar">Kelola Modul Ajar</Link>
+            <Link to="/modul-ajar">Kelola Materi Ajar</Link>
           </Button>
         </div>
       </CardContent>

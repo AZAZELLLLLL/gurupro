@@ -121,7 +121,7 @@ export const Route = createFileRoute("/soal")({
       {
         name: "description",
         content:
-          "Buat soal manual atau dibantu AI dari modul ajar, simpan ke bank soal, lalu terbitkan sebagai tugas untuk kelas Anda.",
+          "Buat soal manual atau dibantu AI dari materi ajar, simpan ke bank soal, lalu terbitkan sebagai tugas untuk kelas Anda.",
       },
       { property: "og:title", content: "Bank Soal — GuruPro" },
       {
@@ -411,9 +411,9 @@ function SoalPage() {
 
   const runGenerate = async () => {
     const modul = moduls.find((m) => m.id === modulId);
-    const t = topik.trim() || modul?.judul.replace(/^Modul Ajar:\s*/, "") || "";
+    const t = topik.trim() || modul?.judul.replace(/^Modul Ajar:\s*|^Materi Ajar:\s*/i, "") || "";
     if (!t) {
-      toast.error("Pilih modul sumber atau tulis topik/materi terlebih dahulu.");
+      toast.error("Pilih materi sumber atau tulis topik terlebih dahulu.");
       return;
     }
     setLoading(true);
@@ -1473,7 +1473,7 @@ function SoalPage() {
             </span>
             <p className="font-display font-semibold text-navy">Bank soal masih kosong</p>
             <p className="max-w-sm text-sm text-muted-foreground">
-              Buat soal manual atau minta GuruPro AI menyusun soal dari modul ajar Anda.
+              Buat soal manual atau minta GuruPro AI menyusun soal dari materi ajar Anda.
             </p>
             <Button
               onClick={() => {

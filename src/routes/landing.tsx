@@ -40,7 +40,7 @@ export const Route = createFileRoute("/landing")({
       {
         property: "og:description",
         content:
-          "Platform pembelajaran dan administrasi terpadu untuk guru SMA/SMK. Susun modul ajar, buat soal, kelola penugasan, dan rekap penilaian.",
+          "Platform pembelajaran dan administrasi terpadu untuk guru SMA/SMK. Susun materi ajar, buat soal, kelola penugasan, dan rekap penilaian.",
       },
     ],
   }),
@@ -251,17 +251,17 @@ export function LandingPage() {
             </div>
 
             <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {/* Fitur 1: Modul Ajar */}
+              {/* Fitur 1: Materi Ajar */}
               <Card className="border border-border/80 bg-card transition-all hover:-translate-y-1 hover:shadow-lift">
                 <CardContent className="p-6">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
                     <BookOpen className="h-6 w-6" />
                   </div>
                   <h3 className="mt-5 font-display text-lg font-bold text-navy dark:text-foreground">
-                    Modul Ajar
+                    Materi Ajar
                   </h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Penyusunan modul ajar Kurikulum Merdeka terstruktur dengan fase, elemen, tujuan pembelajaran, dan langkah kegiatan yang jelas.
+                    Penyusunan materi ajar Kurikulum Merdeka terstruktur dengan fase, elemen, tujuan pembelajaran, dan langkah kegiatan yang jelas.
                   </p>
                 </CardContent>
               </Card>
@@ -346,16 +346,16 @@ export function LandingPage() {
             </div>
 
             <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {/* AI Modul Ajar */}
+              {/* AI Materi Ajar */}
               <div className="rounded-2xl border border-border/90 bg-card p-6 shadow-sm">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <FileText className="h-6 w-6" />
                 </div>
                 <h3 className="mt-5 font-display text-lg font-bold text-navy dark:text-foreground">
-                  AI Modul Ajar
+                  AI Materi Ajar
                 </h3>
                 <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
-                  Susun draf modul ajar terstruktur dari bahan rujukan nyata (CP/ATP, teks materi, dokumen, atau tautan daring). Dilengkapi validasi grounding faktual sebelum disimpan.
+                  Susun draf materi ajar terstruktur dari bahan rujukan nyata (CP/ATP, teks materi, dokumen, atau tautan daring). Dilengkapi validasi grounding faktual sebelum disimpan.
                 </p>
                 <ul className="mt-4 space-y-2 text-xs text-muted-foreground">
                   <li className="flex items-center gap-2">
@@ -401,7 +401,7 @@ export function LandingPage() {
                   AI Illustration Pipeline
                 </h3>
                 <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
-                  Integrasi generasi aset ilustrasi edukatif terverifikasi untuk memperkaya media ajar secara kontekstual sesuai materi modul yang diajarkan guru.
+                  Integrasi generasi aset ilustrasi edukatif terverifikasi untuk memperkaya media ajar secara kontekstual sesuai materi yang diajarkan guru.
                 </p>
                 <ul className="mt-4 space-y-2 text-xs text-muted-foreground">
                   <li className="flex items-center gap-2">
@@ -410,7 +410,7 @@ export function LandingPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-3.5 w-3.5 text-sky shrink-0" />
-                    <span>Manajemen aset ilustrasi per modul guru</span>
+                    <span>Manajemen aset ilustrasi per materi ajar guru</span>
                   </li>
                 </ul>
               </div>
@@ -453,11 +453,11 @@ export function LandingPage() {
                     2
                   </div>
                   <h3 className="font-display text-base font-bold text-navy dark:text-foreground">
-                    Modul Ajar
+                    Materi Ajar
                   </h3>
                 </div>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  Susun draf modul ajar terstruktur dan telaah setiap bagian pembelajaran sebelum diterbitkan ke siswa.
+                  Susun draf materi ajar terstruktur dan telaah setiap bagian pembelajaran sebelum diterbitkan ke siswa.
                 </p>
               </div>
 
@@ -550,7 +550,7 @@ export function LandingPage() {
                         Menyiapkan Materi Pembelajaran
                       </h3>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Penyusunan modul terstandarisasi fase E dan F Kurikulum Merdeka.
+                        Penyusunan materi ajar terstandarisasi fase E dan F Kurikulum Merdeka.
                       </p>
                     </div>
                   </div>
@@ -615,7 +615,7 @@ export function LandingPage() {
                 <div className="mt-6 space-y-4">
                   <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-foreground">Modul Ajar Pembelajaran</span>
+                      <span className="text-xs font-semibold text-foreground">Materi Ajar Pembelajaran</span>
                       <span className="text-xs text-primary font-medium">Kurikulum Merdeka</span>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">

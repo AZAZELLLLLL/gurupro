@@ -149,13 +149,13 @@ export function generateModul(
   });
 
   return {
-    judul: `Modul Ajar: ${topik}`,
+    judul: `Materi Ajar: ${topik}`,
     kelas: "",
     mapel: "",
     status: "Draft",
     sumberTipe: input.sumberTipe,
     sumberInput: input.sumberInput,
-    ringkasan: `${sumberLabel(input.sumberTipe, input.sumberInput)}. Modul ini menuntun siswa memahami ${topik.toLowerCase()} melalui ${konteks}, ditutup dengan contoh penerapan: ${contoh}.`,
+    ringkasan: `${sumberLabel(input.sumberTipe, input.sumberInput)}. Materi ini menuntun siswa memahami ${topik.toLowerCase()} melalui ${konteks}, ditutup dengan contoh penerapan: ${contoh}.`,
     sections,
     slides: [],
   };

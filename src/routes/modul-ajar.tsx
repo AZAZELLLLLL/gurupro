@@ -134,15 +134,15 @@ function ModulAjarPage() {
           role: profile?.role,
           metadata: { modulId: targetPublish.id },
         });
-        toast.success(`Modul "${targetPublish.judul}" berhasil dipublikasikan.`);
+        toast.success(`Materi ajar "${targetPublish.judul}" berhasil dipublikasikan.`);
         await reloadModuls();
         setTargetPublish(null);
       }
     } catch (err: any) {
-      console.error("[handleConfirmPublish] Gagal mempublikasikan modul:", err);
+      console.error("[handleConfirmPublish] Gagal mempublikasikan materi ajar:", err);
       const message = isRecoverableAuthError(err)
         ? "Sesi login tidak valid atau kedaluwarsa. Silakan masuk kembali."
-        : err?.message || "Gagal mempublikasikan modul.";
+        : err?.message || "Gagal mempublikasikan materi ajar.";
       toast.error(message);
     } finally {
       setPublishLoading(false);
@@ -251,7 +251,7 @@ function ModulAjarPage() {
         <div className="max-w-md space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground">Akses Khusus Guru</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Halaman penyusunan modul ajar hanya dapat diakses oleh akun Guru terdaftar.
+            Halaman penyusunan materi ajar hanya dapat diakses oleh akun Guru terdaftar.
           </p>
           <div className="pt-2 flex justify-center">
             <Button asChild variant="outline">
@@ -419,7 +419,7 @@ function ModulAjarPage() {
                       to="/soal"
                       search={{
                         modulId: m.id,
-                        topik: m.judul.replace(/^Modul Ajar:\s*/i, ""),
+                        topik: m.judul.replace(/^Modul Ajar:\s*|^Materi Ajar:\s*/i, ""),
                         mapel: m.mapel || undefined,
                         kelasId: m.kelasId || undefined,
                         mode: "buat",
@@ -447,14 +447,14 @@ function ModulAjarPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onSelect={() => setEditing(m)}>
-                        {m.status === "Terbit" ? "Lihat detail modul" : "Edit modul"}
+                        {m.status === "Terbit" ? "Lihat detail materi" : "Edit materi"}
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link
                           to="/soal"
                           search={{
                             modulId: m.id,
-                            topik: m.judul.replace(/^Modul Ajar:\s*/i, ""),
+                            topik: m.judul.replace(/^Modul Ajar:\s*|^Materi Ajar:\s*/i, ""),
                             mapel: m.mapel || undefined,
                             kelasId: m.kelasId || undefined,
                             mode: "buat",
@@ -462,7 +462,7 @@ function ModulAjarPage() {
                           className="flex items-center gap-1.5 w-full cursor-pointer"
                         >
                           <FileQuestion className="h-4 w-4 mr-1.5 text-primary" />
-                          Buat Soal dari Modul
+                          Buat Soal dari Materi
                         </Link>
                       </DropdownMenuItem>
                       {m.status === "Draft" ? (
@@ -473,7 +473,7 @@ function ModulAjarPage() {
                           }}
                         >
                           <Send className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                          Publikasikan modul
+                          Publikasikan materi ajar
                         </DropdownMenuItem>
                       ) : null}
                       <DropdownMenuItem
@@ -483,7 +483,7 @@ function ModulAjarPage() {
                         }}
                       >
                         <Archive className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                        Arsipkan modul
+                        Arsipkan materi ajar
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
@@ -493,7 +493,7 @@ function ModulAjarPage() {
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
-                        Hapus modul
+                        Hapus materi ajar
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -504,7 +504,7 @@ function ModulAjarPage() {
         )}
       </section>
 
-      {/* Dialog Arsipkan Modul */}
+      {/* Dialog Arsipkan Materi Ajar */}
       <AlertDialog
         open={targetArsip !== null}
         onOpenChange={(o) => !o && !arsipLoading && setTargetArsip(null)}
@@ -512,14 +512,14 @@ function ModulAjarPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display text-navy">
-              Arsipkan modul ini?
+              Arsipkan materi ajar ini?
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <span className="block font-medium text-foreground">
                 &ldquo;{targetArsip?.judul}&rdquo;
               </span>
               <span className="block text-xs leading-relaxed">
-                Modul akan dipindahkan ke Pusat Arsip dan disembunyikan dari daftar aktif, namun dapat
+                Materi ajar akan dipindahkan ke Pusat Arsip dan disembunyikan dari daftar aktif, namun dapat
                 dipulihkan kembali kapan saja dengan data yang tetap utuh.
               </span>
             </AlertDialogDescription>
@@ -538,17 +538,17 @@ function ModulAjarPage() {
                     toast.error(res.message);
                     return;
                   }
-                  toast.success("Modul berhasil diarsipkan ke Pusat Arsip.");
+                  toast.success("Materi ajar berhasil diarsipkan ke Pusat Arsip.");
                   setTargetArsip(null);
                 } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "Gagal mengarsipkan modul.");
+                  toast.error(err instanceof Error ? err.message : "Gagal mengarsipkan materi ajar.");
                 } finally {
                   setArsipLoading(false);
                 }
               }}
             >
               {arsipLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-              Arsipkan Modul
+              Arsipkan Materi Ajar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -557,9 +557,9 @@ function ModulAjarPage() {
       <AlertDialog open={hapus !== null} onOpenChange={(o) => !o && setHapus(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus modul ini?</AlertDialogTitle>
+            <AlertDialogTitle>Hapus materi ajar ini?</AlertDialogTitle>
             <AlertDialogDescription>
-              Modul &ldquo;{hapus?.judul}&rdquo; akan dihapus permanen dari akun Anda.
+              Materi ajar &ldquo;{hapus?.judul}&rdquo; akan dihapus permanen dari akun Anda.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -569,7 +569,7 @@ function ModulAjarPage() {
               onClick={() => {
                 if (hapus) void deleteModul(hapus.id);
                 setHapus(null);
-                toast.success("Modul berhasil dihapus.");
+                toast.success("Materi ajar berhasil dihapus.");
               }}
             >
               Hapus
@@ -642,7 +642,7 @@ function ModulAjarPage() {
                   Mempublikasikan…
                 </>
               ) : (
-                "Ya, Publikasikan Modul"
+                "Ya, Publikasikan Materi Ajar"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

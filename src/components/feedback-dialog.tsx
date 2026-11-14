@@ -177,7 +177,7 @@ export function FeedbackDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="modul_ajar">Modul Ajar AI</SelectItem>
+                    <SelectItem value="modul_ajar">Materi Ajar AI</SelectItem>
                     <SelectItem value="generator_soal">Generator Soal</SelectItem>
                     <SelectItem value="penugasan">Penugasan & Kelas</SelectItem>
                     <SelectItem value="penilaian">Penilaian & Rekap</SelectItem>

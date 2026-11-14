@@ -203,7 +203,7 @@ function DaftarPage() {
       </h1>
       <p className="mt-1.5 text-sm text-muted-foreground">
         {role === "guru"
-          ? "Daftar akun guru untuk menyusun modul ajar, bank soal, dan mengelola kelas pembelajaran."
+          ? "Daftar akun guru untuk menyusun materi ajar, bank soal, dan mengelola kelas pembelajaran."
           : "Daftar akun siswa untuk mengakses pembelajaran, materi, dan tugas."}
       </p>
 

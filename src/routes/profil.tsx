@@ -105,7 +105,7 @@ function ProfilPage() {
         subtitle={
           isUserSiswa
             ? "Data profil ini digunakan untuk keanggotaan kelas dan aktivitas belajar Anda."
-            : "Data ini dipakai pada modul ajar, soal, dan dokumen yang Anda unduh."
+            : "Data ini dipakai pada materi ajar, soal, dan dokumen yang Anda unduh."
         }
         actions={
           edit ? (
@@ -251,7 +251,7 @@ function ProfilPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Keluar dari GuruPro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Anda perlu masuk kembali untuk mengakses modul ajar dan bank soal.
+              Anda perlu masuk kembali untuk mengakses materi ajar dan bank soal.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

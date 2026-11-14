@@ -553,14 +553,14 @@ export function ModulEditor({
         setPublishConfirmOpen(false);
         setManual(false);
         onChange(result.publishedModul);
-        toast.success("Modul ajar berhasil dipublikasikan.");
+        toast.success("Materi ajar berhasil dipublikasikan.");
         onPublish?.();
       }
     } catch (err: any) {
-      console.error("[executePublish] Gagal mempublikasikan modul:", err);
+      console.error("[executePublish] Gagal mempublikasikan materi ajar:", err);
       const message = isRecoverableAuthError(err)
         ? "Sesi login tidak valid atau kedaluwarsa. Silakan masuk kembali."
-        : err?.message || "Gagal mempublikasikan modul.";
+        : err?.message || "Gagal mempublikasikan materi ajar.";
       toast.error(message);
     } finally {
       setIsPublishing(false);
@@ -624,7 +624,7 @@ export function ModulEditor({
             data: {
               sumberTipe: modul.sumberTipe || "Teks",
               konten: rawContent,
-              topik: modul.judul.replace(/^Modul Ajar:\s*/i, ""),
+              topik: modul.judul.replace(/^Modul Ajar:\s*|^Materi Ajar:\s*/i, ""),
               mapel: modul.mapel,
               kelas: modul.kelas,
               ...(modul.sumberJudul ? { sumberJudul: modul.sumberJudul } : {}),
@@ -853,7 +853,7 @@ export function ModulEditor({
                   to="/soal"
                   search={{
                     modulId: modul.id,
-                    topik: modul.judul.replace(/^Modul Ajar:\s*/i, ""),
+                    topik: modul.judul.replace(/^Modul Ajar:\s*|^Materi Ajar:\s*/i, ""),
                     mapel: modul.mapel || undefined,
                     kelasId: modul.kelasId || undefined,
                     mode: "buat",
@@ -1846,8 +1846,8 @@ export function ModulEditor({
               Perubahan Belum Disimpan
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Ada beberapa suntingan draf modul ajar yang belum Anda simpan ke server. Apakah Anda
-              ingin menyimpannya sekarang sebelum kembali ke daftar modul?
+              Ada beberapa suntingan draf materi ajar yang belum Anda simpan ke server. Apakah Anda
+              ingin menyimpannya sekarang sebelum kembali ke daftar materi ajar?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2">
@@ -1879,7 +1879,7 @@ export function ModulEditor({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog Konfirmasi Publikasi Modul Ajar (AI-3C) */}
+      {/* Dialog Konfirmasi Publikasi Materi Ajar (AI-3C) */}
       <AlertDialog open={publishConfirmOpen} onOpenChange={setPublishConfirmOpen}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
@@ -1941,7 +1941,7 @@ export function ModulEditor({
                   Mempublikasikan…
                 </>
               ) : (
-                "Ya, Publikasikan Modul"
+                "Ya, Publikasikan Materi Ajar"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

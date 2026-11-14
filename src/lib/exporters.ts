@@ -441,7 +441,7 @@ export async function exportModulAjarPdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(37, 99, 235); // Primary Blue #2563EB
-  doc.text("GURUPRO — MODUL AJAR KURIKULUM MERDEKA", margin, cursorY);
+  doc.text("GURUPRO — MATERI AJAR KURIKULUM MERDEKA", margin, cursorY);
   cursorY += 6;
 
   // Judul Modul
@@ -610,7 +610,7 @@ export async function exportModulAjarPdf(
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `GuruPro · Modul Ajar — Halaman ${i} dari ${totalPages}`,
+      `GuruPro · Materi Ajar — Halaman ${i} dari ${totalPages}`,
       pageWidth / 2,
       pageHeight - 8,
       { align: "center" }

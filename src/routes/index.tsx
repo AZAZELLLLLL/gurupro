@@ -2354,7 +2354,7 @@ export function AdminDashboard() {
                 {teacherToDelete?.email}) secara permanen dari sistem.
               </p>
               <div className="rounded-md bg-destructive/10 border border-destructive/20 p-2.5 text-[11px] text-destructive leading-relaxed">
-                ⚠️ <strong>Peringatan:</strong> Seluruh modul ajar, paket soal, kelas pembelajaran, dan penugasan yang dibuat oleh guru ini akan dibersihkan dari penyimpanan database untuk menghemat kapasitas. Tindakan ini tidak dapat dibatalkan.
+                ⚠️ <strong>Peringatan:</strong> Seluruh materi ajar, paket soal, kelas pembelajaran, dan penugasan yang dibuat oleh guru ini akan dibersihkan dari penyimpanan database untuk menghemat kapasitas. Tindakan ini tidak dapat dibatalkan.
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

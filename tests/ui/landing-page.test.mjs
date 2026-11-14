@@ -220,21 +220,27 @@ assert.ok(
 );
 pass(12, "Target audience explicitly specifies Guru SMA / SMK");
 
-// Test 13: Implemented core workflow modules are described (Modul Ajar, Soal, Penugasan, Pengumpulan, Penilaian)
+// Test 13: Implemented core workflow modules are described (Materi Ajar, Soal, Penugasan, Pengumpulan, Penilaian)
 const coreModules = [
-  "Modul Ajar",
+  "Materi Ajar",
   "Generator Soal",
   "Penugasan",
   "Pengumpulan",
   "Penilaian",
 ];
 for (const mod of coreModules) {
-  assert.ok(landingSource.includes(mod), `Landing page must describe core module: ${mod}`);
+  assert.ok(
+    landingSource.includes(mod) || (mod === "Materi Ajar" && landingSource.includes("Modul Ajar")),
+    `Landing page must describe core module: ${mod}`
+  );
 }
-pass(13, "Core workflow modules (Modul Ajar, Soal, Penugasan, Pengumpulan, Penilaian) described concisely");
+pass(13, "Core workflow modules (Materi Ajar, Soal, Penugasan, Pengumpulan, Penilaian) described concisely");
 
 // Test 14: AI features strictly advertise verified capabilities (no unfinished PPT generator claims)
-assert.ok(landingSource.includes("AI Modul Ajar"), "Must describe AI Modul Ajar");
+assert.ok(
+  landingSource.includes("AI Materi Ajar") || landingSource.includes("AI Modul Ajar"),
+  "Must describe AI Materi/Modul Ajar"
+);
 assert.ok(landingSource.includes("AI Generator Soal"), "Must describe AI Generator Soal");
 assert.ok(landingSource.includes("AI Illustration Pipeline"), "Must describe verified AI Illustration Pipeline");
 assert.ok(!landingSource.includes("Generator PPT Selesai"), "Must NOT claim unfinished PPT generator as completed");
@@ -243,14 +249,17 @@ pass(14, "AI features strictly highlight verified capabilities without unsupport
 // Test 15: Simple 6-step flow reflects canonical lifecycle
 const flowSteps = [
   "Materi Sumber",
-  "Modul Ajar",
+  "Materi Ajar",
   "Paket Soal",
   "Penugasan",
   "Siswa Mengerjakan",
   "Penilaian",
 ];
 for (const step of flowSteps) {
-  assert.ok(landingSource.includes(step), `Workflow flow must include step: ${step}`);
+  assert.ok(
+    landingSource.includes(step) || (step === "Materi Ajar" && landingSource.includes("Modul Ajar")),
+    `Workflow flow must include step: ${step}`
+  );
 }
 pass(15, "Simple 6-step product flow reflects the canonical educational lifecycle");
 

@@ -98,7 +98,7 @@ export const Route = createFileRoute("/kelas/$kelasId")({
       {
         name: "description",
         content:
-          "Pusat monitoring aktivitas kelas, anggota, modul ajar, tugas aktif, dan rekap nilai.",
+          "Pusat monitoring aktivitas kelas, anggota, materi ajar, tugas aktif, dan rekap nilai.",
       },
     ],
   }),
@@ -677,7 +677,7 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
               {kelasDetail.namaKelas}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Monitoring Hub: Pantau anggota, penugasan, modul ajar, dan capaian belajar siswa
+              Monitoring Hub: Pantau anggota, penugasan, materi ajar, dan capaian belajar siswa
               secara terpusat.
             </p>
           </div>
