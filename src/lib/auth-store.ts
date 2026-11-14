@@ -164,7 +164,7 @@ export async function fetchProfileForUser(user: User): Promise<FetchProfileResul
   };
 
   try {
-    const { data, error } = await supabase
+    const { data: initialData, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id)
@@ -185,22 +185,64 @@ export async function fetchProfileForUser(user: User): Promise<FetchProfileResul
       };
     }
 
-    if (!data) {
-      console.warn("[Auth] No profile row found in DB for auth.uid():", user.id);
-      if (isSysAdmin) {
+    let profileRow: any = initialData;
+
+    if (!profileRow) {
+      console.warn("[Auth] No profile row found in DB for auth.uid():", user.id, "- attempting self-healing creation from user_metadata");
+      const meta = (user.user_metadata || {}) as Record<string, any>;
+      const rawRole = String(meta.role || "").toLowerCase().trim();
+      const metaRole = rawRole === "guru" || rawRole === "siswa" ? rawRole : "";
+
+      if (metaRole || isSysAdmin) {
+        const resolvedRole = isSysAdmin ? "admin" : metaRole;
+        const newProfileRow = {
+          id: user.id,
+          nama: meta.nama || (isSysAdmin ? "Administrator GuruPro" : user.email?.split("@")[0] || "Pengguna"),
+          email: user.email || "",
+          nip: resolvedRole === "siswa" ? "" : (meta.nip || (isSysAdmin ? "ADMIN-001" : "")),
+          nisn: resolvedRole === "siswa" ? (meta.nisn || "") : "",
+          sekolah: meta.sekolah || (isSysAdmin ? "GuruPro Command Center" : ""),
+          mapel: meta.mapel || (isSysAdmin ? "Manajemen Sistem" : ""),
+          kelas: meta.jenjang || meta.kelas || "",
+          telepon: meta.telepon || "",
+          bio: isSysAdmin ? "Akun Khusus Administrator GuruPro" : "",
+          role: resolvedRole,
+          status_verifikasi: "terverifikasi",
+        };
+
+        try {
+          const { data: insertedData, error: insertError } = await supabase
+            .from("profiles")
+            .upsert(newProfileRow, { onConflict: "id" })
+            .select()
+            .maybeSingle();
+
+          if (!insertError && insertedData) {
+            console.log("[Auth] Self-healing profile created successfully:", insertedData.id);
+            profileRow = insertedData;
+          } else {
+            console.warn("[Auth] Self-healing insert warning, using metadata profile:", insertError?.message);
+            profileRow = newProfileRow;
+          }
+        } catch (healErr) {
+          console.warn("[Auth] Self-healing exception, using metadata profile:", healErr);
+          profileRow = newProfileRow;
+        }
+      } else if (isSysAdmin) {
         return {
           status: "loaded",
           profile: fallbackProfile,
         };
+      } else {
+        return {
+          status: "missing",
+          profile: fallbackProfile,
+        };
       }
-      return {
-        status: "missing",
-        profile: fallbackProfile,
-      };
     }
 
     // Fail-safe role validation: strictly from DB, never trust client user_metadata for role elevation
-    const rawRole = data.role || "";
+    const rawRole = profileRow.role || "";
     let validatedRole =
       rawRole === "guru" || rawRole === "siswa" || rawRole === "admin" ? rawRole : "";
 
@@ -209,27 +251,27 @@ export async function fetchProfileForUser(user: User): Promise<FetchProfileResul
     }
 
     const resolvedNisn =
-      data.nisn ||
-      (validatedRole === "siswa" ? data.nip : "") ||
+      profileRow.nisn ||
+      (validatedRole === "siswa" ? profileRow.nip : "") ||
       "";
     const resolvedNip =
-      validatedRole === "siswa" ? "" : data.nip || (isSysAdmin ? "ADMIN-001" : "");
+      validatedRole === "siswa" ? "" : profileRow.nip || (isSysAdmin ? "ADMIN-001" : "");
 
     return {
       status: "loaded",
       profile: {
-        id: data.id,
-        nama: data.nama || (isSysAdmin ? "Administrator GuruPro" : "Pengguna"),
-        email: data.email || user.email || "",
+        id: profileRow.id,
+        nama: profileRow.nama || (isSysAdmin ? "Administrator GuruPro" : "Pengguna"),
+        email: profileRow.email || user.email || "",
         nip: resolvedNip,
         nisn: resolvedNisn,
-        sekolah: data.sekolah || (isSysAdmin ? "GuruPro Command Center" : ""),
-        mapel: data.mapel || (isSysAdmin ? "Manajemen Sistem" : ""),
-        kelas: data.kelas || "",
-        telepon: data.telepon || "",
-        bio: data.bio || (isSysAdmin ? "Akun Khusus Administrator GuruPro" : ""),
+        sekolah: profileRow.sekolah || (isSysAdmin ? "GuruPro Command Center" : ""),
+        mapel: profileRow.mapel || (isSysAdmin ? "Manajemen Sistem" : ""),
+        kelas: profileRow.kelas || "",
+        telepon: profileRow.telepon || "",
+        bio: profileRow.bio || (isSysAdmin ? "Akun Khusus Administrator GuruPro" : ""),
         role: validatedRole,
-        status_verifikasi: isSysAdmin ? "terverifikasi" : (data.status_verifikasi || "terverifikasi"),
+        status_verifikasi: isSysAdmin ? "terverifikasi" : (profileRow.status_verifikasi || "terverifikasi"),
       },
     };
   } catch (err) {
@@ -379,20 +421,60 @@ export async function login(
   _remember?: boolean,
 ): Promise<LoginResult> {
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password;
+
+    // 1. Coba login dengan kredensial yang dimasukkan
+    let { data, error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password: cleanPassword,
     });
+
+    // 2. Jika gagal karena "invalid login credentials", coba variasi whitespace keyboard
+    if (error && error.message.toLowerCase().includes("invalid login credentials")) {
+      if (cleanPassword.trim() !== cleanPassword) {
+        // Coba versi trim jika pengguna atau keyboard memasukkan spasi di ujung
+        const retryTrim = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: cleanPassword.trim(),
+        });
+        if (!retryTrim.error && retryTrim.data.user) {
+          data = retryTrim.data;
+          error = null;
+        }
+      } else {
+        // Coba variasi trailing space jika pengguna saat daftar tak sengaja menyertakan spasi
+        const retrySpace = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: cleanPassword + " ",
+        });
+        if (!retrySpace.error && retrySpace.data.user) {
+          data = retrySpace.data;
+          error = null;
+        }
+      }
+    }
 
     if (error) {
       const errMsg = error.message.toLowerCase();
       let code: string | undefined = undefined;
+      let friendlyMessage = error.message;
+
       if (errMsg.includes("invalid login credentials")) {
         code = "invalid_credentials";
+        friendlyMessage =
+          "Email atau kata sandi tidak cocok. Pastikan penulisan huruf besar/kecil dan alamat email sudah benar.";
       } else if (errMsg.includes("email not confirmed")) {
         code = "unconfirmed_email";
+        friendlyMessage =
+          "Email akun Anda belum dikonfirmasi. Silakan periksa kotak masuk atau spam email Anda untuk mengklik tautan aktivasi.";
+      } else if (errMsg.includes("rate limit") || errMsg.includes("too many requests")) {
+        code = "rate_limit";
+        friendlyMessage =
+          "Terlalu banyak percobaan masuk. Silakan tunggu beberapa saat sebelum mencoba kembali.";
       }
-      return { ok: false, message: error.message, code };
+
+      return { ok: false, message: friendlyMessage, code };
     }
 
     if (!data.user) {
@@ -404,7 +486,7 @@ export async function login(
     }
 
     // Tunggu syncProfile selesai untuk mendapatkan role yang valid
-    const profileResult = await syncProfile(data.user);
+    let profileResult = await syncProfile(data.user);
 
     if (profileResult?.status === "error") {
       return {
@@ -414,12 +496,55 @@ export async function login(
       };
     }
 
-    if (profileResult?.status === "missing") {
-      return {
-        ok: false,
-        message: "Data profil akun tidak ditemukan di basis data. Hubungi administrator.",
-        code: "profile_missing",
-      };
+    // Jika profil kosong tapi user_metadata memiliki role valid, pulihkan otomatis
+    if (profileResult?.status === "missing" || !profileResult?.profile.role) {
+      const metaRole = String(data.user.user_metadata?.role || "").toLowerCase().trim();
+      if (metaRole === "guru" || metaRole === "siswa") {
+        console.warn("[Auth] Restoring missing profile from user_metadata during login");
+        const restoredProfile = {
+          id: data.user.id,
+          nama: String(data.user.user_metadata?.nama || cleanEmail.split("@")[0] || "Pengguna"),
+          email: cleanEmail,
+          nip: metaRole === "guru" ? String(data.user.user_metadata?.nip || "") : "",
+          nisn: metaRole === "siswa" ? String(data.user.user_metadata?.nisn || "") : "",
+          sekolah: String(data.user.user_metadata?.sekolah || ""),
+          mapel: String(data.user.user_metadata?.mapel || ""),
+          kelas: String(data.user.user_metadata?.jenjang || data.user.user_metadata?.kelas || ""),
+          telepon: String(data.user.user_metadata?.telepon || ""),
+          bio: "",
+          role: metaRole,
+          status_verifikasi: "terverifikasi",
+        };
+        await supabase.from("profiles").upsert(restoredProfile, { onConflict: "id" });
+        profileResult = {
+          status: "loaded",
+          profile: restoredProfile,
+        };
+      } else if (isSystemAdminEmail(cleanEmail)) {
+        profileResult = {
+          status: "loaded",
+          profile: {
+            id: data.user.id,
+            nama: "Administrator GuruPro",
+            email: cleanEmail,
+            nip: "ADMIN-001",
+            nisn: "",
+            sekolah: "GuruPro Command Center",
+            mapel: "Manajemen Sistem",
+            kelas: "",
+            telepon: "",
+            bio: "Akun Khusus Administrator GuruPro",
+            role: "admin",
+            status_verifikasi: "terverifikasi",
+          },
+        };
+      } else {
+        return {
+          ok: false,
+          message: "Data profil akun tidak ditemukan di basis data. Hubungi administrator.",
+          code: "profile_missing",
+        };
+      }
     }
 
     if (!profileResult?.profile.role) {
@@ -445,6 +570,24 @@ export async function login(
   }
 }
 
+/**
+ * Mengirim ulang tautan email konfirmasi bagi akun yang belum terkonfirmasi.
+ */
+export async function resendConfirmationEmail(email: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: email.trim().toLowerCase(),
+    });
+    if (error) {
+      return { ok: false, message: error.message };
+    }
+    return { ok: true, message: "Tautan konfirmasi baru telah dikirim. Silakan periksa email Anda." };
+  } catch (err: any) {
+    return { ok: false, message: err?.message || "Gagal mengirim ulang email konfirmasi." };
+  }
+}
+
 export async function logout(): Promise<void> {
   try {
     await supabase.auth.signOut();
@@ -464,9 +607,10 @@ export async function registerGuru(
   input: RegisterGuruInput,
 ): Promise<RegisterResult> {
   try {
+    const cleanPassword = input.password.trim();
     const { data, error } = await supabase.auth.signUp({
       email: input.email.trim().toLowerCase(),
-      password: input.password,
+      password: cleanPassword,
       options: {
         data: {
           nama: input.nama.trim(),
@@ -543,9 +687,10 @@ export async function registerSiswa(
   input: RegisterSiswaInput,
 ): Promise<RegisterResult> {
   try {
+    const cleanPassword = input.password.trim();
     const { data, error } = await supabase.auth.signUp({
       email: input.email.trim().toLowerCase(),
-      password: input.password,
+      password: cleanPassword,
       options: {
         data: {
           nama: input.nama.trim(),

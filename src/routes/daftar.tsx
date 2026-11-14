@@ -99,25 +99,29 @@ function DaftarPage() {
       if (!jenjang.trim()) found.jenjang = "Jenjang / angkatan wajib diisi.";
     }
 
-    // Password validations
-    if (!password) found.password = "Kata sandi wajib diisi.";
-    else if (password.length < 6) found.password = "Kata sandi minimal 6 karakter.";
-    if (confirm !== password) found.confirm = "Konfirmasi kata sandi tidak sama.";
+    // Password validations (abaikan spasi tak sengaja di ujung input keyboard)
+    const cleanPassword = password.trim();
+    const cleanConfirm = confirm.trim();
+    if (!cleanPassword) found.password = "Kata sandi wajib diisi.";
+    else if (cleanPassword.length < 6) found.password = "Kata sandi minimal 6 karakter.";
+    if (cleanConfirm !== cleanPassword) found.confirm = "Konfirmasi kata sandi tidak sama.";
 
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
     setLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+
     try {
       if (role === "guru") {
         const result = await registerGuru({
-          nama,
-          email,
-          telepon,
-          sekolah,
-          mapel,
-          nip,
-          password,
+          nama: nama.trim(),
+          email: cleanEmail,
+          telepon: telepon.trim(),
+          sekolah: sekolah.trim(),
+          mapel: mapel.trim(),
+          nip: nip.trim(),
+          password: cleanPassword,
         });
 
         if (!result.ok) {
@@ -130,16 +134,16 @@ function DaftarPage() {
           result.message || "Pendaftaran akun guru berhasil! Silakan masuk dengan akun Anda.",
           { duration: result.needsConfirmation ? 8000 : 4000 },
         );
-        void navigate({ to: "/login", replace: true });
+        void navigate({ to: "/login", search: { email: cleanEmail }, replace: true });
       } else {
         const result = await registerSiswa({
-          nama,
-          email,
-          telepon,
-          sekolah,
-          jenjang,
-          nisn,
-          password,
+          nama: nama.trim(),
+          email: cleanEmail,
+          telepon: telepon.trim(),
+          sekolah: sekolah.trim(),
+          jenjang: jenjang.trim(),
+          nisn: nisn.trim(),
+          password: cleanPassword,
         });
 
         if (!result.ok) {
@@ -152,7 +156,7 @@ function DaftarPage() {
           result.message || "Pendaftaran akun siswa berhasil! Silakan masuk dengan akun Anda.",
           { duration: result.needsConfirmation ? 8000 : 4000 },
         );
-        void navigate({ to: "/login", replace: true });
+        void navigate({ to: "/login", search: { email: cleanEmail }, replace: true });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Terjadi kesalahan saat pendaftaran.";

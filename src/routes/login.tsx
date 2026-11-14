@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
+import { Eye, EyeOff, Loader2, LogIn, Mail } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -9,9 +9,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login } from "@/lib/auth-store";
+import { login, resendConfirmationEmail } from "@/lib/auth-store";
+
+interface LoginSearchParams {
+  email?: string;
+}
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>): LoginSearchParams => {
+    return {
+      email: typeof search.email === "string" ? search.email : undefined,
+    };
+  },
   head: () => ({
     meta: [
       { title: "Masuk — GuruPro" },
@@ -26,16 +35,34 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(search.email || "");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [ingat, setIngat] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [isUnconfirmed, setIsUnconfirmed] = useState(false);
   const [errors, setErrors] = useState<{
     email?: string | undefined;
     password?: string | undefined;
   }>({});
+
+  const handleResend = async () => {
+    if (!email.trim()) return;
+    setResending(true);
+    try {
+      const res = await resendConfirmationEmail(email);
+      if (res.ok) {
+        toast.success(res.message);
+      } else {
+        toast.error(res.message);
+      }
+    } finally {
+      setResending(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,10 +74,18 @@ function LoginPage() {
     if (Object.keys(found).length > 0) return;
 
     setLoading(true);
+    setIsUnconfirmed(false);
     try {
       const result = await login(email, password, ingat);
       if (!result.ok) {
-        setErrors({ password: result.message || "Email atau kata sandi salah." });
+        if (result.code === "unconfirmed_email") {
+          setIsUnconfirmed(true);
+          setErrors({ email: result.message });
+        } else if (result.code === "invalid_credentials") {
+          setErrors({ password: result.message });
+        } else {
+          setErrors({ password: result.message || "Gagal masuk ke aplikasi." });
+        }
         toast.error(result.message || "Gagal masuk. Periksa email dan kata sandi Anda.");
         return;
       }
@@ -89,7 +124,24 @@ function LoginPage() {
                 placeholder="nama@email.com"
                 aria-invalid={!!errors.email}
               />
-              {errors.email ? <p className="text-xs text-destructive">{errors.email}</p> : null}
+              {errors.email ? (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-destructive">{errors.email}</p>
+                  {isUnconfirmed ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResend}
+                      disabled={resending}
+                      className="h-7 text-xs gap-1 text-primary hover:text-primary"
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      {resending ? "Mengirim ulang…" : "Kirim Ulang Tautan Konfirmasi"}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="grid gap-2">
