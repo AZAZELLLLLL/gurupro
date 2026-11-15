@@ -286,7 +286,7 @@ export function IllustrationPlanningPanel({
                   GEN-0
                 </Badge>
                 <CardTitle className="text-lg font-display text-navy">
-                  Perencanaan Ilustrasi Modul Terstruktur
+                  Perencanaan Ilustrasi Materi Ajar Terstruktur
                 </CardTitle>
               </div>
               <CardDescription className="mt-1 text-xs">
@@ -313,10 +313,10 @@ export function IllustrationPlanningPanel({
             <div className="rounded-xl border border-dashed border-primary/30 bg-background/50 p-6 text-center">
               <Sparkles className="mx-auto h-8 w-8 text-primary mb-2" />
               <h4 className="font-semibold text-sm text-foreground">
-                Belum ada rencana ilustrasi terstruktur untuk modul ini
+                Belum ada rencana ilustrasi terstruktur untuk materi ajar ini
               </h4>
               <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto">
-                Buat draf outline visual awal berdasarkan subjek dan materi modul pembelajaran secara aman tanpa pemanggilan generator eksternal berbiaya.
+                Buat draf outline visual awal berdasarkan subjek dan materi ajar secara aman tanpa pemanggilan generator eksternal berbiaya.
               </p>
               <Button
                 className="mt-4 gap-2"
@@ -346,7 +346,7 @@ export function IllustrationPlanningPanel({
                   </h4>
                 </div>
                 <Badge variant="outline" className="text-xs">
-                  Modul ID: {moduleId.slice(0, 8)}…
+                  Materi Ajar ID: {moduleId.slice(0, 8)}…
                 </Badge>
               </div>
             </CardHeader>
@@ -1053,7 +1053,7 @@ export function IllustrationPlanningPanel({
 
                           <div className="flex items-center justify-between pt-1">
                             <p className="text-[11px] text-muted-foreground">
-                              Gambar telah diverifikasi (binary raster non-mock) dan siap digunakan pada materi modul.
+                              Gambar telah diverifikasi (binary raster non-mock) dan siap digunakan pada materi ajar.
                             </p>
                             <Button
                               size="sm"
@@ -1119,7 +1119,7 @@ export function IllustrationPlanningPanel({
                                     className="text-[10px]"
                                   >
                                     {currentAsset.lifecycleStatus === "attached"
-                                      ? "TERPAUT DI MODUL"
+                                      ? "TERPAUT DI MATERI AJAR"
                                       : currentAsset.lifecycleStatus === "superseded"
                                       ? "DIGANTIKAN (ARSIP)"
                                       : currentAsset.lifecycleStatus === "archived"
@@ -1671,7 +1671,7 @@ export function IllustrationPlanningPanel({
                                 >
                                   <span className="flex items-center gap-1.5">
                                     <Archive className="h-3 w-3" />
-                                    Riwayat Aset Ilustrasi Modul Ini ({moduleAssets.length} Aset Tersimpan)
+                                    Riwayat Aset Ilustrasi Materi Ajar Ini ({moduleAssets.length} Aset Tersimpan)
                                   </span>
                                   {showAssetHistory ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                                 </Button>
@@ -1774,7 +1774,7 @@ export function IllustrationPlanningPanel({
                                     Bab yang Anda pilih sudah memiliki ilustrasi aktif sebelumnya.
                                   </p>
                                   <p className="p-2 rounded bg-muted/30 font-medium text-foreground">
-                                    Ilustrasi sebelumnya akan secara otomatis berstatus <strong>superseded</strong> dan tetap tersimpan aman di riwayat modul. Tidak ada gambar atau data rekam jejak yang akan terhapus.
+                                    Ilustrasi sebelumnya akan secara otomatis berstatus <strong>superseded</strong> dan tetap tersimpan aman di riwayat materi ajar. Tidak ada gambar atau data rekam jejak yang akan terhapus.
                                   </p>
                                   <p>
                                     Apakah Anda yakin ingin mengganti ilustrasi aktif bab tersebut dengan aset ini?
@@ -2209,10 +2209,10 @@ export function PresentationPlanningPanel({
             <div className="rounded-xl border border-dashed border-primary/30 bg-background/50 p-6 text-center">
               <Sparkles className="mx-auto h-8 w-8 text-primary mb-2" />
               <h4 className="font-semibold text-sm text-foreground">
-                Belum ada rencana presentasi terstruktur untuk modul ini
+                Belum ada rencana presentasi terstruktur untuk materi ajar ini
               </h4>
               <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto">
-                Ekstrak alur pembelajaran modul ke dalam slide terstruktur yang dapat ditinjau, diedit urutannya, dan dipilih gaya visualnya sebelum diunduh.
+                Ekstrak alur pembelajaran materi ajar ke dalam slide terstruktur yang dapat ditinjau, diedit urutannya, dan dipilih gaya visualnya sebelum diunduh.
               </p>
               <Button
                 className="mt-4 gap-2"
@@ -3610,7 +3610,7 @@ export function PresentationPlanningPanel({
                               {(currentSlide.evidenceReferences || []).length > 0 ? (
                                 <div className="pt-2 border-t border-border/50 text-[11px]">
                                   <span className="text-muted-foreground block mb-1 font-medium">
-                                    Referensi Grounding Kurikulum / Modul:
+                                    Referensi Grounding Kurikulum / Materi Ajar:
                                   </span>
                                   <div className="flex flex-wrap gap-1.5">
                                     {(currentSlide.evidenceReferences || []).map((ev: any, evIdx: number) => (

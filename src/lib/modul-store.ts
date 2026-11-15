@@ -123,7 +123,7 @@ export async function addModul(data: Omit<Modul, "id" | "createdAt" | "updatedAt
 
   if (error) {
     console.error("[addModul] Supabase insert error:", error);
-    throw new Error(error.message || "Gagal menyimpan modul ke database.");
+    throw new Error(error.message || "Gagal menyimpan materi ajar ke database.");
   }
   const modul = toModul(row as unknown as Row);
   store.set([modul, ...store.get().filter((m) => m.id !== modul.id)]);
@@ -154,7 +154,7 @@ export async function saveModul(modul: Modul) {
 
     if (error) {
       console.error("[saveModul] Supabase update error:", error);
-      throw new Error(error.message || "Gagal memperbarui modul.");
+      throw new Error(error.message || "Gagal memperbarui materi ajar.");
     }
     return next;
   } catch (err) {
@@ -170,7 +170,7 @@ export async function deleteModul(id: string) {
     const { error } = await supabase.from("moduls").delete().eq("id", id);
     if (error) {
       console.error("[deleteModul] Supabase delete error:", error);
-      throw new Error(error.message || "Gagal menghapus modul.");
+      throw new Error(error.message || "Gagal menghapus materi ajar.");
     }
   } catch (err) {
     store.set(previous);

@@ -651,7 +651,7 @@ export function AsistenGuruPage() {
 
     if (action === "modul") {
       setInputMessage(
-        `@generate_modul buatkan Materi Ajar Kurikulum Merdeka yang lengkap, mendalam, dan terstruktur berdasarkan materi terlampir "${title}"`
+        `@generate_materi_ajar buatkan Materi Ajar Kurikulum Merdeka yang lengkap, mendalam, dan terstruktur berdasarkan materi terlampir "${title}"`
       );
     } else if (action === "ppt") {
       setInputMessage(
@@ -1822,7 +1822,7 @@ export function AsistenGuruPage() {
   const handleAttachImageToModul = async (imageUrl: string, promptTitle?: string) => {
     try {
       await addModul({
-        judul: `Modul & Media: ${promptTitle || activeSession?.title || "Materi Pembelajaran"}`,
+        judul: `Materi Ajar & Media: ${promptTitle || activeSession?.title || "Materi Pembelajaran"}`,
         kelas: outlineSettings.jenjang.includes("SMK") ? "X (SMK)" : "X",
         mapel: "Dasar-Dasar Kejuruan / Umum",
         ringkasan: `Dilengkapi dengan media visual ilustrasi edukatif terstandar Kurikulum Merdeka.`,
@@ -2474,7 +2474,7 @@ export function AsistenGuruPage() {
                               title="Simpan rancangan ini ke Materi Ajar"
                             >
                               <BookOpen className="h-3 w-3 text-primary" />
-                              <span>{savingAction === m.id + "-modul" ? "Menyimpan..." : "Simpan ke Materi"}</span>
+                              <span>{savingAction === m.id + "-modul" ? "Menyimpan..." : "Simpan ke Materi Ajar"}</span>
                             </button>
 
                             {/* 2. Save to PPT Button */}
@@ -2692,7 +2692,7 @@ export function AsistenGuruPage() {
               <button
                 onClick={() => {
                   setInputMessage(
-                    `@generate_modul buatkan materi ajar Kurikulum Merdeka yang lengkap, mendalam, dan rinci dengan struktur Capaian Pembelajaran, Alur Tujuan Pembelajaran, Materi Inti, Asesmen & Refleksi tentang `
+                    `@generate_materi_ajar buatkan materi ajar Kurikulum Merdeka yang lengkap, mendalam, dan rinci dengan struktur Capaian Pembelajaran, Alur Tujuan Pembelajaran, Materi Inti, Asesmen & Refleksi tentang `
                   );
                   setTimeout(() => textareaRef.current?.focus(), 80);
                 }}
@@ -2700,7 +2700,7 @@ export function AsistenGuruPage() {
                 title="Ketik perintah rancang Materi Ajar Kurikulum Merdeka"
               >
                 <BookOpen className="h-3.5 w-3.5" />
-                <span>@generate_modul</span>
+                <span>@generate_materi_ajar</span>
               </button>
 
               <button
@@ -2802,11 +2802,11 @@ export function AsistenGuruPage() {
                   </span>
                 </div>
               )}
-              {inputMessage.includes("@generate_modul") && (
+              {(inputMessage.includes("@generate_materi") || inputMessage.includes("@generate_mater") || inputMessage.includes("@generate_materi_ajar") || inputMessage.includes("@generate_modul")) && (
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border-b border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium">
                   <BookOpen className="h-3.5 w-3.5 animate-pulse shrink-0" />
                   <span className="truncate">
-                    Mode Modul Aktif: <strong>Modul Lengkap & Mendalam</strong> (Kurikulum Merdeka)
+                    Mode Materi Ajar Aktif: <strong>Materi Ajar Lengkap & Mendalam</strong> (Kurikulum Merdeka)
                   </span>
                 </div>
               )}
@@ -2823,7 +2823,7 @@ export function AsistenGuruPage() {
                       void handleSendMessage();
                     }
                   }}
-                  placeholder="Tanyakan materi, atau gunakan @generate_ilustrasi, @generate_ppt..."
+                  placeholder="Tanyakan materi, atau gunakan @generate_materi_ajar, @generate_ppt..."
                   className="w-full resize-none bg-transparent p-2.5 sm:p-3 text-[13px] sm:text-sm focus:outline-none max-h-28 sm:max-h-36 min-h-[40px] sm:min-h-[44px]"
                 />
 
@@ -3086,7 +3086,7 @@ export function AsistenGuruPage() {
                     <div className="flex gap-2">
                       {[
                         { label: "16:9 (Lanskap Proyektor)", val: "16:9" },
-                        { label: "1:1 (Persegi Modul)", val: "1:1" },
+                        { label: "1:1 (Persegi Materi Ajar)", val: "1:1" },
                         { label: "4:3 (Buku Pelajaran)", val: "4:3" },
                       ].map((r) => (
                         <button
@@ -3549,7 +3549,7 @@ export function AsistenGuruPage() {
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { label: "16:9 (Slide PPT)", val: "16:9" },
-                    { label: "1:1 (Persegi Modul)", val: "1:1" },
+                    { label: "1:1 (Persegi Materi Ajar)", val: "1:1" },
                     { label: "4:3 (Buku Pelajaran)", val: "4:3" },
                   ].map((r) => (
                     <button
@@ -3575,7 +3575,7 @@ export function AsistenGuruPage() {
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { id: "vector", label: "Vektor Bersih Edukatif", desc: "Garis tegas, warna cerah, cocok modul" },
+                    { id: "vector", label: "Vektor Bersih Edukatif", desc: "Garis tegas, warna cerah, cocok materi ajar" },
                     { id: "infographic", label: "Infografis Digital", desc: "Tata letak modern, ikonik & rapi" },
                     { id: "chalkboard", label: "Sketsa Papan Tulis", desc: "Nuansa ruang kelas & diagram kapur" },
                     { id: "photorealistic", label: "Realistis Edukasi", desc: "Fotografi detail untuk sains/alam" },
@@ -4026,7 +4026,7 @@ export function AsistenGuruPage() {
               Hapus Percakapan Secara Permanen?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Tindakan ini tidak dapat dibatalkan. Riwayat percakapan beserta seluruh modul dan jawaban di dalamnya akan dihapus dari penyimpanan perangkat Anda.
+              Tindakan ini tidak dapat dibatalkan. Riwayat percakapan beserta seluruh materi ajar dan jawaban di dalamnya akan dihapus dari penyimpanan perangkat Anda.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -878,7 +878,7 @@ export async function executeGenerateModuleIllustrations(
   if (!modul) {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
-      "Modul ajar tidak ditemukan."
+      "Materi ajar tidak ditemukan."
     );
   }
 
@@ -886,7 +886,7 @@ export async function executeGenerateModuleIllustrations(
   if (modulOwnerId && modulOwnerId !== userId) {
     throw new AiServiceError(
       AI_ERROR_CODES.ROLE_FORBIDDEN,
-      "Akses ditolak: Anda bukan pemilik modul ajar ini."
+      "Akses ditolak: Anda bukan pemilik materi ajar ini."
     );
   }
 
@@ -950,7 +950,7 @@ export async function executeGenerateModuleIllustrations(
   if (!plan) {
     throw new AiServiceError(
       AI_ERROR_CODES.PLAN_NOT_FOUND,
-      "Rencana ilustrasi belum dibuat untuk modul ini."
+      "Rencana ilustrasi belum dibuat untuk materi ajar ini."
     );
   }
 
@@ -1014,7 +1014,7 @@ export async function executeGenerateModuleIllustrations(
     if (targetSections.length === 0) {
       throw new AiServiceError(
         AI_ERROR_CODES.INVALID_REQUEST,
-        `Bab / Section dengan ID '${data.sectionId}' tidak ditemukan pada modul.`
+        `Bab / Section dengan ID '${data.sectionId}' tidak ditemukan pada materi ajar.`
       );
     }
   }
@@ -1285,7 +1285,7 @@ export const generateModuleIllustrationsServerFn = createServerFn({
     if (!parsed.success) {
       throw new AiServiceError(
         AI_ERROR_CODES.INVALID_REQUEST,
-        "Parameter permintaan generasi ilustrasi modul tidak valid."
+        "Parameter permintaan generasi ilustrasi materi ajar tidak valid."
       );
     }
     return parsed.data;

@@ -695,9 +695,9 @@ function SiswaModulAjarView() {
             className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            Kembali ke Daftar Modul
+            Kembali ke Daftar Materi Ajar
           </Button>
-          <Badge className="bg-emerald-600 text-white hover:bg-emerald-700">Modul Terbit</Badge>
+          <Badge className="bg-emerald-600 text-white hover:bg-emerald-700">Materi Terbit</Badge>
         </div>
 
         <div className="space-y-3">
@@ -781,7 +781,7 @@ function SiswaModulAjarView() {
         <div className="flex justify-center pt-4">
           <Button variant="outline" onClick={() => setActiveModul(null)} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Kembali ke Daftar Modul
+            Kembali ke Daftar Materi Ajar
           </Button>
         </div>
       </div>

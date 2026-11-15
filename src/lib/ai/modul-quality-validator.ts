@@ -207,7 +207,7 @@ export function validateStructuralIntegrity(output: unknown): {
 
   // Additional structural invariants
   if (!data.judul || data.judul.trim().length < 3) {
-    issues.push({ field: "judul", issue: "Judul modul terlalu pendek atau kosong.", severity: "CRITICAL" });
+    issues.push({ field: "judul", issue: "Judul materi ajar terlalu pendek atau kosong.", severity: "CRITICAL" });
   }
 
   if (!data.tujuanPembelajaran || data.tujuanPembelajaran.length === 0) {
@@ -590,7 +590,7 @@ export function detectSourceConflictsInOutput(
       issues.push({
         type: "SOURCE_CONFLICT",
         term: conflict.term,
-        description: `Pertentangan sumber pada topik "${conflict.term}" tidak diakui secara transparan pada catatan keterbatasan modul: ${conflict.description}`,
+        description: `Pertentangan sumber pada topik "${conflict.term}" tidak diakui secara transparan pada catatan keterbatasan materi ajar: ${conflict.description}`,
         evidenceIds: [],
         isAcknowledged: false,
         conflictingSources: [
@@ -685,7 +685,7 @@ export function validatePedagogicalCoherence(
       issues.push({
         ruleId: "PED_DUPLICATE_SECTION",
         section: `sections[${i}]`,
-        description: `Judul bab materi "${output.sections[i].judul}" terduplikasi dalam modul.`,
+        description: `Judul bab materi "${output.sections[i].judul}" terduplikasi dalam materi ajar.`,
         severity: "CRITICAL",
       });
     }
@@ -699,7 +699,7 @@ export function validatePedagogicalCoherence(
       issues.push({
         ruleId: "PED_DUPLICATE_OBJECTIVE",
         section: `tujuanPembelajaran[${i}]`,
-        description: `Deskripsi tujuan pembelajaran terduplikasi dalam modul.`,
+        description: `Deskripsi tujuan pembelajaran terduplikasi dalam materi ajar.`,
         severity: "CRITICAL",
       });
     }

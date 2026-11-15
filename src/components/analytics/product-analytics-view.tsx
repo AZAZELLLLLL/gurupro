@@ -278,7 +278,7 @@ export function ProductAnalyticsView() {
                   Distribusi Penggunaan Fitur
                 </CardTitle>
                 <CardDescription className="text-[11px]">
-                  Proporsi aktivitas pengguna pada setiap modul pembelajaran.
+                  Proporsi aktivitas pengguna pada setiap materi ajar dan fitur pembelajaran.
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-4 pb-4 pt-1 space-y-2">

@@ -230,7 +230,7 @@ function ProfilPage() {
           <div className="min-w-0">
             <p className="font-display font-semibold text-navy">Keluar dari akun</p>
             <p className="text-sm text-muted-foreground">
-              Anda akan diarahkan ke halaman login. Data modul dan soal tetap tersimpan di
+              Anda akan diarahkan ke halaman login. Data materi ajar dan soal tetap tersimpan di
               perangkat.
             </p>
           </div>

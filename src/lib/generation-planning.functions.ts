@@ -163,15 +163,15 @@ export const createGenerationPlanServerFn = createServerFn({ method: "POST" })
 
     if (modulErr) {
       console.error("[createGenerationPlan] DB error fetching modul:", modulErr);
-      throw new AiServiceError(AI_ERROR_CODES.PERSISTENCE_ERROR, `Gagal memuat modul: ${modulErr.message}`);
+      throw new AiServiceError(AI_ERROR_CODES.PERSISTENCE_ERROR, `Gagal memuat materi ajar: ${modulErr.message}`);
     }
 
     if (!modulRow) {
-      throw new AiServiceError(AI_ERROR_CODES.INVALID_REQUEST, "Modul ajar tidak ditemukan.");
+      throw new AiServiceError(AI_ERROR_CODES.INVALID_REQUEST, "Materi ajar tidak ditemukan.");
     }
 
     if (modulRow.user_id !== userId) {
-      throw new AiServiceError(AI_ERROR_CODES.ROLE_FORBIDDEN, "Akses ditolak: Anda bukan pemilik modul ini.");
+      throw new AiServiceError(AI_ERROR_CODES.ROLE_FORBIDDEN, "Akses ditolak: Anda bukan pemilik materi ajar ini.");
     }
 
     // Convert row to Modul type

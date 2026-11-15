@@ -225,7 +225,7 @@ export function useIllustrationAssetStore(targetModuleId?: string): UseIllustrat
         toast.success(
           res.sectionTitle
             ? `Ilustrasi berhasil ditautkan ke ${res.sectionTitle}.`
-            : "Ilustrasi berhasil ditautkan ke bab modul ajar."
+            : "Ilustrasi berhasil ditautkan ke bab materi ajar."
         );
         await loadAssets(moduleId);
         await loadReviewableAssets(moduleId);
@@ -248,7 +248,7 @@ export function useIllustrationAssetStore(targetModuleId?: string): UseIllustrat
       setError(null);
       try {
         await detachIllustrationAssetServerFn({ data: { assetId } });
-        toast.success("Tautan ilustrasi berhasil dilepas dari modul.");
+        toast.success("Tautan ilustrasi berhasil dilepas dari materi ajar.");
         await loadAssets(moduleId);
         await loadReviewableAssets(moduleId);
         return true;

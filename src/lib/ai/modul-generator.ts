@@ -426,7 +426,7 @@ export async function generateGroundedModulAjar(
           );
         }
 
-        const semanticCorrectionPrompt = `${userPrompt}\n\nPERINGATAN KUALITAS AI-2D: Output sebelumnya memerlukan revisi berdasarkan evaluasi berikut:\n${feedbackList.map((f) => `- ${f}`).join("\n")}\n\nHarap perbaiki Modul Ajar agar 100% selaras dengan bukti rujukan dan aturan pedagogis. Balas HANYA JSON murni yang sesuai skema.`;
+        const semanticCorrectionPrompt = `${userPrompt}\n\nPERINGATAN KUALITAS AI-2D: Output sebelumnya memerlukan revisi berdasarkan evaluasi berikut:\n${feedbackList.map((f) => `- ${f}`).join("\n")}\n\nHarap perbaiki Materi Ajar agar 100% selaras dengan bukti rujukan dan aturan pedagogis. Balas HANYA JSON murni yang sesuai skema.`;
 
         const correctedProviderResult = await callAiProviderWithRetry(
           systemPrompt,
@@ -460,10 +460,10 @@ export async function generateGroundedModulAjar(
         qualityResult.structuralIssues[0]?.issue ||
         qualityResult.pedagogicalIssues[0]?.description ||
         qualityResult.sourceConflicts[0]?.description ||
-        "Draf modul ajar tidak memenuhi kriteria penjaminan mutu dan grounding AI-2D.";
+        "Draf materi ajar tidak memenuhi kriteria penjaminan mutu dan grounding AI-2D.";
       throw new AiServiceError(
         AI_ERROR_CODES.QUALITY_VALIDATION_FAILED,
-        `Validasi mutu draf Modul Ajar gagal (REJECT): ${topIssue}`,
+        `Validasi mutu draf Materi Ajar gagal (REJECT): ${topIssue}`,
         qualityResult,
       );
     }

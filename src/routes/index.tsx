@@ -391,7 +391,7 @@ function StudentDashboard() {
     <div className="grid gap-6">
       <PageHeader
         title={`Halo, ${profile.nama || "Siswa"} 🎓`}
-        subtitle="Selamat datang di ruang pembelajaran GuruPro. Pantau kelas, modul materi, dan tugas belajarmu di sini."
+        subtitle="Selamat datang di ruang pembelajaran GuruPro. Pantau kelas, materi ajar, dan tugas belajarmu di sini."
         actions={
           <Dialog open={openModal} onOpenChange={setOpenModal}>
             <DialogTrigger asChild>
@@ -973,7 +973,7 @@ function TeacherDashboard() {
     if (modulAktif > 0) {
       notifs.push({
         id: "notif-active-moduls",
-        judul: `${modulAktif} materi aktif dipublikasikan`,
+        judul: `${modulAktif} materi ajar aktif dipublikasikan`,
         detail: "Siswa di kelasmu dapat mengakses dan mempelajari materi ajar ini.",
         tipe: "modul",
       });
@@ -987,7 +987,7 @@ function TeacherDashboard() {
       label: "Materi Aktif",
       value: String(modulAktif),
       icon: BookOpen,
-      hint: `${modulAktif} materi terbit (${selectedYear || "Semua"})`,
+      hint: `${modulAktif} materi ajar terbit (${selectedYear || "Semua"})`,
       to: "/modul-ajar" as const,
     },
     {

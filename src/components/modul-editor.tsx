@@ -432,7 +432,7 @@ export function ModulEditor({
 
   const handleDownloadPptx = async () => {
     if (modul.slides.length === 0) {
-      toast.error("Belum ada slide presentasi pada modul ini.");
+      toast.error("Belum ada slide presentasi pada materi ajar ini.");
       return;
     }
     setDownloadingPptx(true);
@@ -601,9 +601,9 @@ export function ModulEditor({
       });
       setAiOpen(false);
       setInstruksi("");
-      toast.success("Modul berhasil diperbarui sesuai instruksi AI.");
+      toast.success("Materi ajar berhasil diperbarui sesuai instruksi AI.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "AI gagal merevisi modul.");
+      toast.error(error instanceof Error ? error.message : "AI gagal merevisi materi ajar.");
     } finally {
       setAiLoading(false);
     }
@@ -612,7 +612,7 @@ export function ModulEditor({
   const runRegenerateModul = async () => {
     const rawContent = modul.sumberInput || modul.ringkasan;
     if (!rawContent || rawContent.length < 40) {
-      toast.error("Materi sumber modul tidak mencukupi untuk regenerasi AI.");
+      toast.error("Materi sumber materi ajar tidak mencukupi untuk regenerasi AI.");
       return;
     }
     setRegenerating(true);
@@ -655,9 +655,9 @@ export function ModulEditor({
         updatedAt: new Date().toISOString(),
       });
       setRegenerateOpen(false);
-      toast.success("Modul berhasil disusun ulang dengan AI.");
+      toast.success("Materi ajar berhasil disusun ulang dengan AI.");
     } catch (error) {
-      const raw = error instanceof Error ? error.message : "Gagal meregenerasi modul.";
+      const raw = error instanceof Error ? error.message : "Gagal meregenerasi materi ajar.";
       const message = isRecoverableAuthError(error)
         ? "Sesi login tidak valid atau kedaluwarsa. Keluar lalu masuk kembali, kemudian coba lagi."
         : raw;
@@ -782,7 +782,7 @@ export function ModulEditor({
         <div className="min-w-0">
           <Button variant="ghost" size="sm" className="-ml-2 w-fit" onClick={handleBackClick}>
             <ArrowLeft className="h-4 w-4" />
-            Kembali ke Daftar Modul
+            Kembali ke Daftar Materi Ajar
           </Button>
           <h1 className="mt-1 font-display text-xl font-bold text-navy sm:text-2xl">
             {modul.judul}
@@ -846,7 +846,7 @@ export function ModulEditor({
                 variant="outline"
                 className="border-emerald-500/40 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 text-xs px-3 py-1.5 flex items-center gap-1.5 font-medium"
               >
-                <CheckCircle2 className="h-3.5 w-3.5" /> Modul Terbit (Read-Only)
+                <CheckCircle2 className="h-3.5 w-3.5" /> Materi Terbit (Read-Only)
               </Badge>
               <Button asChild size="sm" variant="outline" className="text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/5">
                 <Link
@@ -860,7 +860,7 @@ export function ModulEditor({
                   }}
                 >
                   <FileQuestion className="h-3.5 w-3.5" />
-                  Buat Soal dari Modul
+                  Buat Soal dari Materi Ajar
                 </Link>
               </Button>
             </div>
@@ -934,7 +934,7 @@ export function ModulEditor({
               }}
             >
               <FileQuestion className="h-3.5 w-3.5" />
-              Lanjut Buat Soal dari Materi
+              Lanjut Buat Soal dari Materi Ajar
             </Link>
           </Button>
         </div>
@@ -947,7 +947,7 @@ export function ModulEditor({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 font-semibold text-navy">
                 <Sparkles className="h-4 w-4 text-primary" />
-                <span>Rekam Jejak & Mutu Modul (AI-2D Provenance)</span>
+                <span>Rekam Jejak & Mutu Materi Ajar (AI-2D Provenance)</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge
@@ -1011,7 +1011,7 @@ export function ModulEditor({
             {(modul.aiMetadata?.originalQualityValidation?.decision === "REVISE" ||
               modul.aiMetadata?.qualityValidation?.decision === "REVISE") && (
               <p className="text-xs font-medium text-amber-700 dark:text-amber-400 pt-1">
-                Catatan Mutu: Modul ini awalnya ditandai perbaikan (REVISE). Guru disarankan memeriksa kembali butir pembelajaran dan asesmen sebelum publikasi.
+                Catatan Mutu: Materi ajar ini awalnya ditandai perbaikan (REVISE). Guru disarankan memeriksa kembali butir pembelajaran dan asesmen sebelum publikasi.
               </p>
             )}
           </CardContent>
@@ -1032,13 +1032,13 @@ export function ModulEditor({
         <TabsContent value="isi" className="mt-4 grid gap-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="font-display text-base text-navy">Informasi Umum Modul</CardTitle>
+              <CardTitle className="font-display text-base text-navy">Informasi Umum Materi Ajar</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 pt-0">
               {manual ? (
                 <>
                   <div className="grid gap-2">
-                    <Label htmlFor="judul">Judul Modul</Label>
+                    <Label htmlFor="judul">Judul Materi Ajar</Label>
                     <Input
                       id="judul"
                       value={modul.judul}
@@ -1046,7 +1046,7 @@ export function ModulEditor({
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="ringkasan">Ringkasan Modul</Label>
+                    <Label htmlFor="ringkasan">Ringkasan Materi Ajar</Label>
                     <Textarea
                       id="ringkasan"
                       rows={3}
@@ -1232,7 +1232,7 @@ export function ModulEditor({
             <CardContent className="grid gap-3 pt-0">
               {(modul.aiMetadata?.tujuanPembelajaran || []).length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">
-                  Belum ada tujuan pembelajaran terstruktur pada modul ini.
+                  Belum ada tujuan pembelajaran terstruktur pada materi ajar ini.
                 </p>
               ) : (
                 (modul.aiMetadata?.tujuanPembelajaran || []).map((tp, idx) => (
@@ -1496,10 +1496,10 @@ export function ModulEditor({
             <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <CardTitle className="font-display text-base text-navy">
-                  Galeri Ilustrasi Bab Modul
+                  Galeri Ilustrasi Bab Materi Ajar
                 </CardTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Daftar ilustrasi visual yang telah terpasang pada bab materi modul ini.
+                  Daftar ilustrasi visual yang telah terpasang pada bab materi ajar ini.
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -1569,7 +1569,7 @@ export function ModulEditor({
                     <ImageIcon className="h-6 w-6" />
                   </div>
                   <p className="max-w-md text-xs leading-relaxed">
-                    Belum ada gambar ilustrasi pada bab modul ini. Anda dapat membuka <strong>AI Asisten Guru</strong>, memilih gaya visual (seperti <em>Flat Educational</em>), dan menyimpannya ke modul ini.
+                    Belum ada gambar ilustrasi pada bab materi ajar ini. Anda dapat membuka <strong>AI Asisten Guru</strong>, memilih gaya visual (seperti <em>Flat Educational</em>), dan menyimpannya ke materi ajar ini.
                   </p>
                   <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs">
                     <Link to="/asisten-guru">
@@ -1615,7 +1615,7 @@ export function ModulEditor({
             <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <CardTitle className="font-display text-base text-navy">
-                  Daftar Slide Modul ({modul.slides.length} Slide)
+                  Daftar Slide Presentasi ({modul.slides.length} Slide)
                 </CardTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Tinjau isi slide, edit butir materi, atau unduh sebagai file PowerPoint asli (.pptx).
@@ -1718,7 +1718,7 @@ export function ModulEditor({
                     <Presentation className="h-6 w-6" />
                   </div>
                   <p className="max-w-md text-xs leading-relaxed">
-                    Belum ada slide presentasi pada modul ini. Buka <strong>AI Asisten Guru</strong>, rancang outline slide (misal dengan tema <em>Educational Classroom</em>), dan simpan langsung ke modul ini.
+                    Belum ada slide presentasi pada materi ajar ini. Buka <strong>AI Asisten Guru</strong>, rancang outline slide (misal dengan tema <em>Educational Classroom</em>), dan simpan langsung ke materi ajar ini.
                   </p>
                   <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs">
                     <Link to="/asisten-guru">
@@ -1738,7 +1738,7 @@ export function ModulEditor({
         <DialogContent className="max-h-[90dvh] w-[calc(100vw-2rem)] sm:max-w-md overflow-y-auto overflow-x-hidden p-4 sm:p-6">
           <DialogHeader className="min-w-0">
             <DialogTitle className="font-display text-navy break-words">
-              Edit Modul dengan AI
+              Edit Materi Ajar dengan AI
             </DialogTitle>
             <DialogDescription className="break-words">
               Tulis instruksi revisi terfokus. AI hanya akan menyempurnakan bagian yang relevan.
@@ -1748,7 +1748,7 @@ export function ModulEditor({
             <div className="grid place-items-center gap-3 py-10 text-center min-w-0 px-2">
               <Loader2 className="h-7 w-7 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground break-words">
-                GuruPro AI sedang merevisi modul…
+                GuruPro AI sedang merevisi materi ajar…
               </p>
             </div>
           ) : (
@@ -1791,10 +1791,10 @@ export function ModulEditor({
         <DialogContent className="max-h-[90dvh] w-[calc(100vw-2rem)] sm:max-w-md overflow-y-auto overflow-x-hidden p-4 sm:p-6">
           <DialogHeader className="min-w-0">
             <DialogTitle className="font-display text-navy break-words">
-              Regenerasi Modul dengan AI
+              Regenerasi Materi Ajar dengan AI
             </DialogTitle>
             <DialogDescription className="break-words">
-              Menyusun ulang seluruh bab modul dengan AI berakar pada materi rujukan asli yang
+              Menyusun ulang seluruh bab materi ajar dengan AI berakar pada materi rujukan asli yang
               tersimpan.
             </DialogDescription>
           </DialogHeader>
@@ -1802,10 +1802,10 @@ export function ModulEditor({
             <div className="grid place-items-center gap-3 py-10 text-center min-w-0 px-2">
               <Loader2 className="h-7 w-7 animate-spin text-primary" />
               <p className="text-sm font-semibold text-navy break-words">
-                GuruPro AI sedang menyusun ulang modul…
+                GuruPro AI sedang menyusun ulang materi ajar…
               </p>
               <p className="text-xs text-muted-foreground break-words">
-                Membaca kembali materi rujukan dan merumuskan ulang bab modul.
+                Membaca kembali materi rujukan dan merumuskan ulang bab materi ajar.
               </p>
             </div>
           ) : (
@@ -1816,7 +1816,7 @@ export function ModulEditor({
                 {modul.sumberJudul ? `: ${modul.sumberJudul}` : ""}).
               </p>
               <p className="text-xs text-amber-600 dark:text-amber-400 break-words">
-                Catatan: Modul akan dibuat ulang berdasarkan sumber rujukan awal.
+                Catatan: Materi ajar akan dibuat ulang berdasarkan sumber rujukan awal.
               </p>
             </div>
           )}

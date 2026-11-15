@@ -99,7 +99,7 @@ export function validateModulGenerationInput(
   if (context.teacherRole !== "guru") {
     throw new AiServiceError(
       AI_ERROR_CODES.ROLE_FORBIDDEN,
-      "Operasi AI Modul Ajar hanya diizinkan untuk akun dengan peran Guru.",
+      "Operasi AI Materi Ajar hanya diizinkan untuk akun dengan peran Guru.",
     );
   }
 
@@ -116,7 +116,7 @@ export function validateModulGenerationInput(
     const errorDetail = parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ");
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
-      `Validasi parameter pembuatan modul gagal: ${errorDetail}`,
+      `Validasi parameter pembuatan materi ajar gagal: ${errorDetail}`,
     );
   }
 
@@ -134,7 +134,7 @@ export function validateModulGenerationInput(
   if (targetClass.guruId !== context.teacherId) {
     throw new AiServiceError(
       AI_ERROR_CODES.ROLE_FORBIDDEN,
-      "Akses ditolak: Anda tidak memiliki wewenang untuk membuat modul pada kelas milik guru lain.",
+      "Akses ditolak: Anda tidak memiliki wewenang untuk membuat materi ajar pada kelas milik guru lain.",
     );
   }
 
@@ -334,12 +334,12 @@ export const PedagogicalAssessmentSchema = z.object({
 
 export const GroundedModulAjarOutputSchema = z.object({
   schemaVersion: z.literal(CANONICAL_OUTPUT_SCHEMA_VERSION).default(CANONICAL_OUTPUT_SCHEMA_VERSION),
-  judul: z.string().trim().min(3, "Judul modul ajar minimal 3 karakter."),
+  judul: z.string().trim().min(3, "Judul materi ajar minimal 3 karakter."),
   mapel: z.string().trim().min(2, "Mata pelajaran wajib diisi."),
   kelas: z.string().trim().min(2, "Kelas wajib diisi."),
   fase: z.enum(["A", "B", "C", "D", "E", "F"]),
   alokasiWaktu: z.string().trim().min(3, "Alokasi waktu wajib ditentukan."),
-  ringkasan: z.string().trim().min(20, "Ringkasan modul minimal 20 karakter."),
+  ringkasan: z.string().trim().min(20, "Ringkasan materi ajar minimal 20 karakter."),
   tujuanPembelajaran: z.array(GroundedObjectiveSchema).min(1, "Minimal satu tujuan pembelajaran wajib ada."),
   sections: z.array(GroundedSectionSchema).min(1, "Minimal satu bab materi pokok wajib ada."),
   kegiatanPembelajaran: LearningActivitiesSchema,
@@ -427,8 +427,8 @@ export const ModulAiMetadataSchema = z.object({
 });
 
 export const TeacherDraftEditSchema = z.object({
-  judul: z.string().trim().min(3, "Judul modul ajar minimal 3 karakter."),
-  ringkasan: z.string().trim().min(10, "Ringkasan modul minimal 10 karakter."),
+  judul: z.string().trim().min(3, "Judul materi ajar minimal 3 karakter."),
+  ringkasan: z.string().trim().min(10, "Ringkasan materi ajar minimal 10 karakter."),
   sections: z.array(
     z.object({
       id: z.string().min(1),
@@ -506,7 +506,7 @@ export function validateModulPublishEligibility(modul: any): PublishEligibilityR
   if (!modul || typeof modul !== "object") {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
-      "Data modul ajar tidak valid untuk evaluasi kelayakan publikasi.",
+      "Data materi ajar tidak valid untuk evaluasi kelayakan publikasi.",
     );
   }
 
@@ -514,7 +514,7 @@ export function validateModulPublishEligibility(modul: any): PublishEligibilityR
   if (modul.status === "Terbit") {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
-      "Modul ajar ini sudah berstatus Terbit.",
+      "Materi ajar ini sudah berstatus Terbit.",
     );
   }
   if (modul.status !== "Draft") {
@@ -528,7 +528,7 @@ export function validateModulPublishEligibility(modul: any): PublishEligibilityR
   if (Boolean(modul.is_archived || modul.isArchived)) {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
-      "Modul ajar yang diarsipkan tidak dapat dipublikasikan.",
+      "Materi ajar yang diarsipkan tidak dapat dipublikasikan.",
     );
   }
 
@@ -573,10 +573,10 @@ export function validateModulPublishEligibility(modul: any): PublishEligibilityR
   ];
 
   const payloadCandidate = {
-    judul: typeof modul.judul === "string" && modul.judul.trim().length >= 3 ? modul.judul.trim() : "Modul Ajar Pembelajaran",
+    judul: typeof modul.judul === "string" && modul.judul.trim().length >= 3 ? modul.judul.trim() : "Materi Ajar Pembelajaran",
     ringkasan: typeof modul.ringkasan === "string" && modul.ringkasan.trim().length >= 10
       ? modul.ringkasan.trim()
-      : `${modul.judul || "Modul"} merupakan modul ajar terstruktur berbasis Kurikulum Merdeka.`,
+      : `${modul.judul || "Materi Ajar"} merupakan materi ajar terstruktur berbasis Kurikulum Merdeka.`,
     sections: finalSections,
     tujuanPembelajaran: Array.isArray(aiMeta?.tujuanPembelajaran) && aiMeta.tujuanPembelajaran.length > 0
       ? aiMeta.tujuanPembelajaran
@@ -651,7 +651,7 @@ export function validateGroundedModulAjarOutput(output: unknown): GroundedModulA
     const details = parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ");
     throw new AiServiceError(
       AI_ERROR_CODES.PROVIDER_MALFORMED_OUTPUT,
-      `Validasi skema keluaran Modul Ajar AI gagal: ${details}`,
+      `Validasi skema keluaran Materi Ajar AI gagal: ${details}`,
     );
   }
 

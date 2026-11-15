@@ -470,7 +470,7 @@ function ArsipPage() {
           <TabsList className="grid grid-cols-4 w-full sm:w-auto">
             <TabsTrigger value="semua">Semua ({items.length})</TabsTrigger>
             <TabsTrigger value="modul">
-              Materi ({items.filter((i) => i.itemType === "modul").length})
+              Materi Ajar ({items.filter((i) => i.itemType === "modul").length})
             </TabsTrigger>
             <TabsTrigger value="paket_soal">
               Soal ({items.filter((i) => i.itemType === "paket_soal").length})

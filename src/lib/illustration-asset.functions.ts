@@ -249,7 +249,7 @@ export async function executePersistIllustrationAsset(
   };
 
   const pedagogicalMetadata = {
-    title: snapshot?.approvedOutline?.title || "Ilustrasi Modul Ajar",
+    title: snapshot?.approvedOutline?.title || "Ilustrasi Materi Ajar",
     objective: snapshot?.approvedOutline?.objective || "Tujuan visualisasi",
     mainSubject: snapshot?.approvedOutline?.mainSubject || "Materi Pokok",
     educationalFocus: snapshot?.approvedOutline?.educationalFocus || "Konsep Inti",
@@ -364,7 +364,7 @@ export async function executeAttachIllustrationAsset(
   if (context.profile?.role && context.profile.role !== "guru") {
     throw new AiServiceError(
       AI_ERROR_CODES.ROLE_FORBIDDEN,
-      "Akses ditolak: Hanya guru yang dapat menautkan aset ke modul ajar."
+      "Akses ditolak: Hanya guru yang dapat menautkan aset ke materi ajar."
     );
   }
 
@@ -402,14 +402,14 @@ export async function executeAttachIllustrationAsset(
   if (assetRow.lifecycle_status === "soft_deleted") {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
-      "Aset yang telah dihapus tidak dapat ditautkan ke modul ajar."
+      "Aset yang telah dihapus tidak dapat ditautkan ke materi ajar."
     );
   }
 
   if (assetRow.module_id !== data.moduleId) {
     throw new AiServiceError(
       AI_ERROR_CODES.INVALID_REQUEST,
-      "Aset ilustrasi ini dibuat untuk modul ajar yang berbeda."
+      "Aset ilustrasi ini dibuat untuk materi ajar yang berbeda."
     );
   }
 
@@ -437,7 +437,7 @@ export async function executeAttachIllustrationAsset(
     if (!targetSection) {
       throw new AiServiceError(
         AI_ERROR_CODES.INVALID_REQUEST,
-        `Bab / Section dengan ID '${data.sectionId}' tidak ditemukan pada modul ajar.`
+        `Bab / Section dengan ID '${data.sectionId}' tidak ditemukan pada materi ajar.`
       );
     }
     sectionTitle = targetSection.judul;

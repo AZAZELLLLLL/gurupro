@@ -16,9 +16,9 @@ export const PROMPT_REGISTRY: Record<string, RegisteredPrompt> = {
   modul_ajar_grounded_v1: {
     version: "modul_ajar_grounded_v1",
     feature: "modul_ajar",
-    description: "Perancang Modul Ajar SMK Kurikulum Merdeka dengan grounding ketat terhadap sumber.",
-    systemPrompt: `Anda adalah Asisten Ahli Perancang Modul Ajar Kurikulum Merdeka untuk SMK di Indonesia.
-Tugas Anda menyusun Modul Ajar terstruktur yang 100% grounded berdasarkan bukti materi sumber yang diberikan.
+    description: "Perancang Materi Ajar SMK Kurikulum Merdeka dengan grounding ketat terhadap sumber.",
+    systemPrompt: `Anda adalah Asisten Ahli Perancang Materi Ajar Kurikulum Merdeka untuk SMK di Indonesia.
+Tugas Anda menyusun Materi Ajar terstruktur yang 100% grounded berdasarkan bukti materi sumber yang diberikan.
 
 HIERARKI INSTRUKSI (WAJIB DIPATUHI SECARA MUTLAK):
 1. SYSTEM INSTRUCTIONS (Peran & Pedoman Keamanan)
@@ -48,7 +48,7 @@ Kelas: ${ctx.kelas || "Fase E/F"}
 Fase Kurikulum: ${ctx.fase || "E"}
 Alokasi Waktu: ${ctx.alokasiWaktu || "2 x 45 menit"}
 
-Tugas Anda: Susun Modul Ajar lengkap dalam format JSON yang valid sesuai skema kanonikal:
+Tugas Anda: Susun Materi Ajar lengkap dalam format JSON yang valid sesuai skema kanonikal:
 {
   "schemaVersion": "1.0.0",
   "judul": string,
@@ -266,7 +266,7 @@ Tugas Anda: Lakukan audit kualitas semantik dan kembalikan JSON murni dengan for
   illustration_quality_v1: {
     version: "illustration_quality_v1",
     feature: "illustration_quality_evaluation",
-    description: "Auditor & Penilai Mutu Visual AI Ilustrasi Modul Ajar SMK terhadap Outline, Gaya, dan Bukti yang Disetujui Guru.",
+    description: "Auditor & Penilai Mutu Visual AI Ilustrasi Materi Ajar SMK terhadap Outline, Gaya, dan Bukti yang Disetujui Guru.",
     systemPrompt: `Anda adalah Auditor & Penilai Ahli Mutu Ilustrasi Edukatif SMK di Indonesia.
 Tugas Anda mengevaluasi secara objektif, kritis, dan berimbang apakah gambar ilustrasi yang dihasilkan AI memenuhi spesifikasi outline yang telah disetujui guru, mematuhi gaya visual terpilih, akurat secara pedagogis, dan memenuhi kebijakan teks.
 
@@ -439,7 +439,7 @@ ${JSON.stringify(ctx.slidesOutline || [], null, 2)}
 </APPROVED_SPECIFICATION>
 
 <GROUNDED_EVIDENCE>
-${ctx.serializedGroundedEvidence || "Materi rujukan terverifikasi sesuai modul ajar."}
+${ctx.serializedGroundedEvidence || "Materi rujukan terverifikasi sesuai materi ajar."}
 </GROUNDED_EVIDENCE>
 
 Tugas Anda: Susun konten terstruktur lengkap untuk setiap slide dalam format JSON kanonikal:

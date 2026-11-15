@@ -165,7 +165,7 @@ export function generateInitialPresentationOutline(
     purpose: "Membuka sesi pembelajaran, menyampaikan apersepsi dan judul topik.",
     keyPoints: [
       modul.kelas || "Mata Pelajaran & Kelas",
-      modul.ringkasan?.slice(0, 100) || "Pengantar modul pembelajaran interaktif",
+      modul.ringkasan?.slice(0, 100) || "Pengantar materi ajar pembelajaran interaktif",
       "Disusun berbasis Kurikulum Merdeka",
     ],
     contentBlocks: [
@@ -244,7 +244,7 @@ export function generateInitialPresentationOutline(
 
   return {
     title: `Presentasi: ${modul.judul}`,
-    objective: modul.tujuan?.[0] || `Menyajikan modul ${modul.judul} secara interaktif dan komunikatif.`,
+    objective: modul.tujuan?.[0] || `Menyajikan materi ajar ${modul.judul} secara interaktif dan komunikatif.`,
     targetAudience: `Siswa ${modul.kelas || "Sekolah Menengah"}`,
     intendedSlideCount: slides.length,
     presentationStructure: "Pembuka → Tujuan Pembelajaran → Konsep Inti Bertahap → Rangkuman & Refleksi",

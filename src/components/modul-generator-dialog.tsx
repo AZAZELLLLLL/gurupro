@@ -68,7 +68,7 @@ const ICONS: Record<SumberTipeWithExisting, typeof Target> = {
 
 const PLACEHOLDER: Record<SumberTipe, string> = {
   "CP / ATP": "Tempel capaian pembelajaran / alur tujuan pembelajaran di sini… (minimal 50 karakter)",
-  "eBook / Dokumen": "Tempel bagian/bab dari eBook yang ingin dijadikan modul…",
+  "eBook / Dokumen": "Tempel bagian/bab dari eBook yang ingin dijadikan materi ajar…",
   Teks: "Tempel materi, catatan, atau ringkasan bahan ajar Anda… (minimal 50 karakter)",
   "Link Luar": "https://sumber-belajar.example.com/artikel-materi",
 };
@@ -486,7 +486,7 @@ export function ModulGeneratorDialog({
                   stage === "generating" ? "font-semibold text-primary" : "text-muted-foreground"
                 }
               >
-                2. Generasi Modul Berakar Sumber (Kurikulum Merdeka)
+                2. Generasi Materi Ajar Berakar Sumber (Kurikulum Merdeka)
               </span>
               <span
                 className={
@@ -879,7 +879,7 @@ export function ModulGeneratorDialog({
               className="w-full sm:w-auto"
             >
               <Sparkles className="h-4 w-4" />
-              Susun Modul dengan AI
+              Susun Materi Ajar dengan AI
             </Button>
           </DialogFooter>
         ) : null}

@@ -252,7 +252,7 @@ export const analisisSumberTeks = createServerFn({ method: "POST" })
   .inputValidator((input: TextInputPayload) => {
     const raw = String(input?.text ?? "").trim();
     if (raw.length < 50) {
-      throw new Error("Materi teks terlalu pendek (minimal 50 karakter) agar modul dapat disusun secara faktual.");
+      throw new Error("Materi teks terlalu pendek (minimal 50 karakter) agar materi ajar dapat disusun secara faktual.");
     }
     return {
       text: raw,

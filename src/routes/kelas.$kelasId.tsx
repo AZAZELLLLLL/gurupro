@@ -406,13 +406,13 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
 
       await reloadModuls();
       toast.success(
-        `Berhasil mengirim ${suksesCount} modul ke kelas ${kelasDetail.namaKelas}!`,
+        `Berhasil mengirim ${suksesCount} materi ajar ke kelas ${kelasDetail.namaKelas}!`,
       );
       setSelectedModulIds([]);
       setOpenTambahModul(false);
     } catch (err: any) {
-      console.error("[handleKirimModulKeKelas] Gagal mengirim modul:", err);
-      toast.error(err?.message || "Gagal mengirim modul ke kelas.");
+      console.error("[handleKirimModulKeKelas] Gagal mengirim materi ajar:", err);
+      toast.error(err?.message || "Gagal mengirim materi ajar ke kelas.");
     } finally {
       setKirimLoading(false);
     }
@@ -1003,17 +1003,17 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
                                   size="sm"
                                   className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                   onClick={async () => {
-                                    if (confirm(`Lepaskan modul "${modul.judul}" dari kelas ${kelasDetail.namaKelas}?`)) {
+                                    if (confirm(`Lepaskan materi ajar "${modul.judul}" dari kelas ${kelasDetail.namaKelas}?`)) {
                                       await saveModul({
                                         ...modul,
                                         kelasId: undefined,
                                         kelas: "",
                                       });
                                       await reloadModuls();
-                                      toast.success(`Modul dilepas dari kelas ${kelasDetail.namaKelas}.`);
+                                      toast.success(`Materi ajar dilepas dari kelas ${kelasDetail.namaKelas}.`);
                                     }
                                   }}
-                                  title="Lepas modul dari kelas ini"
+                                  title="Lepas materi ajar dari kelas ini"
                                 >
                                   Lepas
                                 </Button>
@@ -2171,7 +2171,7 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
           {loadingModuls ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
               <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
-              <p className="mt-2">Memuat materi pembelajaran kelas…</p>
+              <p className="mt-2">Memuat materi ajar kelas…</p>
             </div>
           ) : classModuls.length === 0 ? (
             <Card className="py-10 text-center">

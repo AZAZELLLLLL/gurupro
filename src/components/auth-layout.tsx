@@ -20,7 +20,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
             Guru fokus mengajar, GuruPro urus adminnya.
           </h2>
           <p className="max-w-md text-sm leading-relaxed text-navy-foreground/75">
-            Daftar, diverifikasi Admin, lalu masuk untuk menyusun modul, soal, dan penilaian dari
+            Daftar, diverifikasi Admin, lalu masuk untuk menyusun materi ajar, soal, dan penilaian dari
             satu dashboard.
           </p>
         </div>
