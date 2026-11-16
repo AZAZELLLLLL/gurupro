@@ -49,6 +49,7 @@ import { getCachedSnapshotsForUser, setCachedSourceSnapshot } from "./ai/source-
 import { AiServiceError, AI_ERROR_CODES, isMissingColumnError } from "./ai/error-taxonomy";
 import { getServerEnv } from "./ai/ai-service";
 import type { Modul } from "./modul-types";
+import type { PaketSoal } from "./soal-types";
 
 const MODEL = "google/gemini-2.5-flash";
 const ENDPOINT = "https://ai.gateway.lovable.dev/v1/chat/completions";

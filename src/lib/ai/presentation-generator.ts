@@ -35,6 +35,7 @@ import {
   type PresentationGenerationParameters,
   type PresentationGenerationRequest,
   type PresentationSlideContent,
+  type SlidePedagogicalType,
   PresentationContentBlockTypeSchema,
   computePresentationGenerationKey,
   validateContinuousSlideOrdering,
