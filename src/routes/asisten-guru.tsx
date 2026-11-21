@@ -64,6 +64,7 @@ import { addPaket } from "@/lib/soal-store";
 import { uid } from "@/lib/cloud-store";
 import type { ModulSection, Slide } from "@/lib/modul-types";
 import type { Soal } from "@/lib/soal-types";
+import { parseQuestionsFromMarkdown } from "@/lib/soal-parser";
 
 export const Route = createFileRoute("/asisten-guru")({
   component: AsistenGuruPage,
@@ -1546,145 +1547,7 @@ export function AsistenGuruPage() {
   const handleSaveToSoal = async (content: string, msgId: string) => {
     setSavingAction(msgId + "-soal");
     try {
-      const normalizedContent = content.replace(/\r\n/g, "\n");
-
-      // Robust question boundary detection:
-      // Matches standard "1. ", bolded "**2. ", headers "### 3. ", "4) ", "Soal 5:", "Nomor 6."
-      const questionHeaderRegex = /(?:^|\n)[ \t]*(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?(\d+)[\.\)]\s*(?:[*_]{1,3})?\s*/gi;
-      const matches: { index: number; num: number; matchStr: string }[] = [];
-      let m: RegExpExecArray | null;
-
-      while ((m = questionHeaderRegex.exec(normalizedContent)) !== null) {
-        matches.push({
-          index: m.index + (m[0].startsWith("\n") ? 1 : 0),
-          num: parseInt(m[1], 10),
-          matchStr: m[0],
-        });
-      }
-
-      const questionBlocks: string[] = [];
-      if (matches.length > 0) {
-        for (let i = 0; i < matches.length; i++) {
-          const start = matches[i].index;
-          const end = i < matches.length - 1 ? matches[i + 1].index : normalizedContent.length;
-          const block = normalizedContent.slice(start, end).trim();
-          if (block) {
-            questionBlocks.push(block);
-          }
-        }
-      } else {
-        // Fallback split on newline followed by digit
-        questionBlocks.push(...normalizedContent.split(/\n(?=\d+\.\s+)/).map(b => b.trim()).filter(Boolean));
-      }
-
-      const parsedSoal: Soal[] = [];
-
-      for (const qBlock of questionBlocks) {
-        // Ekstrak teks pertanyaan sebelum daftar opsi
-        const qMatch = qBlock.match(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*(?:[*_]{1,3})?\s*([\s\S]+?)(?=\n[ \t]*[A-Ea-e][.):\-]\s*|\n[ \t]*Kunci|\n[ \t]*Pembahasan|$)/i);
-
-        let rawPertanyaan = "";
-        if (qMatch) {
-          rawPertanyaan = qMatch[1].trim();
-        } else {
-          const firstLine = qBlock.split("\n")[0] || "";
-          rawPertanyaan = firstLine.replace(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*/i, "").trim();
-        }
-
-        // Antisipasi: jika di dalam teks pertanyaan masih terdapat nomor soal berikutnya (misal soal 3 tergabung ke soal 2)
-        const embeddedSplit = rawPertanyaan.split(/\n+(?=(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*)/i);
-        const cleanPertanyaan = cleanSlideText(embeddedSplit[0] || rawPertanyaan);
-
-        // Ekstrak opsi A, B, C, D
-        const opsiMatches = Array.from(qBlock.matchAll(/^[ \t]*[A-Ea-e][.):\-]\s*(.+)$/gmi));
-
-        let cleanOpsi = opsiMatches.map((o) => cleanSlideText(o[1])).filter(Boolean);
-        if (cleanOpsi.length === 0) {
-          cleanOpsi = ["Opsi A", "Opsi B", "Opsi C", "Opsi D"];
-        } else if (cleanOpsi.length < 4) {
-          const defaults = [
-            "Pernyataan alternatif A",
-            "Pernyataan alternatif B",
-            "Pernyataan alternatif C",
-            "Pernyataan alternatif D",
-          ];
-          while (cleanOpsi.length < 4) {
-            cleanOpsi.push(defaults[cleanOpsi.length]);
-          }
-        } else if (cleanOpsi.length > 4) {
-          cleanOpsi = cleanOpsi.slice(0, 4);
-        }
-
-        // Pastikan opsi unik
-        const seen = new Set<string>();
-        const distinctOpsi = cleanOpsi.map((opt, idx) => {
-          const lower = opt.toLowerCase();
-          if (seen.has(lower)) {
-            const unique = `${opt} (${String.fromCharCode(65 + idx)})`;
-            seen.add(unique.toLowerCase());
-            return unique;
-          }
-          seen.add(lower);
-          return opt;
-        });
-
-        // Ekstrak kunci jawaban
-        const kunciMatch = qBlock.match(/Kunci(?:\s+Jawaban)?\s*[:\-–]?\s*([A-Ea-e])/i);
-        let validKunci = "A";
-        if (kunciMatch) {
-          const char = kunciMatch[1].toUpperCase();
-          if (["A", "B", "C", "D"].includes(char)) {
-            validKunci = char;
-          } else if (char === "E") {
-            validKunci = "D";
-          }
-        }
-
-        // Ekstrak pembahasan
-        const pembMatch = qBlock.match(/Pembahasan\s*[:\-–]?\s*([^\n]+(?:\n[^\n]+)*)/i);
-        const pembahasan = pembMatch
-          ? cleanSlideText(pembMatch[1])
-          : "Pertanyaan asesmen pemahaman konsep materi.";
-
-        if (cleanPertanyaan.length >= 5) {
-          parsedSoal.push({
-            id: uid(),
-            pertanyaan: cleanPertanyaan,
-            jenis: "Pilihan Ganda",
-            opsi: distinctOpsi,
-            kunci: validKunci,
-            penjelasan: pembahasan,
-            tingkat: "Sedang",
-            evidenceIds: ["ev_chat_assistant"],
-          });
-        }
-
-        // Jika ada soal tambahan yang terlanjur menempel di teks pertanyaan, jadikan kartu soal tersendiri
-        if (embeddedSplit.length > 1) {
-          for (let k = 1; k < embeddedSplit.length; k++) {
-            const extraQText = cleanSlideText(
-              embeddedSplit[k].replace(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*/i, "").trim()
-            );
-            if (extraQText.length >= 5) {
-              parsedSoal.push({
-                id: uid(),
-                pertanyaan: extraQText,
-                jenis: "Pilihan Ganda",
-                opsi: [
-                  "Pernyataan analisis konsep pertama",
-                  "Pernyataan analisis konsep kedua",
-                  "Pernyataan analisis konsep ketiga",
-                  "Pernyataan analisis konsep keempat",
-                ],
-                kunci: "A",
-                penjelasan: "Asesmen tindak lanjut konsep materi.",
-                tingkat: "Sedang",
-                evidenceIds: ["ev_chat_assistant"],
-              });
-            }
-          }
-        }
-      }
+      let parsedSoal = parseQuestionsFromMarkdown(content);
 
       if (parsedSoal.length === 0) {
         parsedSoal.push({

@@ -195,7 +195,28 @@ Jika pengguna menyertakan tag "@generate_ilustrasi" atau meminta pembuatan ilust
 3. DI BAGIAN PALING AKHIR JAWABAN, WAJIB sertakan blok kode khusus yang mendeskripsikan prompt visual untuk engine image generator (FLUX.1) dalam format berikut:
 \`\`\`ai_image_prompt
 [Deskripsi prompt visual konkret dalam Bahasa Inggris untuk model difusi FLUX.1. Wajib sebutkan elemen fisik/diagram spesifik: jika materi pemrograman/algoritma, sebutkan flowchart belah ketupat diamond decision node, panah hijau TRUE dan panah merah FALSE ke kotak aksi proses; jika materi biologi/sains, sebutkan penampang diagram berlabel; tata letak clean white background, educational textbook vector infographic, high contrast, no watermark, no logo, no blurry artifacts, no abstract rings]
-\`\`\``;
+\`\`\`
+
+ATURAN KHUSUS PERANCANGAN SOAL & BANK SOAL ASESMEN HOTS (@generate_soal / buat soal / latihan asesmen):
+Bila guru meminta pembuatan soal asesmen (misal: "buatkan soal...", "soal latihan...", "bank soal...", tag @generate_soal, dsb.):
+1. STRUKTUR SETIAP BUTIR SOAL WAJIB TERPISAH DAN JELAS:
+   - Setiap nomor soal WAJIB diawali dengan heading di baris baru tersendiri: \`### Soal [Nomor]: [Teks Pokok Pertanyaan / Studi Kasus]\`
+   - DILARANG KERAS menggabungkan dua nomor soal atau menempelkan soal nomor berikutnya ke dalam satu paragraf yang sama!
+   - Pisahkan setiap nomor soal dengan jarak baris kosong yang jelas.
+2. FORMAT OPSI PILIHAN GANDA (A, B, C, D, E) WAJIB PADA BARIS BARU TERSENDIRI:
+   - Setiap opsi jawaban WAJIB ditulis pada baris baru terpisah menggunakan awalan huruf kapital:
+     A. [Uraian opsi A]
+     B. [Uraian opsi B]
+     C. [Uraian opsi C]
+     D. [Uraian opsi D]
+     E. [Uraian opsi E]
+   - DILARANG KERAS menuliskan opsi secara inline / bersambung dalam satu baris (misal: "A. ... B. ... C. ...")!
+   - Seluruh opsi harus unik dan tidak boleh ada opsi kembar/duplikat.
+3. KUNCI JAWABAN & PEMBAHASAN MENDALAM LANGSUNG DI BAWAH MASING-MASING SOAL:
+   - Langsung sertakan kunci jawaban dan pembahasan mendalam di bawah opsi masing-masing butir soal:
+     Kunci Jawaban: [Huruf Opsi Benar, misal: A]
+     Pembahasan: [Penjelasan mendalam mengapa opsi tersebut benar, analisis konsep, dan alasan mengapa opsi lain salah]
+   - DILARANG menumpuk seluruh kunci jawaban di bagian paling akhir dokumen tanpa pembatas atau menempelkannya ke teks soal terakhir.`;
 
 // ==============================================================================
 // 2. HELPER FUNCTIONS & DIRECT IMAGE GENERATION (FLUX.1 SCHNELL / SERVERLESS)

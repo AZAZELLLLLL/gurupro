@@ -50,6 +50,7 @@ import { AiServiceError, AI_ERROR_CODES, isMissingColumnError } from "./ai/error
 import { getServerEnv } from "./ai/ai-service";
 import type { Modul } from "./modul-types";
 import type { PaketSoal } from "./soal-types";
+import { sanitizeAndUnbundleSoalList } from "./soal-parser";
 
 const MODEL = "google/gemini-2.5-flash";
 const ENDPOINT = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -914,40 +915,8 @@ export function validateAndNormalizeSoal(rawList: any[]): SoalAi[] {
   const seenQuestions = new Set<string>();
 
   // 1. Unbundle / pisahkan jika ada soal yang tergabung ke dalam nomor sebelumnya
-  const expandedList: any[] = [];
-  for (const item of rawList) {
-    if (!item || typeof item !== "object") continue;
-    const rawP = String(item.pertanyaan ?? "").trim();
-    if (!rawP) continue;
-
-    const embeddedSplit = rawP.split(/\n+(?=(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*)/i);
-    if (embeddedSplit.length > 1) {
-      // Pertanyaan pertama
-      const firstQ = embeddedSplit[0].replace(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*/i, "").trim();
-      expandedList.push({
-        ...item,
-        pertanyaan: firstQ || embeddedSplit[0].trim(),
-      });
-      // Pertanyaan berikutnya yang terpecah
-      for (let s = 1; s < embeddedSplit.length; s++) {
-        const nextQ = embeddedSplit[s].replace(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*/i, "").trim();
-        if (nextQ.length >= 5) {
-          expandedList.push({
-            pertanyaan: nextQ,
-            jenis: item.jenis || "Pilihan Ganda",
-            opsi: item.opsi || ["Pernyataan A", "Pernyataan B", "Pernyataan C", "Pernyataan D"],
-            kunci: "A",
-          });
-        }
-      }
-    } else {
-      const cleanP = rawP.replace(/^(?:#{1,6}\s+|[*_]{1,3}\s*)?(?:Soal\s+|Nomor\s+)?\d+[\.\)]\s*/i, "").trim();
-      expandedList.push({
-        ...item,
-        pertanyaan: cleanP || rawP,
-      });
-    }
-  }
+  const safeItems: any[] = (rawList || []).filter((it) => it && typeof it === "object");
+  const expandedList = sanitizeAndUnbundleSoalList(safeItems as any);
 
   for (const item of expandedList) {
     if (!item || typeof item !== "object") continue;
@@ -996,7 +965,7 @@ export function validateAndNormalizeSoal(rawList: any[]): SoalAi[] {
         }
       }
 
-      // Harus tepat 4 opsi
+      // Harus minimal 4 opsi
       if (uniqueOpsi.length < 4) continue;
       const opsi = uniqueOpsi.slice(0, 4);
 

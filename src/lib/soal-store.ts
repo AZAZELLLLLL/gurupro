@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createCloudStore, uid } from "./cloud-store";
 import { isMissingColumnError } from "./ai/error-taxonomy";
 import type { PaketSoal, Soal, SoalStatus } from "./soal-types";
+import { sanitizeAndUnbundleSoalList } from "./soal-parser";
 
 type Row = {
   id: string;
@@ -31,7 +32,7 @@ function toPaket(row: Row): PaketSoal {
     modulId: row.modul_id ?? undefined,
     status: (row.status as SoalStatus) ?? "Draft",
     kelas: row.kelas ?? [],
-    soal: (Array.isArray(row.soal) ? row.soal : []) as Soal[],
+    soal: sanitizeAndUnbundleSoalList((Array.isArray(row.soal) ? row.soal : []) as Soal[]),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     isArchived: Boolean(row.is_archived),
@@ -51,7 +52,7 @@ function toRow(paket: Partial<PaketSoal>) {
   if (paket.modulId !== undefined) row["modul_id"] = paket.modulId ?? null;
   if (paket.status !== undefined) row["status"] = paket.status;
   if (paket.kelas !== undefined) row["kelas"] = paket.kelas;
-  if (paket.soal !== undefined) row["soal"] = paket.soal;
+  if (paket.soal !== undefined) row["soal"] = Array.isArray(paket.soal) ? sanitizeAndUnbundleSoalList(paket.soal) : [];
   if (paket.isArchived !== undefined) row["is_archived"] = paket.isArchived;
   if (paket.archivedAt !== undefined) row["archived_at"] = paket.archivedAt;
   if (paket.archivedBy !== undefined) row["archived_by"] = paket.archivedBy;

@@ -78,6 +78,7 @@ import { useTahunAjaran } from "@/lib/tahun-ajaran-store";
 import { uid } from "@/lib/cloud-store";
 
 import { INSTRUKSI_AI } from "@/lib/soal-ai";
+import { sanitizeAndUnbundleSoalList } from "@/lib/soal-parser";
 import { generateSoalAi, reviseSoalAi, saveQuestionDraftServerFn } from "@/lib/ai.functions";
 import type { QuestionAiMetadata } from "@/lib/ai/question-contract";
 import { supabase } from "@/integrations/supabase/client";
@@ -354,17 +355,18 @@ function SoalPage() {
   };
 
   const handleOpenReview = (p: PaketSoal) => {
+    const cleanSoal = sanitizeAndUnbundleSoalList(p.soal);
     setJudul(p.judul);
     setTopik(p.topik);
     setModulId(p.modulId ?? "");
-    setDraftSoal(JSON.parse(JSON.stringify(p.soal)));
+    setDraftSoal(cleanSoal);
     setPaketId(p.id);
-    setActivePaket(p);
+    setActivePaket({ ...p, soal: cleanSoal });
     setAiMetadata((p.ai_metadata as any) || null);
     setInitialSnapshot({
       judul: p.judul,
       topik: p.topik,
-      soal: JSON.parse(JSON.stringify(p.soal)),
+      soal: JSON.parse(JSON.stringify(cleanSoal)),
     });
     setEditId(null);
     setSaveState("clean");
