@@ -17,12 +17,15 @@ import {
   GraduationCap,
   Link2,
   Loader2,
+  MoreVertical,
+  Pencil,
   Plus,
   RefreshCw,
   School,
   Search,
   Share2,
   Sparkles,
+  Trash2,
   UserCheck,
   Users,
   X,
@@ -40,10 +43,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useTahunAjaran } from "@/lib/tahun-ajaran-store";
 import {
   Table,
   TableBody,
@@ -67,6 +86,9 @@ import { initials, useAuth } from "@/lib/auth-store";
 import {
   getKelasById,
   getKelasBySiswa,
+  editKelas,
+  hapusKelas,
+  perbaruiKodeKelas,
   setujuiAnggota,
   tolakAnggota,
   useKelas,
@@ -169,6 +191,105 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
   const [targetTolak, setTargetTolak] = useState<AnggotaKelas | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedKode, setCopiedKode] = useState(false);
+
+  const currentGuruId = user?.id || profile.id;
+  const { availableYears } = useTahunAjaran(currentGuruId);
+
+  // State Edit Kelas
+  const [openEditModal, setOpenEditModal] = useState(false);
+  const [editNamaKelas, setEditNamaKelas] = useState("");
+  const [editTingkat, setEditTingkat] = useState("XI");
+  const [editMapel, setEditMapel] = useState("");
+  const [editTahunAjaran, setEditTahunAjaran] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // State Hapus Kelas
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [deletingKelas, setDeletingKelas] = useState(false);
+
+  // State Regenerasi Kode Kelas
+  const [openRegenerateDialog, setOpenRegenerateDialog] = useState(false);
+  const [regeneratingKode, setRegeneratingKode] = useState(false);
+
+  const handleOpenEditModal = () => {
+    if (!kelasDetail) return;
+    setEditNamaKelas(kelasDetail.namaKelas);
+    setEditTingkat(kelasDetail.tingkat);
+    setEditMapel(kelasDetail.mapel);
+    setEditTahunAjaran(kelasDetail.tahunAjaran);
+    setOpenEditModal(true);
+  };
+
+  const handleSaveEditKelas = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!kelasDetail) return;
+    if (!editNamaKelas.trim()) {
+      toast.error("Nama kelas wajib diisi (misal: XI RPL 1).");
+      return;
+    }
+    if (!editTingkat.trim()) {
+      toast.error("Pilih tingkat / jenjang kelas.");
+      return;
+    }
+    if (!editMapel.trim()) {
+      toast.error("Mata pelajaran wajib diisi.");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const updated = await editKelas(kelasDetail.id, {
+        namaKelas: editNamaKelas.trim(),
+        tingkat: editTingkat.trim(),
+        mapel: editMapel.trim(),
+        tahunAjaran: editTahunAjaran.trim() || kelasDetail.tahunAjaran,
+      });
+      setKelasDetail(updated);
+      toast.success(`Kelas ${updated.tingkat} ${updated.namaKelas} berhasil diperbarui!`);
+      setOpenEditModal(false);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal memperbarui data kelas.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleConfirmHapusKelas = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!kelasDetail) return;
+    setDeletingKelas(true);
+    try {
+      await hapusKelas(kelasDetail.id);
+      toast.success(`Kelas ${kelasDetail.tingkat} ${kelasDetail.namaKelas} berhasil dihapus.`);
+      setOpenDeleteDialog(false);
+      await refresh();
+      void navigate({ to: "/kelas" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus kelas.");
+    } finally {
+      setDeletingKelas(false);
+    }
+  };
+
+  const handleConfirmRegenerateKode = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!kelasDetail) return;
+    setRegeneratingKode(true);
+    try {
+      const updated = await perbaruiKodeKelas(kelasDetail.id);
+      if (updated) {
+        setKelasDetail(updated);
+        toast.success(`Kode kelas berhasil diperbarui menjadi ${updated.kodeKelas}`);
+      }
+      setOpenRegenerateDialog(false);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal memperbarui kode kelas.");
+    } finally {
+      setRegeneratingKode(false);
+    }
+  };
 
   // Store data untuk tab modul dan tugas
   const allModuls = useModuls();
@@ -658,6 +779,43 @@ function GuruKelasDetailMonitoringView({ kelasId }: { kelasId: string }) {
             {copiedLink ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
             Salin Link Undangan
           </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleOpenEditModal}
+            className="h-9 gap-1.5 font-medium shadow-xs"
+          >
+            <Pencil className="h-4 w-4 text-primary" />
+            Edit Kelas
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-9 w-9">
+                <MoreVertical className="h-4 w-4" />
+                <span className="sr-only">Menu Opsi Kelas</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={handleOpenEditModal}>
+                <Pencil className="mr-2 h-4 w-4 text-primary" />
+                <span>Edit Data Kelas</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setOpenRegenerateDialog(true)}>
+                <RefreshCw className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>Perbarui Kode Kelas</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                onClick={() => setOpenDeleteDialog(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span>Hapus Kelas</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -2486,6 +2644,208 @@ function SiswaKelasDetailView({ kelasId }: { kelasId: string }) {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Dialog Edit Data Kelas */}
+      <Dialog
+        open={openEditModal}
+        onOpenChange={(o) => !o && !savingEdit && setOpenEditModal(false)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleSaveEditKelas}>
+            <DialogHeader>
+              <DialogTitle className="font-display text-navy">Edit Data Kelas</DialogTitle>
+              <DialogDescription>
+                Perbarui nama rombel, tingkat jenjang, tahun ajaran, atau mata pelajaran kelas ini.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="detailEditNamaKelas">Nama Kelas</Label>
+                <Input
+                  id="detailEditNamaKelas"
+                  placeholder="Contoh: XI RPL 1 atau IPA 2"
+                  value={editNamaKelas}
+                  onChange={(e) => setEditNamaKelas(e.target.value)}
+                  required
+                  disabled={savingEdit}
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="detailEditTingkat">Tingkat / Jenjang</Label>
+                  <Select value={editTingkat} onValueChange={setEditTingkat} disabled={savingEdit}>
+                    <SelectTrigger id="detailEditTingkat">
+                      <SelectValue placeholder="Pilih tingkat" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="X">Kelas X</SelectItem>
+                      <SelectItem value="XI">Kelas XI</SelectItem>
+                      <SelectItem value="XII">Kelas XII</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="detailEditTahunAjaran">Tahun Ajaran</Label>
+                  {availableYears.length > 0 ? (
+                    <Select
+                      value={editTahunAjaran}
+                      onValueChange={setEditTahunAjaran}
+                      disabled={savingEdit}
+                    >
+                      <SelectTrigger id="detailEditTahunAjaran">
+                        <SelectValue placeholder="Pilih tahun ajaran" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableYears.map((y) => (
+                          <SelectItem key={y.id || y.tahun} value={y.tahun}>
+                            {y.tahun} {y.isActive ? "(Aktif)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id="detailEditTahunAjaran"
+                      placeholder="2026/2027"
+                      value={editTahunAjaran}
+                      onChange={(e) => setEditTahunAjaran(e.target.value)}
+                      required
+                      disabled={savingEdit}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="detailEditMapel">Mata Pelajaran</Label>
+                <Input
+                  id="detailEditMapel"
+                  placeholder="Contoh: Matematika, Pemrograman Web"
+                  value={editMapel}
+                  onChange={(e) => setEditMapel(e.target.value)}
+                  required
+                  disabled={savingEdit}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpenEditModal(false)}
+                disabled={savingEdit}
+              >
+                Batal
+              </Button>
+              <Button type="submit" disabled={savingEdit} className="gap-1.5">
+                {savingEdit ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Menyimpan…</span>
+                  </>
+                ) : (
+                  "Simpan Perubahan"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog Hapus Kelas */}
+      <AlertDialog
+        open={openDeleteDialog}
+        onOpenChange={(o) => !o && !deletingKelas && setOpenDeleteDialog(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Hapus Kelas {kelasDetail.tingkat} {kelasDetail.namaKelas}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 text-left">
+              <span>
+                Apakah Anda yakin ingin menghapus kelas{" "}
+                <strong className="text-foreground">
+                  &ldquo;{kelasDetail.tingkat} {kelasDetail.namaKelas}&rdquo;
+                </strong>{" "}
+                ({kelasDetail.mapel} · Tahun Ajaran {kelasDetail.tahunAjaran})?
+              </span>
+              <span className="block rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive leading-relaxed">
+                ⚠️ <strong>Perhatian:</strong> Menghapus kelas ini akan menghapus riwayat keanggotaan
+                siswa ({aktifList.length} siswa aktif) dan seluruh penugasan yang terhubung dengan kelas ini secara permanen. Tindakan ini tidak dapat dibatalkan.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingKelas}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmHapusKelas}
+              disabled={deletingKelas}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-medium gap-1.5"
+            >
+              {deletingKelas ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Menghapus…</span>
+                </>
+              ) : (
+                "Ya, Hapus Kelas Ini"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog Perbarui Kode Kelas */}
+      <AlertDialog
+        open={openRegenerateDialog}
+        onOpenChange={(o) => !o && !regeneratingKode && setOpenRegenerateDialog(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-navy flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-primary" />
+              Perbarui Kode Kelas {kelasDetail.namaKelas}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 text-left">
+              <span>
+                Kode kelas saat ini adalah{" "}
+                <code className="font-mono font-bold text-primary">
+                  {kelasDetail.kodeKelas}
+                </code>
+                . Kode baru acak akan digenerate secara otomatis.
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Siswa yang sudah bergabung tetap menjadi anggota kelas. Namun siswa baru harus
+                menggunakan kode yang baru untuk mendaftar.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={regeneratingKode}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmRegenerateKode}
+              disabled={regeneratingKode}
+              className="font-medium gap-1.5"
+            >
+              {regeneratingKode ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Memperbarui…</span>
+                </>
+              ) : (
+                "Ya, Perbarui Kode"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -198,7 +198,11 @@ export async function buatKelas(data: {
 
 // Regenerate class code in Supabase
 export async function perbaruiKodeKelas(id: string): Promise<Kelas | null> {
-  const target = cachedKelasList.find((k) => k.id === id);
+  let target = cachedKelasList.find((k) => k.id === id);
+  if (!target) {
+    const fetched = await getKelasById(id);
+    if (fetched) target = fetched;
+  }
   if (!target) return null;
 
   const newKode = generateKodeKelas(target.tingkat, target.mapel);
@@ -225,9 +229,79 @@ export async function perbaruiKodeKelas(id: string): Promise<Kelas | null> {
     createdAt: updated.created_at,
   };
 
-  cachedKelasList = cachedKelasList.map((k) => (k.id === id ? updatedKelas : k));
+  cachedKelasList = cachedKelasList.some((k) => k.id === id)
+    ? cachedKelasList.map((k) => (k.id === id ? updatedKelas : k))
+    : [updatedKelas, ...cachedKelasList];
   emitChange();
   return updatedKelas;
+}
+
+export interface EditKelasInput {
+  namaKelas: string;
+  tingkat: string;
+  mapel: string;
+  tahunAjaran: string;
+}
+
+// Update existing class in Supabase
+export async function editKelas(id: string, data: EditKelasInput): Promise<Kelas> {
+  if (!id) throw new Error("ID kelas wajib disertakan.");
+  if (!data.namaKelas?.trim()) throw new Error("Nama kelas wajib diisi.");
+  if (!data.tingkat?.trim()) throw new Error("Tingkat kelas wajib diisi.");
+  if (!data.mapel?.trim()) throw new Error("Mata pelajaran wajib diisi.");
+  if (!data.tahunAjaran?.trim()) throw new Error("Tahun ajaran wajib diisi.");
+
+  const { data: updated, error } = await supabase
+    .from("kelas")
+    .update({
+      nama_kelas: data.namaKelas.trim(),
+      tingkat: data.tingkat.trim(),
+      mapel: data.mapel.trim(),
+      tahun_ajaran: data.tahunAjaran.trim(),
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error || !updated) {
+    throw new Error(error?.message || "Gagal memperbarui data kelas.");
+  }
+
+  const updatedKelas: Kelas = {
+    id: updated.id,
+    namaKelas: updated.nama_kelas,
+    tingkat: updated.tingkat,
+    mapel: updated.mapel,
+    tahunAjaran: updated.tahun_ajaran,
+    guruId: updated.guru_id,
+    kodeKelas: updated.kode_kelas,
+    createdAt: updated.created_at,
+  };
+
+  cachedKelasList = cachedKelasList.some((k) => k.id === id)
+    ? cachedKelasList.map((k) => (k.id === id ? updatedKelas : k))
+    : [updatedKelas, ...cachedKelasList];
+  emitChange();
+  return updatedKelas;
+}
+
+// Delete class from Supabase
+export async function hapusKelas(id: string): Promise<boolean> {
+  if (!id) throw new Error("ID kelas wajib disertakan.");
+
+  const { error } = await supabase
+    .from("kelas")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    throw new Error(error.message || "Gagal menghapus kelas dari database.");
+  }
+
+  cachedKelasList = cachedKelasList.filter((k) => k.id !== id);
+  cachedAnggotaList = cachedAnggotaList.filter((a) => a.kelasId !== id);
+  emitChange();
+  return true;
 }
 
 export async function getKelasByKode(kodeKelas: string): Promise<Kelas | null> {

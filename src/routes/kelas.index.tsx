@@ -10,9 +10,13 @@ import {
   GraduationCap,
   Link2,
   Loader2,
+  MoreVertical,
+  Pencil,
   Plus,
+  RefreshCw,
   School,
   Sparkles,
+  Trash2,
   Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -39,6 +43,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -52,6 +73,9 @@ import { useAuth } from "@/lib/auth-store";
 import {
   ajukanGabung,
   buatKelas,
+  editKelas,
+  hapusKelas,
+  perbaruiKodeKelas,
   getKelasBySiswa,
   useKelas,
   type Kelas,
@@ -105,6 +129,98 @@ function KelasListPage() {
   // Status copy feedback per kelas id
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
+
+  // Dialog edit kelas
+  const [editingKelas, setEditingKelas] = useState<Kelas | null>(null);
+  const [editNamaKelas, setEditNamaKelas] = useState("");
+  const [editTingkat, setEditTingkat] = useState("XI");
+  const [editMapel, setEditMapel] = useState("");
+  const [editTahunAjaran, setEditTahunAjaran] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Dialog hapus kelas
+  const [targetHapus, setTargetHapus] = useState<Kelas | null>(null);
+  const [deletingKelas, setDeletingKelas] = useState(false);
+
+  // Dialog perbarui kode kelas
+  const [targetRegenerate, setTargetRegenerate] = useState<Kelas | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+
+  const handleOpenEdit = (k: Kelas) => {
+    setEditingKelas(k);
+    setEditNamaKelas(k.namaKelas);
+    setEditTingkat(k.tingkat);
+    setEditMapel(k.mapel);
+    setEditTahunAjaran(k.tahunAjaran);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingKelas) return;
+    if (!editNamaKelas.trim()) {
+      toast.error("Nama kelas wajib diisi (misal: XI RPL 1).");
+      return;
+    }
+    if (!editTingkat.trim()) {
+      toast.error("Pilih tingkat / jenjang kelas.");
+      return;
+    }
+    if (!editMapel.trim()) {
+      toast.error("Mata pelajaran wajib diisi.");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const updated = await editKelas(editingKelas.id, {
+        namaKelas: editNamaKelas.trim(),
+        tingkat: editTingkat.trim(),
+        mapel: editMapel.trim(),
+        tahunAjaran: editTahunAjaran.trim() || editingKelas.tahunAjaran,
+      });
+      toast.success(`Kelas ${updated.tingkat} ${updated.namaKelas} berhasil diperbarui!`);
+      setEditingKelas(null);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal memperbarui data kelas.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleConfirmHapus = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!targetHapus) return;
+    setDeletingKelas(true);
+    try {
+      await hapusKelas(targetHapus.id);
+      toast.success(`Kelas ${targetHapus.tingkat} ${targetHapus.namaKelas} berhasil dihapus.`);
+      setTargetHapus(null);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus kelas.");
+    } finally {
+      setDeletingKelas(false);
+    }
+  };
+
+  const handleConfirmRegenerate = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!targetRegenerate) return;
+    setRegenerating(true);
+    try {
+      const updated = await perbaruiKodeKelas(targetRegenerate.id);
+      if (updated) {
+        toast.success(`Kode kelas berhasil diperbarui menjadi ${updated.kodeKelas}`);
+      }
+      setTargetRegenerate(null);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal memperbarui kode kelas.");
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   if (ready && profile.role === "siswa") {
     return <SiswaKelasListView />;
@@ -364,13 +480,51 @@ function KelasListPage() {
                 <div>
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
-                      <Badge
-                        variant="secondary"
-                        className="bg-primary-soft/80 font-medium text-primary hover:bg-primary-soft"
-                      >
-                        {kelas.tingkat} · {kelas.mapel}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">{kelas.tahunAjaran}</span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge
+                          variant="secondary"
+                          className="bg-primary-soft/80 font-medium text-primary hover:bg-primary-soft"
+                        >
+                          {kelas.tingkat} · {kelas.mapel}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{kelas.tahunAjaran}</span>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">Opsi Kelas</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem asChild>
+                            <Link to="/kelas/$kelasId" params={{ kelasId: kelas.id }}>
+                              <School className="mr-2 h-4 w-4" />
+                              <span>Buka Monitoring</span>
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenEdit(kelas)}>
+                            <Pencil className="mr-2 h-4 w-4 text-primary" />
+                            <span>Edit Data Kelas</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setTargetRegenerate(kelas)}>
+                            <RefreshCw className="mr-2 h-4 w-4 text-muted-foreground" />
+                            <span>Perbarui Kode</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                            onClick={() => setTargetHapus(kelas)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Hapus Kelas</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <CardTitle className="mt-2 font-display text-xl font-bold tracking-tight text-navy">
                       {kelas.namaKelas}
@@ -438,15 +592,24 @@ function KelasListPage() {
                   </CardContent>
                 </div>
 
-                <CardFooter className="border-t border-border/60 bg-card/50 pt-3">
+                <CardFooter className="border-t border-border/60 bg-card/50 pt-3 flex items-center justify-between gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => handleOpenEdit(kelas)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    <span>Edit</span>
+                  </Button>
                   <Button
                     asChild
-                    variant="outline"
-                    className="w-full justify-between font-medium group-hover:border-primary/50 group-hover:bg-primary group-hover:text-primary-foreground"
+                    size="sm"
+                    className="flex-1 justify-center gap-1.5 font-medium group-hover:shadow-xs"
                   >
                     <Link to="/kelas/$kelasId" params={{ kelasId: kelas.id }}>
                       <span>Buka Kelas</span>
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
                     </Link>
                   </Button>
                 </CardFooter>
@@ -455,6 +618,208 @@ function KelasListPage() {
           })}
         </div>
       )}
+
+      {/* Dialog Edit Data Kelas */}
+      <Dialog
+        open={editingKelas !== null}
+        onOpenChange={(o) => !o && !savingEdit && setEditingKelas(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleSaveEdit}>
+            <DialogHeader>
+              <DialogTitle className="font-display text-navy">Edit Data Kelas</DialogTitle>
+              <DialogDescription>
+                Perbarui nama rombel, tingkat jenjang, tahun ajaran, atau mata pelajaran kelas.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="editNamaKelas">Nama Kelas</Label>
+                <Input
+                  id="editNamaKelas"
+                  placeholder="Contoh: XI RPL 1 atau IPA 2"
+                  value={editNamaKelas}
+                  onChange={(e) => setEditNamaKelas(e.target.value)}
+                  required
+                  disabled={savingEdit}
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="editTingkat">Tingkat / Jenjang</Label>
+                  <Select value={editTingkat} onValueChange={setEditTingkat} disabled={savingEdit}>
+                    <SelectTrigger id="editTingkat">
+                      <SelectValue placeholder="Pilih tingkat" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="X">Kelas X</SelectItem>
+                      <SelectItem value="XI">Kelas XI</SelectItem>
+                      <SelectItem value="XII">Kelas XII</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="editTahunAjaran">Tahun Ajaran</Label>
+                  {availableYears.length > 0 ? (
+                    <Select
+                      value={editTahunAjaran}
+                      onValueChange={setEditTahunAjaran}
+                      disabled={savingEdit}
+                    >
+                      <SelectTrigger id="editTahunAjaran">
+                        <SelectValue placeholder="Pilih tahun ajaran" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableYears.map((y) => (
+                          <SelectItem key={y.id || y.tahun} value={y.tahun}>
+                            {y.tahun} {y.isActive ? "(Aktif)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id="editTahunAjaran"
+                      placeholder="2026/2027"
+                      value={editTahunAjaran}
+                      onChange={(e) => setEditTahunAjaran(e.target.value)}
+                      required
+                      disabled={savingEdit}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="editMapel">Mata Pelajaran</Label>
+                <Input
+                  id="editMapel"
+                  placeholder="Contoh: Matematika, Pemrograman Web"
+                  value={editMapel}
+                  onChange={(e) => setEditMapel(e.target.value)}
+                  required
+                  disabled={savingEdit}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditingKelas(null)}
+                disabled={savingEdit}
+              >
+                Batal
+              </Button>
+              <Button type="submit" disabled={savingEdit} className="gap-1.5">
+                {savingEdit ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Menyimpan…</span>
+                  </>
+                ) : (
+                  "Simpan Perubahan"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog Hapus Kelas */}
+      <AlertDialog
+        open={targetHapus !== null}
+        onOpenChange={(o) => !o && !deletingKelas && setTargetHapus(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Hapus Kelas {targetHapus?.tingkat} {targetHapus?.namaKelas}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 text-left">
+              <span>
+                Apakah Anda yakin ingin menghapus kelas{" "}
+                <strong className="text-foreground">
+                  &ldquo;{targetHapus?.tingkat} {targetHapus?.namaKelas}&rdquo;
+                </strong>{" "}
+                ({targetHapus?.mapel} · Tahun Ajaran {targetHapus?.tahunAjaran})?
+              </span>
+              <span className="block rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive leading-relaxed">
+                ⚠️ <strong>Perhatian:</strong> Menghapus kelas ini akan menghapus riwayat keanggotaan
+                siswa dan penugasan yang terdaftar di kelas ini secara permanen. Tindakan ini tidak dapat dibatalkan.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingKelas}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmHapus}
+              disabled={deletingKelas}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-medium gap-1.5"
+            >
+              {deletingKelas ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Menghapus…</span>
+                </>
+              ) : (
+                "Ya, Hapus Kelas Ini"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog Perbarui Kode Kelas */}
+      <AlertDialog
+        open={targetRegenerate !== null}
+        onOpenChange={(o) => !o && !regenerating && setTargetRegenerate(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-navy flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-primary" />
+              Perbarui Kode Kelas {targetRegenerate?.namaKelas}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 text-left">
+              <span>
+                Kode kelas saat ini adalah{" "}
+                <code className="font-mono font-bold text-primary">
+                  {targetRegenerate?.kodeKelas}
+                </code>
+                . Kode baru acak akan digenerate secara otomatis.
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Siswa yang sudah bergabung tetap menjadi anggota kelas. Namun siswa baru harus
+                menggunakan kode yang baru untuk mendaftar.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={regenerating}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmRegenerate}
+              disabled={regenerating}
+              className="font-medium gap-1.5"
+            >
+              {regenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Memperbarui…</span>
+                </>
+              ) : (
+                "Ya, Perbarui Kode"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
